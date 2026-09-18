@@ -269,6 +269,7 @@ function updateClock(){
   if(!d){el.textContent='';return}
   const sec=Math.max(0,Math.ceil((d-Date.now())/1000));
   el.textContent=sec?Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'):'abgelaufen';
+  const timeout=$('#timeoutRoom');if(timeout)timeout.disabled=Date.now()<d;
 }
 
 async function roomAction(action,arg={}){
@@ -348,19 +349,20 @@ function renderRoom(){
           return `<button data-district="${i}" ${own?'disabled':''}><b>${safe(d.name)}</b><small>${own?'Dein Revier':owner?'Besetzt: '+safe(owner.name)+' · Angriff $150':'Frei · Übernahme $350'}</small></button>`;
         }).join('')}
       </div></div>`;
-    if(g.deadline&&Date.now()>=g.deadline)body+='<button id="timeoutRoom" class="online-wide">Abgelaufenen Zug weitergeben</button>';
+    body+='<button id="timeoutRoom" class="online-wide" '+(g.deadline&&Date.now()<g.deadline?'disabled':'')+'>Abgelaufenen Zug weitergeben</button>';
   }else{
     const winners=(g.winners||[]).map(id=>g.players.find(p=>p.id===id)?.name).filter(Boolean);
     body+=`<div class="online-card"><h3>Partie beendet</h3><p>${winners.length?'Sieger: <b>'+winners.map(safe).join(', ')+'</b>':'Runde beendet.'}</p><p>Wertung: Punkte × 100 + Bargeld − Schulden + $500 je Revier.</p></div>`;
   }
 
   body+=`<div class="online-card"><h3>Chronik</h3><div class="mp-log">${g.log.map(x=>'<div>'+safe(x)+'</div>').join('')}</div></div>
-    <div class="online-row"><button id="roomBack">← Online-Menü</button><button id="roomLeave">${g.status==='playing'?'Aufgeben':'Runde verlassen'}</button></div>`;
+    <div class="online-row"><button id="roomBack">← Online-Menü</button><button id="roomRefresh">Jetzt aktualisieren</button><button id="roomLeave">${g.status==='playing'?'Aufgeben':'Runde verlassen'}</button></div>`;
 
   onlineShow('Mehrspieler',body);
   updateClock();
   $('#copyRoom').onclick=()=>copyText(r.code);
   $('#roomBack').onclick=()=>{stopRoom();activeRoom=null;openHub()};
+  $('#roomRefresh').onclick=pollRoom;
   $('#roomLeave').onclick=leaveRoom;
   if($('#startRoom'))$('#startRoom').onclick=()=>roomAction('start');
   if($('#timeoutRoom'))$('#timeoutRoom').onclick=()=>roomAction('timeout');
