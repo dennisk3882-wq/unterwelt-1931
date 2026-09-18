@@ -32,10 +32,10 @@ test('police persists and blocks movement','S.control={price:200};save();let loc
 test('jail sentence expires','S.crew[0].jailed=true;S.crew[0].jailMonths=1;nextMonth();if(S.crew[0].jailed)throw Error("jail")');
 test('ace scoring','if(total([1,1,9])!==21||total([1,13,5])!==16)throw Error("cards")');
 
-new vm.Script(fs.readFileSync('dist/online.js','utf8'));
-assert.match(fs.readFileSync('dist/index.html','utf8'),/id="online"/);
+new vm.Script(fs.readFileSync('dist/online.js','utf8'));new vm.Script(fs.readFileSync('dist/menu.js','utf8'));
+assert.match(fs.readFileSync('dist/index.html','utf8'),/id="online"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/id="mainMenu"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/id="gameMenu"/);
 assert.match(fs.readFileSync('dist/sw.js','utf8'),/online\.js/);
-assert.match(fs.readFileSync('dist/sw.js','utf8'),/unterwelt-1931-v9/);
+assert.match(fs.readFileSync('dist/sw.js','utf8'),/unterwelt-1931-v10/);
 assert.match(fs.readFileSync('dist/index.html','utf8'),/JANUAR 1931/);
 assert.match(fs.readFileSync('dist/rules.js','utf8'),/Gameplay revision 8/);
 assert.match(fs.readFileSync('dist/rules.js','utf8'),/Kreditgeschäft verkaufen/);
