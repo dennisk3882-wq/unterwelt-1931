@@ -1,4 +1,4 @@
-const CACHE='unterwelt-1931-v6',FILES=['./','index.html','style.css','rules.css','online.css','app.js','rules.js','map-loader.js','online.js','assets/map/map.part0.b64','assets/map/map.part1.b64','assets/map/map.part2.b64','assets/map/map.part3.b64','assets/map/map.part4.b64','assets/map/map.part5.b64','assets/map/map.part6.b64','manifest.webmanifest','icon-192.png','icon-512.png'];
+const CACHE='unterwelt-1931-v7',FILES=['./','index.html','style.css','rules.css','online.css','app.js','rules.js','online.js','assets/map/unterwelt-city-map.webp','manifest.webmanifest','icon-192.png','icon-512.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('unterwelt-1931-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{if(e.request.method==='GET'&&new URL(e.request.url).origin===self.location.origin)e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)))});

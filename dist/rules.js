@@ -64,7 +64,7 @@ nextMonth=function(){if(blocked())return;let wages=Math.max(0,S.crew.length-1)*6
 endScreen=function(){show(S.over==='win'?'Chef der Unterwelt!':'Kampagne beendet',`<p>${esc(rankName())} · ${S.score} Punkte · ${cash(S.cash)}. ${S.debt>15000?'Überschuldung.':''}</p><button id="restart">Neues Spiel</button>`);$('#restart').onclick=()=>restart()};
 function restart(){if(!confirm('Neu beginnen? Der aktuelle Stand wird vorher als Sicherung auf diesem Gerät behalten.'))return;localStorage.setItem('uw1931-backup',JSON.stringify(S));S=upgrade(fresh());selected=S.loc;modal.close();if(battle.open)battle.close();save()}
 function help(){show('So spielst du',`<p>Jeder Monat gibt dir 12 Aktionspunkte. Reisen kostet je nach Entfernung Wegepunkte. Kaufe zuerst Ausrüstung und ein Zimmer, dann rekrutiere deine Bande.</p><p>Unterkünfte: 4 / 7 / 10 Plätze. Löhne: $60 je zusätzlichem Mitglied und Monat. Schulden wachsen monatlich um 8 %. Über $15.000 endet die Kampagne.</p><p>Erreiche bis Januar 1928 100 Punkte und erledige beide Spezialaufträge. Hinweise bekommst du in der Kneipe. Geschick verbessert Trefferchancen, Kraft den Nahkampf, Intelligenz ermöglicht Tresoraufträge.</p><p>Im Kampf: eigene Figur wählen; Nachbarfeld zum Bewegen oder roten Gegner zum Angreifen antippen. Jede Figur handelt einmal je Runde. Deckung senkt Trefferchancen.</p><p>Lokal wird weiterhin automatisch gespeichert. Cloud-Synchronisierung und private Mehrspieler-Partien findest du oben unter Online. Export-Sicherungen bleiben zusätzlich verfügbar.</p>`)}
-function backups(){show('Spielstand',`<p>Revision 6 · lokaler Spielstand, Cloud und Riverton-Karte</p><button id="exportSave">Sicherung herunterladen</button><p><label>Sicherung importieren <input id="importSave" type="file" accept="application/json,.json"></label></p><button id="resetSave">Neues Spiel</button>`);$('#exportSave').onclick=()=>{let url=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='unterwelt-spielstand.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};$('#importSave').onchange=async e=>{try{const file=e.target.files[0];if(!file||file.size>2000000)throw Error();let raw=JSON.parse(await file.text());if(raw.v!==2||!Array.isArray(raw.crew)||raw.encounter||raw.control||raw.cards)throw Error();const next=upgrade(raw);if(!confirm('Aktuellen Stand durch diese Sicherung ersetzen?'))return;localStorage.setItem('uw1931-backup',JSON.stringify(S));S=next;selected=S.loc;modal.close();save()}catch(err){toast('Sicherung ungültig oder enthält eine laufende Begegnung.')}};$('#resetSave').onclick=restart}
+function backups(){show('Spielstand',`<p>Revision 7 · lokaler Spielstand, Cloud und neue Unterwelt-Karte</p><button id="exportSave">Sicherung herunterladen</button><p><label>Sicherung importieren <input id="importSave" type="file" accept="application/json,.json"></label></p><button id="resetSave">Neues Spiel</button>`);$('#exportSave').onclick=()=>{let url=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='unterwelt-spielstand.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};$('#importSave').onchange=async e=>{try{const file=e.target.files[0];if(!file||file.size>2000000)throw Error();let raw=JSON.parse(await file.text());if(raw.v!==2||!Array.isArray(raw.crew)||raw.encounter||raw.control||raw.cards)throw Error();const next=upgrade(raw);if(!confirm('Aktuellen Stand durch diese Sicherung ersetzen?'))return;localStorage.setItem('uw1931-backup',JSON.stringify(S));S=next;selected=S.loc;modal.close();save()}catch(err){toast('Sicherung ungültig oder enthält eine laufende Begegnung.')}};$('#resetSave').onclick=restart}
 /* Card game: a shuffled finite deck, persisted before each decision. */
 const total=hand=>{let n=hand.reduce((s,c)=>s+Math.min(10,c),0),aces=hand.filter(c=>c===1).length;while(aces--&&n+10<=21)n+=10;return n};
 blackjack=function(){if(!S.cards){show('Blackjack',`<p>Ein Einsatz kostet 1 AP. Gleichstand gibt den Einsatz zurück.</p>${[25,50,100,250].map(n=>`<button data-bet="${n}">${cash(n)}</button>`).join('')}`);modalBody.querySelectorAll('[data-bet]').forEach(b=>b.onclick=()=>{let bet=+b.dataset.bet;if(S.cash<bet||!useAP())return;S.cash-=bet;let deck=Array.from({length:52},(_,i)=>i%13+1);for(let i=51;i>0;i--){let j=rnd(0,i);[deck[i],deck[j]]=[deck[j],deck[i]]}S.cards={bet,deck,hand:[deck.pop(),deck.pop()],dealer:[deck.pop(),deck.pop()]};persist();cardUI()});}else cardUI()};
@@ -85,44 +85,38 @@ function finishBattle(win){let name=S.encounter.name;S.encounter=null;battle.clo
  let ri=S.rivals.findIndex(r=>r[0]===name);if(ri>=0){S.rivals[ri][2]=0;S.owned.push('rival'+ri);return reward(400,6,20,'Revier erobert')}
  const results={'Leibwächter':[1200,15,25],'Polizeieskorte':[2500,18,35],'Tresorwachen':[1300,9,25],'Bankwachen':[650,6,18],'Postzug-Eskorte':[1000,8,22],'Schuldner':[350,2,6],'Bewaffnete Gegner':[100,2,9],'Ladenbesitzer':[80,3,18],'Polizeiwache':[0,5,28]};
  if(name==='Leibwächter'){S.mayorDone=true;S.mayorTip=false;selected=S.loc='hideout'}if(name==='Polizeieskorte'){S.transportDone=true;S.transportTip=false;selected=S.loc='hideout'}if(name==='Ladenbesitzer'&&!S.owned.includes('shop'))S.owned.push('shop');if(name==='Polizeiwache'){let c=S.crew.find(c=>c.jailed);if(c){c.jailed=false;c.jailMonths=0}}reward(...(results[name]||[100,2,5]),name+' besiegt')}
-const MAP_POS={
- transport:[18.3,13.2],
- station:[53.2,13.0],
- fake:[70.6,12.4],
- hideout:[88.8,22.8],
- cars:[34.8,24.6],
- bank:[52.0,35.2],
- casino:[71.4,31.8],
- loan:[88.1,42.7],
- weapons:[40.0,41.5],
- pub:[32.5,49.2],
- police:[76.0,52.7],
- subway:[61.5,59.2],
- hotel:[45.7,63.0],
- shop:[31.3,75.3],
- mayor:[88.1,71.0]
+const MAP_SPOTS={
+ station:[51.6,11.7,18.0,5.0],
+ fake:[81.2,15.6,18.0,5.0],
+ cars:[13.4,21.8,20.0,5.0],
+ mayor:[67.4,24.1,21.0,5.0],
+ weapons:[34.2,27.6,22.0,5.2],
+ bank:[49.0,35.2,15.0,5.0],
+ casino:[85.8,42.7,22.0,6.5],
+ pub:[12.8,49.8,18.0,5.2],
+ hotel:[38.6,63.8,16.0,5.0],
+ subway:[64.0,63.7,18.0,5.0],
+ police:[85.7,68.9,23.0,5.0],
+ shop:[13.5,72.7,21.0,5.0],
+ loan:[57.8,78.1,18.0,5.0],
+ hideout:[31.0,88.2,22.0,5.0],
+ transport:[76.0,87.9,22.0,5.0]
 };
-function centerCurrentMapPin(){
- const frame=$('#mapFrame'),pin=map.querySelector?.('.place[aria-current="location"]');
- if(!frame||!pin||frame.scrollWidth<=frame.clientWidth+4)return;
- frame.scrollTo?.({left:Math.max(0,pin.offsetLeft-frame.clientWidth/2),behavior:'smooth'});
-}
 drawMap=function(){
- map.querySelectorAll('.place').forEach(e=>e.remove());
- Object.entries(B).forEach(([k,b])=>{
-  if(k==='mayor'&&!S.mayorTip||k==='transport'&&!S.transportTip)return;
-  const p=MAP_POS[k]||[b[3],b[4]];
-  const x=document.createElement('button');
-  x.className='place map-hotspot'+(k===selected?' active':'')+(k===S.loc?' current':'')+(['mayor','transport'].includes(k)?' special':'')+(k==='weapons'?' map-generated-label':'');
-  x.style.cssText=`--x:${p[0]}%;--y:${p[1]}%`;
-  x.dataset.place=b[0];
-  x.dataset.key=k;
-  x.innerHTML=`<span class="pin-icon">${b[1]}</span><strong>${esc(b[0])}</strong><small>${esc(b[2])}</small>`;
-  x.onclick=()=>visit(k);
-  if(k===S.loc)x.setAttribute('aria-current','location');
-  x.setAttribute('aria-label',b[0]+', '+b[2]+(k===S.loc?', aktueller Standort':''));
-  map.append(x);
- });
- if(typeof requestAnimationFrame==='function')requestAnimationFrame(centerCurrentMapPin);
+  map.querySelectorAll('.place').forEach(e=>e.remove());
+  Object.entries(B).forEach(([k,b])=>{
+    if(k==='mayor'&&!S.mayorTip||k==='transport'&&!S.transportTip)return;
+    const p=MAP_SPOTS[k];
+    if(!p)return;
+    const x=document.createElement('button');
+    x.className='place map-hotspot'+(k===selected?' active':'')+(k===S.loc?' current':'')+(['mayor','transport'].includes(k)?' special':'');
+    x.style.cssText=`--x:${p[0]}%;--y:${p[1]}%;--w:${p[2]}%;--h:${p[3]}%`;
+    x.dataset.key=k;
+    x.onclick=()=>visit(k);
+    if(k===S.loc)x.setAttribute('aria-current','location');
+    x.setAttribute('aria-label',b[0]+', '+b[2]+(k===S.loc?', aktueller Standort':''));
+    x.title=b[0];
+    map.append(x);
+  });
 };
 save();if(S.encounter)drawTactics();else if(S.control)controlUI();else if(S.cards)cardUI();

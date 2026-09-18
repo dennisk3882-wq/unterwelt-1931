@@ -3,13 +3,14 @@
 
 
 
-/* Revision 6: Riverton illustrated interactive city map */
+
+/* Revision 7: purpose-built Unterwelt 1931 game map */
 .map-frame{
   position:relative;
   margin:0 11px;
-  border:1px solid #80602a;
-  border-radius:14px;
   overflow:hidden;
+  border:1px solid #7f612e;
+  border-radius:14px;
   background:#050807;
   box-shadow:0 18px 45px #000b,inset 0 0 0 1px #d3a84f22;
 }
@@ -19,16 +20,12 @@
   height:auto;
   min-height:0;
   max-height:none;
-  aspect-ratio:16/9;
+  aspect-ratio:941/1218;
   overflow:hidden;
+  margin:0;
   border:0;
-  background-color:#090c0a;
-  background-image:
-    linear-gradient(180deg,#05080708,#05080700 70%,#05080735),
-    var(--city-map,linear-gradient(145deg,#18251f,#07100d));
-  background-size:100% 100%,100% 100%;
-  background-position:center,center;
-  background-repeat:no-repeat;
+  border-radius:0;
+  background:#07100d url("assets/map/unterwelt-city-map.webp") center/100% 100% no-repeat;
   isolation:isolate;
 }
 .map::before{
@@ -37,131 +34,78 @@
   inset:0;
   z-index:1;
   pointer-events:none;
-  background:radial-gradient(ellipse at center,transparent 68%,#0005 100%);
+  background:
+    linear-gradient(180deg,#00000010,transparent 8%,transparent 92%,#00000020),
+    radial-gradient(ellipse at center,transparent 74%,#00000045 100%);
 }
 .map-vignette{
   position:absolute;
   inset:0;
   z-index:1;
   pointer-events:none;
-  box-shadow:inset 0 0 44px #0006;
+  box-shadow:inset 0 0 34px #0005;
 }
 .river,.roads{display:none!important}
 .place.map-hotspot{
-  z-index:4;
-  width:92px;
-  height:34px;
+  position:absolute;
+  left:var(--x);
+  top:var(--y);
+  width:var(--w,16%);
+  height:var(--h,4.6%);
   min-width:0;
   max-width:none;
   padding:0;
+  transform:translate(-50%,-50%);
   border:1px solid transparent;
-  border-radius:8px;
+  border-radius:10px;
   background:transparent;
   box-shadow:none;
   color:transparent;
-  text-shadow:none;
-  backdrop-filter:none;
+  z-index:4;
   cursor:pointer;
   -webkit-tap-highlight-color:transparent;
 }
-.place.map-hotspot .pin-icon,
-.place.map-hotspot strong,
-.place.map-hotspot small{visibility:hidden}
 .place.map-hotspot:hover,
 .place.map-hotspot:focus-visible{
-  border-color:#e2b85e;
-  background:#090c09a8;
-  box-shadow:0 0 0 2px #d3a84f35,0 0 20px #d3a84f55;
+  border-color:#e3bc68;
+  background:#d3a84f12;
+  box-shadow:0 0 0 2px #d3a84f2b,0 0 20px #d3a84f55;
   outline:none;
 }
-.place.map-hotspot:hover::after,
-.place.map-hotspot:focus-visible::after{
-  content:attr(data-place);
-  position:absolute;
-  left:50%;
-  bottom:calc(100% + 4px);
-  transform:translateX(-50%);
-  padding:4px 7px;
-  border:1px solid #8f6f38;
-  border-radius:5px;
-  background:#080b09ed;
-  color:#f5e4bd;
-  font:700 .56rem/1.1 Georgia,serif;
-  letter-spacing:.035em;
-  text-transform:uppercase;
-  white-space:nowrap;
-  box-shadow:0 4px 12px #000c;
-}
 .place.map-hotspot.active{
-  border-color:#f0c66c;
-  background:#d3a84f14;
-  box-shadow:0 0 0 2px #d3a84f45,0 0 23px #d3a84f88;
+  border-color:#e8c875;
+  background:#d3a84f10;
+  box-shadow:0 0 0 2px #d3a84f30,0 0 18px #d3a84f66;
 }
-.place.map-hotspot.current::before{
-  content:"";
-  position:absolute;
-  left:50%;
-  top:50%;
-  width:9px;
-  height:9px;
-  transform:translate(-50%,-50%);
-  border:2px solid #ffe099;
-  border-radius:50%;
-  background:#d39b39;
-  box-shadow:0 0 0 4px #d3a84f35,0 0 14px #ffc75a;
+.place.map-hotspot.current{
+  border-color:#f0c66c;
+  background:#d3a84f0d;
+  box-shadow:0 0 0 2px #d3a84f3d,0 0 25px #f3bd4a88;
+  animation:currentMapPlace 2.1s ease-in-out infinite;
 }
 .place.map-hotspot.current::after{
-  content:"AKTUELL";
+  content:"";
   position:absolute;
-  left:50%;
-  top:calc(100% + 3px);
-  bottom:auto;
-  transform:translateX(-50%);
-  padding:2px 5px;
-  border:1px solid #b98a3c;
-  border-radius:4px;
-  background:#090c09e8;
-  color:#f3d38b;
-  font:800 .45rem/1.1 system-ui,sans-serif;
-  letter-spacing:.08em;
-  white-space:nowrap;
+  right:7px;
+  top:7px;
+  width:8px;
+  height:8px;
+  border:2px solid #ffe4a4;
+  border-radius:50%;
+  background:#d9a33f;
+  box-shadow:0 0 0 4px #d3a84f25,0 0 12px #ffc85c;
 }
 .place.map-hotspot.special{
-  animation:mapPulse 1.6s infinite;
+  border-color:#c79b48aa;
+  animation:specialMapPlace 2.2s ease-in-out infinite;
 }
-.place.map-hotspot.map-generated-label{
-  width:118px;
-  height:36px;
-  border-color:#8f6f38;
-  background:linear-gradient(180deg,#111512ef,#070a09ef);
-  box-shadow:0 5px 15px #000b;
+@keyframes currentMapPlace{
+  50%{box-shadow:0 0 0 3px #d3a84f42,0 0 30px #f3bd4a99}
 }
-.place.map-hotspot.map-generated-label .pin-icon,
-.place.map-hotspot.map-generated-label strong{visibility:visible}
-.place.map-hotspot.map-generated-label small{display:none}
-.place.map-hotspot.map-generated-label .pin-icon{
-  position:absolute;
-  left:6px;
-  top:50%;
-  transform:translateY(-50%);
-  color:#e1b75e;
-  font-size:.9rem;
+@keyframes specialMapPlace{
+  50%{box-shadow:0 0 0 3px #d3a84f25,0 0 23px #d39a4680}
 }
-.place.map-hotspot.map-generated-label strong{
-  display:block;
-  padding-left:22px;
-  color:#f0cf83;
-  font:700 .56rem/36px Georgia,serif;
-  letter-spacing:.025em;
-  text-transform:uppercase;
-  white-space:nowrap;
-}
-@keyframes mapPulse{
-  50%{box-shadow:0 0 0 5px #d3a84f22,0 0 26px #d36b4f99}
-}
-.map-pan-hint{display:none}
-.city-map-ready .map-frame{border-color:#9b7332}
-.city-map-fallback .map{background-size:100% 100%;background-position:center}
+.map-pan-hint{display:none!important}
 .panel{margin:-7px 11px 0}
 @media(max-width:699px){
   .map-frame{
@@ -169,42 +113,16 @@
     border-left:0;
     border-right:0;
     border-radius:0;
-    overflow-x:auto;
-    overflow-y:hidden;
-    scrollbar-width:none;
-    overscroll-behavior-x:contain;
-    -webkit-overflow-scrolling:touch;
   }
-  .map-frame::-webkit-scrollbar{display:none}
   .map{
-    width:760px;
-    min-width:760px;
-    height:428px;
-    aspect-ratio:auto;
-    margin:0;
-    border-radius:0;
+    width:100%;
+    min-width:0;
+    height:auto;
+    aspect-ratio:941/1218;
   }
-  .place.map-hotspot{width:92px;height:36px}
-  .place.map-hotspot.map-generated-label{width:122px}
-  .map-pan-hint{
-    display:block;
-    position:sticky;
-    left:calc(100% - 92px);
-    bottom:8px;
-    width:max-content;
-    z-index:6;
-    margin-top:-28px;
-    margin-bottom:8px;
-    padding:4px 7px;
-    border:1px solid #8f6f38;
-    border-radius:6px;
-    background:#080b09e8;
-    color:#d9bd82;
-    font-size:.58rem;
-    pointer-events:none;
-  }
+  .place.map-hotspot{border-radius:8px}
   .panel{margin:-2px 8px 0}
 }
 @media(min-width:700px){
-  .map{margin:0;border-radius:0}
+  .map-frame{margin-inline:11px}
 }
