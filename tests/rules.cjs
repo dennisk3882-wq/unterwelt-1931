@@ -16,4 +16,8 @@ test('jail sentence expires','S.crew[0].jailed=true;S.crew[0].jailMonths=1;nextM
 test('monthly costs and reset','S.hotel=1;S.ap=0;S.debt=1000;nextMonth();if(S.cash!==350||S.debt!==1080||S.ap!==12)throw Error("month")');
 test('ace scoring','if(total([1,1,9])!==21||total([1,13,5])!==16)throw Error("cards")');
 test('migration clamps exploit assets','S=upgrade({...fresh(),shops:900,heat:900});if(S.owned.length!==1||S.heat!==100)throw Error("migration")');
+new vm.Script(fs.readFileSync('dist/online.js','utf8'));
+assert.match(fs.readFileSync('dist/index.html','utf8'),/id="online"/);
+assert.match(fs.readFileSync('dist/sw.js','utf8'),/online\.js/);
+console.log('PASS online client syntax and PWA entrypoint');
 console.log('All rule regression checks passed. DOM mocked; not a browser test.');
