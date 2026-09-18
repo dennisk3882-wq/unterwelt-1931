@@ -20,4 +20,5 @@ new vm.Script(fs.readFileSync('dist/online.js','utf8'));
 assert.match(fs.readFileSync('dist/index.html','utf8'),/id="online"/);
 assert.match(fs.readFileSync('dist/sw.js','utf8'),/online\.js/);
 console.log('PASS online client syntax and PWA entrypoint');
+require('node:child_process').execFileSync(process.execPath,['tests/multiplayer.mjs'],{stdio:'inherit'});
 console.log('All rule regression checks passed. DOM mocked; not a browser test.');
