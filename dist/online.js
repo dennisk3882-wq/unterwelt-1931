@@ -377,15 +377,15 @@ function renderRoom(){
 }
 
 const originalPersist=persist;
-persist=function(){originalPersist();queueCloud()};
+persist=function(){originalPersist();if(campaignActive)queueCloud()};
 const originalSave=save;
-save=function(){originalSave();queueCloud()};
+save=function(){originalSave();if(campaignActive)queueCloud()};
 
 const onlineButton=$('#online');
 if(onlineButton)onlineButton.onclick=openHub;
 modal.addEventListener('close',()=>{if(activeRoom){stopRoom();activeRoom=null}});
 
 if(key)refreshProfile().then(()=>{
-  if(autoEnabled()&&!conflict&&serverVersion===0)queueCloud();
+  if(campaignActive&&autoEnabled()&&!conflict&&serverVersion===0)queueCloud();
 }).catch(()=>{});
 })();
