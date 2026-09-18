@@ -85,5 +85,42 @@ function finishBattle(win){let name=S.encounter.name;S.encounter=null;battle.clo
  let ri=S.rivals.findIndex(r=>r[0]===name);if(ri>=0){S.rivals[ri][2]=0;S.owned.push('rival'+ri);return reward(400,6,20,'Revier erobert')}
  const results={'Leibwächter':[1200,15,25],'Polizeieskorte':[2500,18,35],'Tresorwachen':[1300,9,25],'Bankwachen':[650,6,18],'Postzug-Eskorte':[1000,8,22],'Schuldner':[350,2,6],'Bewaffnete Gegner':[100,2,9],'Ladenbesitzer':[80,3,18],'Polizeiwache':[0,5,28]};
  if(name==='Leibwächter'){S.mayorDone=true;S.mayorTip=false;selected=S.loc='hideout'}if(name==='Polizeieskorte'){S.transportDone=true;S.transportTip=false;selected=S.loc='hideout'}if(name==='Ladenbesitzer'&&!S.owned.includes('shop'))S.owned.push('shop');if(name==='Polizeiwache'){let c=S.crew.find(c=>c.jailed);if(c){c.jailed=false;c.jailMonths=0}}reward(...(results[name]||[100,2,5]),name+' besiegt')}
-drawMap=function(){legacy.drawMap();document.querySelectorAll('.place').forEach(p=>{if(p.classList.contains('active'))p.setAttribute('aria-current','location')})};
+const MAP_POS={
+ hideout:[72,72],
+ pub:[65,16],
+ hotel:[55,70],
+ weapons:[69,38],
+ cars:[35,43],
+ shop:[85,16],
+ bank:[41,10],
+ casino:[62,27],
+ fake:[18,58],
+ subway:[47,58],
+ police:[89,42],
+ loan:[41,20],
+ station:[14,20],
+ mayor:[53,35],
+ transport:[49,53]
+};
+function centerCurrentMapPin(){
+ const frame=$('#mapFrame'),pin=map.querySelector?.('.place[aria-current="location"]');
+ if(!frame||!pin||frame.scrollWidth<=frame.clientWidth+4)return;
+ frame.scrollTo?.({left:Math.max(0,pin.offsetLeft-frame.clientWidth/2),behavior:'smooth'});
+}
+drawMap=function(){
+ map.querySelectorAll('.place').forEach(e=>e.remove());
+ Object.entries(B).forEach(([k,b])=>{
+  if(k==='mayor'&&!S.mayorTip||k==='transport'&&!S.transportTip)return;
+  const p=MAP_POS[k]||[b[3],b[4]];
+  const x=document.createElement('button');
+  x.className='place'+(k===selected?' active':'')+(['mayor','transport'].includes(k)?' special':'');
+  x.style.cssText=`--x:${p[0]}%;--y:${p[1]}%`;
+  x.innerHTML=`<span class="pin-icon">${b[1]}</span><strong>${esc(b[0])}</strong><small>${esc(b[2])}</small>`;
+  x.onclick=()=>visit(k);
+  if(k===S.loc)x.setAttribute('aria-current','location');
+  x.setAttribute('aria-label',b[0]+', '+b[2]+(k===S.loc?', aktueller Standort':''));
+  map.append(x);
+ });
+ if(typeof requestAnimationFrame==='function')requestAnimationFrame(centerCurrentMapPin);
+};
 save();if(S.encounter)drawTactics();else if(S.control)controlUI();else if(S.cards)cardUI();
