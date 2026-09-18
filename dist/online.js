@@ -248,7 +248,7 @@ function openRoom(room){
   activeRoom=room;
   renderRoom();
   stopRoom();
-  pollTimer=setInterval(pollRoom,15000);
+  pollTimer=setInterval(pollRoom,6000);
   clockTimer=setInterval(updateClock,1000);
 }
 
