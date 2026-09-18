@@ -35,7 +35,7 @@ test('ace scoring','if(total([1,1,9])!==21||total([1,13,5])!==16)throw Error("ca
 new vm.Script(fs.readFileSync('dist/online.js','utf8'));
 assert.match(fs.readFileSync('dist/index.html','utf8'),/id="online"/);
 assert.match(fs.readFileSync('dist/sw.js','utf8'),/online\.js/);
-assert.match(fs.readFileSync('dist/sw.js','utf8'),/unterwelt-1931-v8/);
+assert.match(fs.readFileSync('dist/sw.js','utf8'),/unterwelt-1931-v9/);
 assert.match(fs.readFileSync('dist/index.html','utf8'),/JANUAR 1931/);
 assert.match(fs.readFileSync('dist/rules.js','utf8'),/Gameplay revision 8/);
 assert.match(fs.readFileSync('dist/rules.js','utf8'),/Kreditgeschäft verkaufen/);
