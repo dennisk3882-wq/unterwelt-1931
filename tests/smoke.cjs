@@ -3,9 +3,9 @@ const fs=require('fs');const path=require('path');const assert=require('node:ass
 (async()=>{const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:390,height:844},serviceWorkers:'block'});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());await page.route('https://local.test/**',route=>{let name=new URL(route.request().url()).pathname.slice(1)||'index.html';const file=path.resolve(__dirname,'../dist',name);route.fulfill({body:fs.readFileSync(file),contentType:name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':name.endsWith('.html')?'text/html':'application/json'})});await page.goto('https://local.test/');
 assert.equal(await page.locator('.place').count(),13);assert.equal(errors.length,0,errors.join('\n'));
 await page.evaluate(()=>{S.ap=1;action('rest');action('rest')});assert.equal(await page.evaluate(()=>S.ap),0);
-await page.evaluate(()=>{S.ap=12;action('borrow');action('borrow');action('borrow')});assert.equal(await page.evaluate(()=>S.debt),2600);
-await page.evaluate(()=>action('repay'));assert.equal(await page.evaluate(()=>S.debt),2100);
-await page.evaluate(()=>{S.owned=['shop'];S.score=50;action('protect')});assert.equal(await page.evaluate(()=>S.owned.length),1);
+await page.evaluate(()=>{S.ap=12;action('borrow');action('borrow');action('borrow')});assert.equal(await page.evaluate(()=>S.debt),2300);
+await page.evaluate(()=>action('repay'));assert.equal(await page.evaluate(()=>S.debt),1800);
+await page.evaluate(()=>{S.shopOwned=true;S.owned=['shop'];S.score=50;action('protect')});assert.equal(await page.evaluate(()=>S.owned.length),1);
 await page.evaluate(()=>{S.control={price:100};persist();controlUI()});await page.keyboard.press('Escape');assert.equal(await page.locator('#modal').evaluate(e=>e.open),true);await page.reload();assert.equal(await page.locator('#modalTitle').textContent(),'Polizeikontrolle');await page.locator('#payCop').click();
 await page.evaluate(()=>{S.ap=10;S.cash=2000;blackjack()});await page.locator('[data-bet="25"]').click();await page.reload();assert.equal(await page.locator('#modalTitle').textContent(),'Blackjack');await page.locator('#stand').click();await page.locator('.close').click();
 await page.evaluate(()=>{S.crew[0].jailed=false;beginFight('Bankwachen',2)});assert.equal(await page.locator('.tactical button').count(),30);await page.reload();assert.equal(await page.locator('#battle').evaluate(e=>e.open),true);await page.evaluate(()=>finishBattle(true));
