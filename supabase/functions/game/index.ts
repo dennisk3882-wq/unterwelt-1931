@@ -45,7 +45,7 @@ Deno.serve(async(req:Request)=>{
   const hourEnd=new Date(now.getTime()+3600000).toISOString(),monthEnd=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,1)).toISOString();
   // Shared ceiling stays below Free Function invocation quota during normal use.
   await limit('requests:'+month,300000,monthEnd);
-  await limit('player:'+digest+':'+hour,360,hourEnd);
+  await limit('player:'+digest+':'+hour,720,hourEnd);
   let account=(await db('uw_accounts?key_hash=eq.'+digest+'&select=id,name'))[0];
   if(b.op==='register'){
    if(!account){
