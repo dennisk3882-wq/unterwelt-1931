@@ -1,6 +1,6 @@
 // Authoritative multiplayer rules, shared by the Edge Function and Node tests.
 export const DISTRICTS = ['South Side','Little Italy','West Loop','River North','The Loop','Rail Yard','North Side','Back Yards'];
-export function player(id,name) { return {id,name,cash:700,score:0,heat:0,crew:1,weapon:0,car:false,booze:0,debt:0,ap:3,resigned:false}; }
+export function player(id,name) { return {id,name,cash:700,score:0,heat:0,crew:1,weapon:0,car:false,booze:0,debt:0,ap:3,soldRound:0,resigned:false}; }
 export function lobby(id,name) { return {status:'lobby',players:[player(id,name)],districts:DISTRICTS.map(name=>({name,owner:null})),round:1,turn:0,log:['Private Runde eröffnet.'],deadline:null}; }
 function requireRule(ok,message) { if(!ok) throw new Error(message); }
 function pay(p,n) { requireRule(p.cash>=n,'Nicht genug Bargeld.'); p.cash-=n; }
