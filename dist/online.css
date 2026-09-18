@@ -1,0 +1,32 @@
+#online{border:1px solid #806b3f;background:#14221c;color:var(--gold);border-radius:9px;padding:9px 11px;font-weight:800;margin-left:6px}
+.header-actions{display:flex;align-items:center}
+.online-card{border:1px solid var(--line);border-radius:12px;padding:13px;margin:0 0 10px;background:#0a1411}
+.online-card h3{margin-bottom:6px}
+.online-card p,.muted{color:var(--muted);font-size:.82rem}
+.online-label{display:grid;gap:5px;color:var(--muted);font-size:.74rem;margin:9px 0}
+.online-label input,#roomCode,#recoveryCode{width:100%;border:1px solid var(--line);background:#07100d;color:var(--cream);border-radius:8px;padding:10px;font:inherit}
+#recoveryCode{font:11px/1.35 ui-monospace,monospace;resize:none}
+.online-wide{width:100%}
+.online-row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.online-row>button,.online-row>input{flex:1;min-width:120px}
+.online-row button,.room-entry,.district-grid button,.mp-actions button{border:1px solid #806b3f;background:#14221c;border-radius:8px;padding:9px;color:var(--cream);font-weight:800}
+.online-toggle{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:.78rem;margin:9px 0}
+.online-warn{color:#f0b06e!important}
+.account-card,.room-head{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.online-dot{color:var(--good);font-size:.72rem}
+.room-entry{width:100%;display:flex;justify-content:space-between;align-items:center;text-align:left;margin-top:7px}
+.room-entry span,.room-entry small{display:block}
+.room-entry small{color:var(--muted);margin-top:3px}
+.room-meta{font-size:.75rem;color:var(--muted);margin-bottom:9px}
+.mp-players{display:grid;gap:6px;margin-bottom:10px}
+.mp-player{border:1px solid var(--line);padding:9px;border-radius:9px;background:#0a1411}
+.mp-player.active{border-color:var(--gold)}
+.mp-player.resigned{opacity:.45}
+.mp-player small{display:block;color:var(--muted);margin-top:3px}
+.turn-badge{font-size:.58rem;color:#132019;background:var(--gold);padding:2px 5px;border-radius:10px;margin-left:7px}
+.mp-actions,.district-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
+.mp-actions button small,.district-grid button small{display:block;color:var(--muted);font-weight:500;margin-top:2px}
+.mp-actions button:disabled,.district-grid button:disabled{opacity:.48}
+.mp-log{max-height:150px;overflow:auto;font:12px/1.45 ui-monospace,monospace;color:#b8c2bb}
+.mp-log div{padding:3px 0;border-bottom:1px solid #1d2a25}
+@media(max-width:430px){.mp-actions,.district-grid{grid-template-columns:1fr}.online-row>button,.online-row>input{min-width:100%}#online{padding:8px;font-size:.72rem}}
