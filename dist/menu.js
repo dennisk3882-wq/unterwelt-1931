@@ -19,8 +19,9 @@ const deactivateCampaign=(archiveKey='uw1931-backup')=>{
 };
 const saveSummary=()=>{
   if(!campaignActive)return '';
-  const territories=Array.isArray(S.territories)?S.territories.reduce((a,n)=>a+(Number(n)||0),0):0;
-  return `<div class="menu-save-card"><b>Aktive Kampagne</b><span>${esc(month())} ${S.y} · ${esc(S.crew?.[0]?.name||'Du')}</span><div class="menu-save-grid"><div><small>Bargeld</small><strong>${cash(S.cash)}</strong></div><div><small>Rang</small><strong>${esc(rankName())}</strong></div><div><small>Reviere</small><strong>${territories}</strong></div></div></div>`;
+  const territories=S.empire?.districts?.filter?.(d=>d.owner==='player').length??(Array.isArray(S.territories)?S.territories.reduce((a,n)=>a+(Number(n)||0),0):0);
+  const mode=S.empire?.endless?'Endlosmodus':S.empire?.ng?'New Game+ '+S.empire.ng:'Kampagne';
+  return `<div class="menu-save-card"><b>Aktive Kampagne</b><span>${esc(month())} ${S.y} · ${esc(S.crew?.[0]?.name||'Du')} · ${esc(mode)}</span><div class="menu-save-grid"><div><small>Bargeld</small><strong>${cash(S.cash)}</strong></div><div><small>Rang</small><strong>${esc(rankName())}</strong></div><div><small>Bezirke</small><strong>${territories}</strong></div></div></div>`;
 };
 function showMainMenu(message=''){
   closeSituations();
@@ -46,16 +47,28 @@ function showCreateGame(){
       <div><small>Ziel</small><b>100 Punkte + 2 Spezialaufträge</b></div>
     </div>
     <label>Dein Name / Spitzname<input id="playerAlias" maxlength="18" autocomplete="off" value=""></label>
+    <label>Schwierigkeit<select id="gameDifficulty">
+      <option value="easy">Leicht</option>
+      <option value="normal" selected>Normal</option>
+      <option value="hard">Schwer</option>
+      <option value="hardcore">1931 Hardcore</option>
+    </select></label>
+    <p class="difficulty-help" id="difficultyHelp">Normal: ausgewogene Wirtschaft, Rivalen, Polizei und Kämpfe.</p>
     <p class="menu-note">Das Spiel wird automatisch lokal gespeichert. Wenn bereits eine Kampagne läuft, wird sie beim Start der neuen Partie vorher als Sicherung abgelegt.</p>
     <button class="menu-primary" id="startGame">Spiel starten <span>Januar 1931 · South Side</span></button>
     <button class="menu-secondary" id="backMenu">Zurück zum Hauptmenü</button>
   </div>`;
-  const alias=$('#playerAlias');if(alias){alias.value=currentName;setTimeout(()=>alias.focus(),0)}
+  const alias=$('#playerAlias'),difficulty=$('#gameDifficulty'),help=$('#difficultyHelp');if(alias){alias.value=currentName;setTimeout(()=>alias.focus(),0)}
+  const diffText={easy:'Leicht: +15 % Einnahmen, schwächere Rivalen, Polizei und Gegner.',normal:'Normal: ausgewogene Wirtschaft, Rivalen, Polizei und Kämpfe.',hard:'Schwer: weniger Einnahmen, stärkere Rivalen, Polizei und Gegner.',hardcore:'1931 Hardcore: höchste Gefahr; gefallene Crewmitglieder können dauerhaft sterben.'};
+  if(difficulty)difficulty.onchange=()=>{if(help)help.textContent=diffText[difficulty.value]||diffText.normal};
   $('#backMenu').onclick=()=>showMainMenu();
   $('#startGame').onclick=()=>{
     if(campaignActive&&!confirm('Neue Kampagne starten? Die aktuelle Partie wird vorher lokal gesichert.'))return;
     archiveCurrent('uw1931-backup');
+    const chosenDifficulty=difficulty?.value||'normal';
     S=upgrade(fresh());
+    if(window.UNTERWELT_EMPIRE?.ensure)window.UNTERWELT_EMPIRE.ensure(S);
+    S.empire=S.empire||{};S.empire.difficulty=chosenDifficulty;
     S.crew[0].name=cleanName(alias?.value);
     S.log=[`Januar 1931: ${S.crew[0].name} wird aus dem Gefängnis entlassen.`];
     selected=S.loc;
