@@ -86,21 +86,21 @@ function finishBattle(win){let name=S.encounter.name;S.encounter=null;battle.clo
  const results={'Leibwächter':[1200,15,25],'Polizeieskorte':[2500,18,35],'Tresorwachen':[1300,9,25],'Bankwachen':[650,6,18],'Postzug-Eskorte':[1000,8,22],'Schuldner':[350,2,6],'Bewaffnete Gegner':[100,2,9],'Ladenbesitzer':[80,3,18],'Polizeiwache':[0,5,28]};
  if(name==='Leibwächter'){S.mayorDone=true;S.mayorTip=false;selected=S.loc='hideout'}if(name==='Polizeieskorte'){S.transportDone=true;S.transportTip=false;selected=S.loc='hideout'}if(name==='Ladenbesitzer'&&!S.owned.includes('shop'))S.owned.push('shop');if(name==='Polizeiwache'){let c=S.crew.find(c=>c.jailed);if(c){c.jailed=false;c.jailMonths=0}}reward(...(results[name]||[100,2,5]),name+' besiegt')}
 const MAP_POS={
- hideout:[72,72],
- pub:[65,16],
- hotel:[55,70],
- weapons:[69,38],
- cars:[35,43],
- shop:[85,16],
- bank:[41,10],
- casino:[62,27],
- fake:[18,58],
- subway:[47,58],
- police:[89,42],
- loan:[41,20],
- station:[14,20],
- mayor:[53,35],
- transport:[49,53]
+ transport:[18.3,13.2],
+ station:[53.2,13.0],
+ fake:[70.6,12.4],
+ hideout:[88.8,22.8],
+ cars:[34.8,24.6],
+ bank:[52.0,35.2],
+ casino:[71.4,31.8],
+ loan:[88.1,42.7],
+ weapons:[40.0,41.5],
+ pub:[32.5,49.2],
+ police:[76.0,52.7],
+ subway:[61.5,59.2],
+ hotel:[45.7,63.0],
+ shop:[31.3,75.3],
+ mayor:[88.1,71.0]
 };
 function centerCurrentMapPin(){
  const frame=$('#mapFrame'),pin=map.querySelector?.('.place[aria-current="location"]');
@@ -113,8 +113,10 @@ drawMap=function(){
   if(k==='mayor'&&!S.mayorTip||k==='transport'&&!S.transportTip)return;
   const p=MAP_POS[k]||[b[3],b[4]];
   const x=document.createElement('button');
-  x.className='place'+(k===selected?' active':'')+(['mayor','transport'].includes(k)?' special':'');
+  x.className='place map-hotspot'+(k===selected?' active':'')+(k===S.loc?' current':'')+(['mayor','transport'].includes(k)?' special':'')+(k==='weapons'?' map-generated-label':'');
   x.style.cssText=`--x:${p[0]}%;--y:${p[1]}%`;
+  x.dataset.place=b[0];
+  x.dataset.key=k;
   x.innerHTML=`<span class="pin-icon">${b[1]}</span><strong>${esc(b[0])}</strong><small>${esc(b[2])}</small>`;
   x.onclick=()=>visit(k);
   if(k===S.loc)x.setAttribute('aria-current','location');
