@@ -8,7 +8,7 @@ for(const id of ['date','cash','rank','heat','crewCount','steps','location','map
 context.window=context;vm.createContext(context);
 const run=code=>vm.runInContext(code,context);
 run(fs.readFileSync('dist/app.js','utf8'));run(fs.readFileSync('dist/rules.js','utf8'));
-function reset(){run('S=upgrade(fresh());selected=S.loc;S.over=false;modal.close();battle.close();Math.random=()=>0;save()')}
+function reset(){run('campaignActive=true;S=upgrade(fresh());selected=S.loc;S.over=false;modal.close();battle.close();Math.random=()=>0;save()')}
 function test(name,code){reset();run(code);console.log('PASS',name)}
 
 test('1931 campaign migration and new game','if(S.y!==1931||S.m!==1)throw Error("timeline");if(!S.log[0].includes("1931"))throw Error("log")');
