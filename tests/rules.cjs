@@ -32,10 +32,27 @@ test('police persists and blocks movement','S.control={price:200};save();let loc
 test('jail sentence expires','S.crew[0].jailed=true;S.crew[0].jailMonths=1;nextMonth();if(S.crew[0].jailed)throw Error("jail")');
 test('ace scoring','if(total([1,1,9])!==21||total([1,13,5])!==16)throw Error("cards")');
 
+const zlib=require('node:zlib'),nodeCrypto=require('node:crypto');
+const empire64=Array.from({length:4},(_,i)=>fs.readFileSync('dist/empire/part'+i+'.gz.b64','utf8').trim()).join('');
+const empireSource=zlib.gunzipSync(Buffer.from(empire64,'base64')).toString('utf8');
+assert.equal(nodeCrypto.createHash('sha256').update(empireSource).digest('hex'),'f317b7e9a52f041e82434166e0fd65c14dd9a3655e197e046280895d1a884d26','Empire source mismatch');
+new vm.Script(empireSource);new vm.Script(fs.readFileSync('dist/empire-loader.js','utf8'));
+run(empireSource);
+
+test('Empire state migrates with 12 districts and active rival AI','if(S.empire.v!==11)throw Error("empire version");if(S.empire.districts.length!==12)throw Error("district count");if(S.empire.rivalAI.length!==3)throw Error("rivals");if(S.empire.districts.filter(d=>d.owner==="player").length<1)throw Error("starting district")');
+test('Empire exposes eight businesses, eight vehicles and five black-market goods','if(Object.keys(UNTERWELT_EMPIRE.businesses).length!==8)throw Error("businesses");if(Object.keys(UNTERWELT_EMPIRE.vehicles).length!==8)throw Error("vehicles");if(Object.keys(UNTERWELT_EMPIRE.goods).length!==5)throw Error("goods")');
+test('crew receives role, trait, loyalty, XP and injury model','let c=S.crew[0];if(!c.role||!c.trait||typeof c.loyalty!=="number"||typeof c.xp!=="number"||typeof c.level!=="number"||typeof c.injuryMonths!=="number")throw Error("crew depth")');
+test('difficulty modes include hardcore permanent-death rules','if(Object.keys(UNTERWELT_DIFFICULTIES).length!==4)throw Error("difficulty count");S.empire.difficulty="hardcore";if(UNTERWELT_DIFFICULTIES.hardcore.death!==1)throw Error("hardcore")');
+test('endless mode removes the 1934 time loss','S.empire.campaignWon=true;S.empire.endless=true;S.y=1940;S.over=false;checkEnd();if(S.over)throw Error("endless ended")');
+test('tactical Empire combat adds arenas, cover and ammunition','beginFight("Bankwachen",2);if(S.encounter.arena!=="Bankhalle")throw Error("arena");if(!S.encounter.coverType||!Object.keys(S.encounter.coverType).length)throw Error("cover");if(!S.encounter.units.every(u=>typeof u.ammo==="number"))throw Error("ammo")');
+test('Empire achievements and statistics are persistent','S.empire.stats.fightsWon=1;UNTERWELT_EMPIRE.checkAchievements();if(!S.empire.ach.includes("firstFight"))throw Error("achievement");if(typeof S.empire.stats.cashPeak!=="number")throw Error("stats")');
+test('Empire cargo and smuggling capacity are vehicle-aware','S.car="truck";S.empire.businesses=[];if(UNTERWELT_EMPIRE.cargoCap()!==18)throw Error("truck cargo");if(!S.empire.suppliers.canada)throw Error("supplier")');
+console.log('PASS Empire Update systems 1-14');
+
 new vm.Script(fs.readFileSync('dist/online.js','utf8'));new vm.Script(fs.readFileSync('dist/menu.js','utf8'));
-assert.match(fs.readFileSync('dist/index.html','utf8'),/id="online"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/id="mainMenu"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/id="gameMenu"/);
+assert.match(fs.readFileSync('dist/index.html','utf8'),/id="online"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/id="mainMenu"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/id="gameMenu"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/data-tab="empire"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/empire-loader\.js/);assert.match(fs.readFileSync('dist/index.html','utf8'),/empire\.css/);
 assert.match(fs.readFileSync('dist/sw.js','utf8'),/online\.js/);
-assert.match(fs.readFileSync('dist/sw.js','utf8'),/unterwelt-1931-v10/);
+assert.match(fs.readFileSync('dist/sw.js','utf8'),/unterwelt-1931-v11/);
 assert.match(fs.readFileSync('dist/index.html','utf8'),/JANUAR 1931/);
 assert.match(fs.readFileSync('dist/rules.js','utf8'),/Gameplay revision 8/);
 assert.match(fs.readFileSync('dist/rules.js','utf8'),/Kreditgeschäft verkaufen/);
@@ -46,4 +63,4 @@ assert.equal(mapBytes.subarray(0,4).toString(),'RIFF');assert.equal(mapBytes.sub
 assert.ok(mapBytes.length>350000&&mapBytes.length<450000,'map asset unexpected size');
 console.log('PASS purpose-built interactive Unterwelt map');
 require('node:child_process').execFileSync(process.execPath,['tests/multiplayer.mjs'],{stdio:'inherit'});
-console.log('All revision-8 gameplay, economy, campaign and multiplayer rule checks passed. DOM mocked; live backend is verified separately.');
+console.log('All revision-11 gameplay, Empire, economy, campaign and multiplayer rule checks passed. DOM mocked; live backend is verified separately.');
