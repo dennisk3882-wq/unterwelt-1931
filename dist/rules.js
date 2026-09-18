@@ -18,7 +18,7 @@ function upgrade(s){
  return s;
 }
 try{if(S.revision!==8)localStorage.setItem('uw1931-before-v3',JSON.stringify(S));S=upgrade(S)}catch(e){S=upgrade(fresh())}selected=S.loc;
-function persist(){if(!campaignActive)return;try{localStorage.setItem('uw1931',JSON.stringify(S))}catch(e){toast('Speichern fehlgeschlagen. Bitte Spielstand exportieren.')}}
+function persist(){try{localStorage.setItem('uw1931',JSON.stringify(S))}catch(e){toast('Speichern fehlgeschlagen. Bitte Spielstand exportieren.')}}
 save=function(){S.heat=clamp(S.heat,0,100);S.cash=Math.max(0,S.cash);S.shops=S.owned.length;checkEnd();persist();render()};
 function checkEnd(){if(S.over)return;if(S.score>=100&&S.mayorDone&&S.transportDone)S.over='win';else if(S.y>=1934||S.debt>15000)S.over='lose'}
 function blocked(){return S.over||S.encounter||S.control||S.cards}
