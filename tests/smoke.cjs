@@ -1,7 +1,7 @@
 const {chromium}=require('/opt/codex/runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const fs=require('fs');const path=require('path');const assert=require('node:assert/strict');
 (async()=>{const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:390,height:844},serviceWorkers:'block'});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());await page.route('https://local.test/**',route=>{let name=new URL(route.request().url()).pathname.slice(1)||'index.html';const file=path.resolve(__dirname,'../dist',name);route.fulfill({body:fs.readFileSync(file),contentType:name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':name.endsWith('.html')?'text/html':'application/json'})});await page.goto('https://local.test/');
-assert.equal(await page.locator('.place').count(),13);assert.equal(errors.length,0,errors.join('\n'));
+assert.equal(await page.locator('#mainMenu').isVisible(),true);await page.locator('#createGame').click();await page.locator('#playerAlias').fill('Smoke Boss');await page.locator('#startGame').click();assert.equal(await page.locator('#mainMenu').isVisible(),false);assert.equal(await page.evaluate(()=>S.crew[0].name),'Smoke Boss');assert.equal(await page.locator('.place').count(),13);assert.equal(errors.length,0,errors.join('\n'));
 await page.evaluate(()=>{S.ap=1;action('rest');action('rest')});assert.equal(await page.evaluate(()=>S.ap),0);
 await page.evaluate(()=>{S.ap=12;action('borrow');action('borrow');action('borrow')});assert.equal(await page.evaluate(()=>S.debt),2300);
 await page.evaluate(()=>action('repay'));assert.equal(await page.evaluate(()=>S.debt),1800);
