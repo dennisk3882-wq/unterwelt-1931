@@ -28,7 +28,13 @@ const map64=Array.from({length:7},(_,i)=>fs.readFileSync('dist/assets/map/map.pa
 const mapBytes=Buffer.from(map64,'base64');
 assert.equal(mapBytes.subarray(0,4).toString(),'RIFF');
 assert.equal(mapBytes.subarray(8,12).toString(),'WEBP');
-assert.ok(mapBytes.length>50000,'map asset unexpectedly small');
+assert.ok(mapBytes.length>90000&&mapBytes.length<100000,'map asset unexpected size');
+const mapHash=require('node:crypto').createHash('sha256').update(mapBytes).digest('hex');
+assert.equal(mapHash,'623c9918076c601d318b1b2aa81cc4af922a7ebe1ad226df0873dd760fd63ee2','unexpected map artwork');
+const rulesText=fs.readFileSync('dist/rules.js','utf8');
+for(const key of ['hideout','pub','hotel','weapons','cars','shop','bank','casino','fake','subway','police','loan','station','mayor','transport'])assert.match(rulesText,new RegExp('\\b'+key+':\\['));
+assert.match(rulesText,/map-generated-label/);
+assert.match(fs.readFileSync('dist/sw.js','utf8'),/unterwelt-1931-v6/);
 console.log('PASS interactive city map asset and hotspots');
 require('node:child_process').execFileSync(process.execPath,['tests/multiplayer.mjs'],{stdio:'inherit'});
 console.log('All rule regression checks passed. DOM mocked; not a browser test.');
