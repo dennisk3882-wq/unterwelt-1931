@@ -11,6 +11,11 @@ const localVersion=()=>Number(localStorage.getItem(versionKey())||0);
 const setLocalVersion=v=>localStorage.setItem(versionKey(),String(v||0));
 const autoEnabled=()=>localStorage.getItem(AUTO_KEY)!=='0';
 const setAuto=v=>localStorage.setItem(AUTO_KEY,v?'1':'0');
+function onlineShow(t,h){
+  modalTitle.textContent=t;
+  modalBody.innerHTML=h;
+  if(!modal.open)modal.showModal();
+}
 
 async function api(body,overrideKey){
   const token=overrideKey||key;
@@ -142,7 +147,7 @@ function queueCloud(){
 }
 
 function renderLogin(){
-  show('Online & Cloud',`
+  onlineShow('Online & Cloud',`
     <div class="online-card">
       <h3>Kostenloses Online-Konto</h3>
       <p>Kein Abo, keine E-Mail nötig. Dein privater Spielercode ist gleichzeitig dein Wiederherstellungsschlüssel für andere Geräte.</p>
@@ -166,7 +171,7 @@ async function openHub(){
 
 function renderHub(){
   if(!account)return renderLogin();
-  show('Online & Cloud',`
+  onlineShow('Online & Cloud',`
     <div class="online-card account-card">
       <div><span class="eyebrow">ONLINE-KONTO</span><h3>${safe(account.name)}</h3></div>
       <span class="online-dot">● verbunden</span>
@@ -352,7 +357,7 @@ function renderRoom(){
   body+=`<div class="online-card"><h3>Chronik</h3><div class="mp-log">${g.log.map(x=>'<div>'+safe(x)+'</div>').join('')}</div></div>
     <div class="online-row"><button id="roomBack">← Online-Menü</button><button id="roomLeave">${g.status==='playing'?'Aufgeben':'Runde verlassen'}</button></div>`;
 
-  show('Mehrspieler',body);
+  onlineShow('Mehrspieler',body);
   updateClock();
   $('#copyRoom').onclick=()=>copyText(r.code);
   $('#roomBack').onclick=()=>{stopRoom();activeRoom=null;openHub()};
