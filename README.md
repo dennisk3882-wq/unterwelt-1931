@@ -1,7 +1,9 @@
 # Unterwelt 1931
 
-Android-compatible progressive web game.
+Mobile PWA. Serve dist over HTTPS; no dependencies or build required.
 
-Serve the dist directory over HTTPS. No build dependencies required.
+Render Static Site: main branch, build command `echo Ready`, publish directory `dist`.
 
-Current game saves are stored on the device; cloud sync and online multiplayer are not yet implemented.
+Run rule checks with `node tests/rules.cjs`. These use a mocked DOM, not a browser.
+
+Current saves are device-local. Online multiplayer and cloud sync are not implemented.

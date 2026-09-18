@@ -1,0 +1,19 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const nodes=new Map();function element(){return {open:false,innerHTML:'',textContent:'',hidden:false,disabled:false,style:{},dataset:{},classList:{add(){},remove(){},contains(){return false}},append(){},prepend(){},remove(){},setAttribute(){},addEventListener(){},querySelectorAll(){return []},showModal(){this.open=true},close(){this.open=false},click(){}}}
+const el=k=>{if(!nodes.has(k))nodes.set(k,element());return nodes.get(k)};const data=new Map();
+const context={console,Math,JSON,Number,String,Array,Object,Set,Map,Date,Boolean,Error,Blob,URL,setTimeout:()=>{},confirm:()=>true,localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)},navigator:{},document:{querySelector:el,querySelectorAll:()=>[],createElement:element,addEventListener(){}},addEventListener(){}};for(const id of ['date','cash','rank','heat','crewCount','steps','location','map','panel','modal','modalTitle','modalBody','battle','battleTitle','battleBody','install','endTurn','newGame','br','fl','yi'])context[id]=el('#'+id);context.window=context;vm.createContext(context);
+const run=code=>vm.runInContext(code,context);run(fs.readFileSync('dist/app.js','utf8'));run(fs.readFileSync('dist/rules.js','utf8'));
+function test(name,code){run('S=upgrade(fresh()); selected=S.loc; modal.close(); battle.close();');run(code);console.log('PASS',name)}
+test('AP prevents free healing','S.ap=1;action("rest");action("rest");if(S.ap!==0)throw Error("AP")');
+test('credit limit and repayment','action("borrow");action("borrow");action("borrow");if(S.debt!==2600)throw Error("limit");action("repay");if(S.debt!==2100)throw Error("repay")');
+test('single shop ownership','S.score=80;S.owned=["shop"];action("protect");if(S.owned.length!==1)throw Error("duplicate")');
+test('completed missions cannot restart','S.mayorDone=true;S.mayorTip=true;action("mayorfight");if(S.encounter)throw Error("repeat")');
+test('police persists and blocks movement','S.control={price:200};save();visit("pub");if(S.loc!=="hideout"||!JSON.parse(localStorage.getItem("uw1931")).control)throw Error("control")');
+test('battle saves and resolves once','beginFight("Bankwachen",2);if(!JSON.parse(localStorage.getItem("uw1931")).encounter)throw Error("battle");finishBattle(true);if(S.cash!==1100||S.encounter)throw Error("reward")');
+test('fahndung bounded','S.heat=130;save();if(S.heat!==100)throw Error("heat")');
+test('campaign locks gameplay','S.over="win";let n=S.cash;action("borrow");visit("pub");if(S.cash!==n||S.loc!=="hideout")throw Error("end")');
+test('jail sentence expires','S.crew[0].jailed=true;S.crew[0].jailMonths=1;nextMonth();if(S.crew[0].jailed)throw Error("jail")');
+test('monthly costs and reset','S.hotel=1;S.ap=0;S.debt=1000;nextMonth();if(S.cash!==350||S.debt!==1080||S.ap!==12)throw Error("month")');
+test('ace scoring','if(total([1,1,9])!==21||total([1,13,5])!==16)throw Error("cards")');
+test('migration clamps exploit assets','S=upgrade({...fresh(),shops:900,heat:900});if(S.owned.length!==1||S.heat!==100)throw Error("migration")');
+console.log('All rule regression checks passed. DOM mocked; not a browser test.');
