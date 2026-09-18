@@ -10,7 +10,7 @@ assert.throws(()=>command(g,'b','timeout',{},()=>0.5,1500),/Zugzeit läuft noch/
 
 // Exercise the complete multiplayer action set with server-authoritative validation.
 let h=lobby('a','Alice');h.players.push(player('b','Bob'));h=command(h,'a','start',{},()=>0,1000);
-function act(id,a,arg={},rnd=()=>0){h=command(h,id,a,arg,rnd,1000+h.round*100+(h.players.find(p=>p.id===id)?.ap||0));}
+let now=2000;function act(id,a,arg={},rnd=()=>0){now+=1000;h=command(h,id,a,arg,rnd,now);}
 act('a','loan');act('a','hire');act('a','end');
 act('b','job');act('b','loan');act('b','end');
 act('a','weapon');act('a','car');act('a','end');
@@ -22,7 +22,7 @@ assert.ok(Number.isFinite(value(h,h.players[0]))&&Number.isFinite(value(h,h.play
 // Deterministically play out the remaining 12-round match and prove a terminal winner exists.
 while(h.status==='playing'){
  const p=h.players[h.turn];
- if(p.ap>0){h=command(h,p.id,'job',{},()=>0.5,Date.now());}
+ if(p.ap>0){now+=1000;h=command(h,p.id,'job',{},()=>0.5,now);}
 }
 assert.equal(h.status,'finished');assert.ok(Array.isArray(h.winners)&&h.winners.length>=1);
 
