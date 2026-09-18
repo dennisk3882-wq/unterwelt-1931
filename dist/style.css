@@ -126,3 +126,66 @@
 @media(min-width:700px){
   .map-frame{margin-inline:11px}
 }
+
+/* Revision 10: full game main menu and campaign creation */
+.main-menu{
+  position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:20px;
+  background:#030706;color:#efe4ca;overflow:auto;
+}
+.main-menu[hidden]{display:none!important}
+.menu-backdrop{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(circle at 50% 15%,#9d74331f,transparent 28%),
+    linear-gradient(180deg,#07110fe8,#030706fa),
+    url("assets/map/unterwelt-city-map.webp") center/cover no-repeat;
+  filter:saturate(.55) brightness(.38);
+}
+.menu-backdrop::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#0008,transparent 30%,transparent 70%,#0008)}
+.menu-shell{
+  position:relative;z-index:1;width:min(560px,100%);border:1px solid #755a2f;border-radius:20px;
+  background:linear-gradient(180deg,#0d1915f5,#07100df8);box-shadow:0 26px 80px #000e,inset 0 1px #d3a84f1e;
+  overflow:hidden;
+}
+.menu-brand{padding:28px 24px 22px;text-align:center;border-bottom:1px solid #6e552c}
+.menu-brand>span{color:#cda95f;font-size:.7rem;letter-spacing:.22em;text-transform:uppercase}
+.menu-brand h2{margin:5px 0 3px;font:700 clamp(2.1rem,10vw,3.7rem)/.95 Georgia,serif;text-transform:uppercase;letter-spacing:.02em}
+.menu-brand h2 i{color:#d4ad5e;font-style:normal}
+.menu-brand p{margin:11px auto 0;max-width:390px;color:#a9b2ab;font-size:.82rem;line-height:1.45}
+.menu-content{padding:20px;display:grid;gap:10px}
+.menu-primary,.menu-secondary,.menu-danger{
+  width:100%;min-height:52px;border-radius:11px;padding:12px 15px;text-align:left;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:800;
+}
+.menu-primary{border:1px solid #d0a650;background:linear-gradient(180deg,#d6b05d,#a97d32);color:#10140f}
+.menu-secondary{border:1px solid #506057;background:#101d18;color:#e8ddc4}
+.menu-danger{border:1px solid #74443c;background:#21100e;color:#e8b7ad}
+.menu-primary span,.menu-secondary span,.menu-danger span{display:block;font-size:.68rem;font-weight:500;opacity:.75;margin-top:2px}
+.menu-save-card{border:1px solid #46574f;border-radius:12px;background:#09130f;padding:13px 14px}
+.menu-save-card b{display:block;color:#e2c273;margin-bottom:5px}
+.menu-save-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}
+.menu-save-grid div{border-left:1px solid #425047;padding-left:8px}
+.menu-save-grid small{display:block;color:#829087;font-size:.61rem;text-transform:uppercase}
+.menu-save-grid strong{font-size:.8rem}
+.menu-divider{height:1px;background:#34453d;margin:4px 0}
+.menu-create{display:grid;gap:13px}
+.menu-create label{display:grid;gap:6px;color:#b8c2bb;font-size:.75rem}
+.menu-create input{
+  width:100%;box-sizing:border-box;border:1px solid #58685f;border-radius:10px;background:#07100d;color:#f0e6cf;
+  padding:12px;font:700 1rem system-ui,sans-serif;outline:none;
+}
+.menu-create input:focus{border-color:#d3a84f;box-shadow:0 0 0 3px #d3a84f20}
+.menu-campaign-card{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.menu-campaign-card div{border:1px solid #3e4e46;border-radius:10px;padding:10px;background:#09130f}
+.menu-campaign-card small{display:block;color:#819087;font-size:.62rem;text-transform:uppercase}
+.menu-campaign-card b{display:block;margin-top:3px;color:#e5d5b1;font-size:.82rem}
+.menu-note{color:#8f9c94;font-size:.7rem;line-height:1.45;margin:0}
+body.menu-open{overflow:hidden}
+body.menu-open #app{filter:blur(2px);pointer-events:none;user-select:none}
+#gameMenu{border-color:#806431;color:#d7b563}
+@media(max-width:520px){
+  .main-menu{padding:0;place-items:stretch}
+  .menu-shell{width:100%;min-height:100dvh;border:0;border-radius:0;display:flex;flex-direction:column;justify-content:center}
+  .menu-brand{padding-top:max(30px,env(safe-area-inset-top))}
+  .menu-content{padding-bottom:max(22px,env(safe-area-inset-bottom))}
+}
