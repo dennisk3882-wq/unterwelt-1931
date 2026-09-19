@@ -50,10 +50,19 @@ test('Empire cargo and smuggling capacity are vehicle-aware','S.car="truck";S.em
 console.log('PASS Empire Update systems 1-14');
 
 new vm.Script(fs.readFileSync('dist/online.js','utf8'));new vm.Script(fs.readFileSync('dist/menu.js','utf8'));
-assert.match(fs.readFileSync('dist/index.html','utf8'),/id="online"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/id="mainMenu"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/id="gameMenu"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/data-tab="empire"/);assert.match(fs.readFileSync('dist/index.html','utf8'),/empire-loader\.js/);assert.match(fs.readFileSync('dist/index.html','utf8'),/empire\.css/);
-assert.match(fs.readFileSync('dist/sw.js','utf8'),/online\.js/);
-assert.match(fs.readFileSync('dist/sw.js','utf8'),/unterwelt-1931-v11/);
-assert.match(fs.readFileSync('dist/index.html','utf8'),/JANUAR 1931/);
+const deployedHtml=fs.readFileSync('dist/index.html','utf8');
+const deployedSw=fs.readFileSync('dist/sw.js','utf8');
+assert.match(deployedHtml,/id="menuScreen"/);
+assert.match(deployedHtml,/id="setupScreen"/);
+assert.match(deployedHtml,/id="gameScreen"/);
+assert.match(deployedHtml,/id="districtGrid"/);
+assert.match(deployedHtml,/id="businessList"/);
+assert.match(deployedHtml,/id="missionsView"/);
+assert.match(deployedHtml,/Vollausbau 2\.0/);
+assert.match(deployedHtml,/manifest\.webmanifest/);
+assert.match(deployedHtml,/navigator\.serviceWorker\.register/);
+assert.match(deployedSw,/unterwelt-syndikat-v20/);
+assert.match(deployedSw,/index\.html/);
 assert.match(fs.readFileSync('dist/rules.js','utf8'),/Gameplay revision 8/);
 assert.match(fs.readFileSync('dist/rules.js','utf8'),/Kreditgeschäft verkaufen/);
 assert.match(fs.readFileSync('dist/rules.js','utf8'),/Double Down/);
