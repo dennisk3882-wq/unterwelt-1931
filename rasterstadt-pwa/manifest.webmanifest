@@ -1,0 +1,19 @@
+{
+  "name": "Rasterstadt – Aufbau-Strategie",
+  "short_name": "Rasterstadt",
+  "description": "Rasterbasiertes Aufbau- und Strategiespiel.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0c130f",
+  "theme_color": "#17261b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
