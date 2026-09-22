@@ -64,82 +64,111 @@ function objAt(r,c){const id=occ[r]?.[c];return id?objs.get(id):null}
 function isRoad(r,c){return objAt(r,c)?.type==='road'}
 function roadMask(r,c){let m=0;if(isRoad(r-1,c))m|=1;if(isRoad(r,c+1))m|=2;if(isRoad(r+1,c))m|=4;if(isRoad(r,c-1))m|=8;return m}
 function roadSvg(mask){
-  const arm = 24, curb = 5;
-  const outer0 = 8, outer1 = 56;
-  const inner0 = outer0 + curb, inner1 = outer1 - curb;
-  const center = 32;
+  // Breite, blockige Dorfstraße: Pflaster + helle Steinplatten + unregelmäßiger Erd-/Moosrand.
+  const center=32;
+  const shoulder0=3, shoulder1=61;
+  const curb0=6, curb1=58;
+  const road0=11, road1=53;
 
-  const outer = [
-    `<rect x="${outer0}" y="${outer0}" width="${outer1-outer0}" height="${outer1-outer0}" fill="url(#curb)"/>`
+  const shoulder=[
+    `<rect x="${shoulder0}" y="${shoulder0}" width="${shoulder1-shoulder0}" height="${shoulder1-shoulder0}" fill="url(#soil)"/>`
   ];
-  const inner = [
-    `<rect x="${inner0}" y="${inner0}" width="${inner1-inner0}" height="${inner1-inner0}" fill="url(#road)"/>`
+  const curb=[
+    `<rect x="${curb0}" y="${curb0}" width="${curb1-curb0}" height="${curb1-curb0}" fill="url(#curb)"/>`
+  ];
+  const road=[
+    `<rect x="${road0}" y="${road0}" width="${road1-road0}" height="${road1-road0}" fill="url(#road)"/>`
   ];
 
   if(mask&1){
-    outer.push(`<rect x="${outer0}" y="0" width="${outer1-outer0}" height="${center}" fill="url(#curb)"/>`);
-    inner.push(`<rect x="${inner0}" y="0" width="${inner1-inner0}" height="${center+1}" fill="url(#road)"/>`);
+    shoulder.push(`<rect x="${shoulder0}" y="0" width="${shoulder1-shoulder0}" height="${center+1}" fill="url(#soil)"/>`);
+    curb.push(`<rect x="${curb0}" y="0" width="${curb1-curb0}" height="${center+1}" fill="url(#curb)"/>`);
+    road.push(`<rect x="${road0}" y="0" width="${road1-road0}" height="${center+1}" fill="url(#road)"/>`);
   }
   if(mask&2){
-    outer.push(`<rect x="${center}" y="${outer0}" width="${64-center}" height="${outer1-outer0}" fill="url(#curb)"/>`);
-    inner.push(`<rect x="${center-1}" y="${inner0}" width="${65-center}" height="${inner1-inner0}" fill="url(#road)"/>`);
+    shoulder.push(`<rect x="${center-1}" y="${shoulder0}" width="${65-center}" height="${shoulder1-shoulder0}" fill="url(#soil)"/>`);
+    curb.push(`<rect x="${center-1}" y="${curb0}" width="${65-center}" height="${curb1-curb0}" fill="url(#curb)"/>`);
+    road.push(`<rect x="${center-1}" y="${road0}" width="${65-center}" height="${road1-road0}" fill="url(#road)"/>`);
   }
   if(mask&4){
-    outer.push(`<rect x="${outer0}" y="${center}" width="${outer1-outer0}" height="${64-center}" fill="url(#curb)"/>`);
-    inner.push(`<rect x="${inner0}" y="${center-1}" width="${inner1-inner0}" height="${65-center}" fill="url(#road)"/>`);
+    shoulder.push(`<rect x="${shoulder0}" y="${center-1}" width="${shoulder1-shoulder0}" height="${65-center}" fill="url(#soil)"/>`);
+    curb.push(`<rect x="${curb0}" y="${center-1}" width="${curb1-curb0}" height="${65-center}" fill="url(#curb)"/>`);
+    road.push(`<rect x="${road0}" y="${center-1}" width="${road1-road0}" height="${65-center}" fill="url(#road)"/>`);
   }
   if(mask&8){
-    outer.push(`<rect x="0" y="${outer0}" width="${center}" height="${outer1-outer0}" fill="url(#curb)"/>`);
-    inner.push(`<rect x="0" y="${inner0}" width="${center+1}" height="${inner1-inner0}" fill="url(#road)"/>`);
+    shoulder.push(`<rect x="0" y="${shoulder0}" width="${center+1}" height="${shoulder1-shoulder0}" fill="url(#soil)"/>`);
+    curb.push(`<rect x="0" y="${curb0}" width="${center+1}" height="${curb1-curb0}" fill="url(#curb)"/>`);
+    road.push(`<rect x="0" y="${road0}" width="${center+1}" height="${road1-road0}" fill="url(#road)"/>`);
   }
 
-  // Bei einem einzelnen Straßenfeld wirkt es wie ein kurzer gepflasterter Bauabschnitt.
   if(mask===0){
-    outer.length=0; inner.length=0;
-    outer.push(`<rect x="8" y="14" width="48" height="36" fill="url(#curb)"/>`);
-    inner.push(`<rect x="13" y="19" width="38" height="26" fill="url(#road)"/>`);
+    shoulder.length=0;curb.length=0;road.length=0;
+    shoulder.push('<rect x="5" y="14" width="54" height="38" fill="url(#soil)"/>');
+    curb.push('<rect x="8" y="17" width="48" height="32" fill="url(#curb)"/>');
+    road.push('<rect x="13" y="21" width="38" height="24" fill="url(#road)"/>');
   }
 
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges">
   <defs>
-    <filter id="shadow" x="-25%" y="-25%" width="150%" height="150%">
-      <feDropShadow dx="0" dy="2" stdDeviation="1.4" flood-color="#172018" flood-opacity=".38"/>
+    <filter id="depth" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="2.2" stdDeviation="1.2" flood-color="#182114" flood-opacity=".42"/>
     </filter>
 
-    <pattern id="curb" width="12" height="12" patternUnits="userSpaceOnUse">
-      <rect width="12" height="12" fill="#aaa79e"/>
-      <rect x="1" y="1" width="10" height="4" fill="#c9c5ba"/>
-      <rect x="1" y="6" width="10" height="5" fill="#918e86"/>
-      <path d="M0 6h12M0 0v12" stroke="#716f69" stroke-width="1"/>
-      <path d="M1 1h10" stroke="#ded9ce" stroke-width="1" opacity=".65"/>
+    <pattern id="soil" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="#78634b"/>
+      <rect x="1" y="2" width="5" height="4" fill="#8b7354"/>
+      <rect x="8" y="1" width="6" height="5" fill="#685640"/>
+      <rect x="3" y="9" width="6" height="5" fill="#866e50"/>
+      <rect x="11" y="10" width="3" height="3" fill="#566e42"/>
+      <rect x="1" y="12" width="3" height="2" fill="#6c844d"/>
+      <rect x="13" y="5" width="2" height="2" fill="#4f653e"/>
     </pattern>
 
-    <pattern id="road" width="16" height="16" patternUnits="userSpaceOnUse">
-      <rect width="16" height="16" fill="#716f6a"/>
-      <rect x="1" y="1" width="7" height="6" fill="#85817a"/>
-      <rect x="9" y="1" width="6" height="6" fill="#66645f"/>
-      <rect x="1" y="8" width="5" height="7" fill="#625f5a"/>
-      <rect x="7" y="8" width="8" height="7" fill="#7d7972"/>
-      <path d="M0 7h16M8 0v7M6 7v9" stroke="#4d4b47" stroke-width="1.3"/>
-      <path d="M2 2h5M10 2h4M8 9h6" stroke="#aaa59b" stroke-width="1" opacity=".5"/>
-      <rect x="13" y="12" width="2" height="2" fill="#657557" opacity=".8"/>
-      <rect x="2" y="10" width="2" height="2" fill="#536847" opacity=".55"/>
+    <pattern id="curb" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="#aaa69c"/>
+      <rect x="1" y="1" width="7" height="6" fill="#d1ccc0"/>
+      <rect x="9" y="1" width="6" height="6" fill="#9b988f"/>
+      <rect x="1" y="8" width="6" height="7" fill="#929087"/>
+      <rect x="8" y="8" width="7" height="7" fill="#bbb6aa"/>
+      <path d="M0 7.5h16M8 0v7.5M7 7.5V16" stroke="#77746d" stroke-width="1"/>
+      <path d="M2 2h5M10 2h4M9 9h5" stroke="#e4ded2" stroke-width="1" opacity=".68"/>
+      <rect x="13" y="13" width="2" height="2" fill="#6d8159" opacity=".65"/>
     </pattern>
 
-    <clipPath id="innerClip">
-      ${inner.join('')}
+    <pattern id="road" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="#66645f"/>
+      <rect x="1" y="1" width="8" height="7" rx="1" fill="#77746e"/>
+      <rect x="10" y="1" width="9" height="6" rx="1" fill="#575650"/>
+      <rect x="1" y="9" width="6" height="10" rx="1" fill="#5d5b56"/>
+      <rect x="8" y="8" width="11" height="10" rx="1" fill="#74716b"/>
+      <path d="M0 8h20M9.5 0v8M7 8v12" stroke="#44433f" stroke-width="1.4"/>
+      <path d="M2 2h6M11 2h7M9 10h9" stroke="#a09b91" stroke-width="1" opacity=".5"/>
+      <rect x="3" y="14" width="2" height="2" fill="#526846" opacity=".8"/>
+      <rect x="16" y="12" width="2" height="3" fill="#687e54" opacity=".72"/>
+      <rect x="12" y="18" width="3" height="1" fill="#8c7554" opacity=".7"/>
+    </pattern>
+
+    <clipPath id="roadClip">
+      ${road.join('')}
     </clipPath>
   </defs>
 
-  <g filter="url(#shadow)">
-    ${outer.join('')}
-  </g>
-  ${inner.join('')}
+  <g filter="url(#depth)">${shoulder.join('')}</g>
+  ${curb.join('')}
+  ${road.join('')}
 
-  <g clip-path="url(#innerClip)" opacity=".32">
-    <path d="M4 17h18M42 6h16M6 47h15M42 54h17" stroke="#45433f" stroke-width="1"/>
-    <rect x="18" y="27" width="3" height="2" fill="#789064"/>
-    <rect x="43" y="37" width="2" height="3" fill="#6f875d"/>
+  <g clip-path="url(#roadClip)">
+    <path d="M4 19h12M48 7h11M7 48h13M45 56h12" stroke="#3e3d39" stroke-width="1" opacity=".35"/>
+    <rect x="17" y="29" width="3" height="2" fill="#7d9662" opacity=".72"/>
+    <rect x="43" y="36" width="2" height="3" fill="#66824f" opacity=".7"/>
+    <rect x="29" y="13" width="2" height="2" fill="#8e795b" opacity=".55"/>
+  </g>
+
+  <g opacity=".42">
+    <rect x="5" y="5" width="3" height="2" fill="#7d965b"/>
+    <rect x="56" y="11" width="3" height="2" fill="#5e7747"/>
+    <rect x="6" y="55" width="2" height="3" fill="#83985f"/>
+    <rect x="54" y="54" width="3" height="2" fill="#587044"/>
   </g>
   </svg>`;
 
