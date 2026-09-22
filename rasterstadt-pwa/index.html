@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17261b">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<title>Rasterstadt</title>
+<style>
+:root{--cell:34px;--green:#38d978;--red:#ff5a5f;--bg:#0c130f;--panel:#18241b;--text:#f5f7f2;--muted:#aab8ac;--road:#494d52}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:linear-gradient(#152018,#0b120e);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.app{max-width:1050px;margin:auto;padding:14px}
+header{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:12px}.eyebrow{font-size:11px;letter-spacing:.14em;color:#9eb0a0;font-weight:800}h1{margin:2px 0 0;font-size:34px}
+.actions{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px}button{font:inherit}
+.reset{border:1px solid #ffffff24;background:#ffffff0c;color:#fff;border-radius:10px;padding:8px 10px}
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:7px;border:1px solid #ffffff14;background:#ffffff08;border-radius:16px;margin-bottom:10px}
+.tool{min-height:68px;border:1px solid transparent;border-radius:12px;background:#ffffff0a;color:#fff;padding:8px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px}
+.tool.active{border-color:#70c67b;background:#437b4938}.tool b{font-size:13px}.tool small{font-size:10px;color:var(--muted)}
+.hint{font-size:12px;color:#d5dfd6;margin:8px 2px}
+.shell{border:1px solid #ffffff14;border-radius:16px;background:#142018;padding:7px;overflow:hidden;box-shadow:0 18px 50px #0007}
+.stage{overflow:auto;max-height:72vh;border-radius:10px;-webkit-overflow-scrolling:touch}
+.board{position:relative;display:grid;grid-template-columns:repeat(20,var(--cell));grid-template-rows:repeat(20,var(--cell));width:calc(20*var(--cell));height:calc(20*var(--cell));background:
+radial-gradient(circle at 20% 25%,#ffffff12,transparent 130px),
+radial-gradient(circle at 75% 70%,#244e2d88,transparent 180px),
+linear-gradient(135deg,#6f8d59,#587747);touch-action:pan-x pan-y;user-select:none}
+.cell{width:var(--cell);height:var(--cell);border-right:1px solid #ffffff21;border-bottom:1px solid #ffffff21;position:relative}
+.cell:nth-child(-n+20){border-top:1px solid #ffffff21}.cell:nth-child(20n+1){border-left:1px solid #ffffff21}
+.cell.ok{background:#38d97845}.cell.bad{background:#ff5a5f50}.cell.ok:after,.cell.bad:after{content:"";position:absolute;inset:1px;border:2px solid var(--green);pointer-events:none}.cell.bad:after{border-color:var(--red)}
+.cell.road{background:linear-gradient(90deg,transparent 46%,#eadf7c 46% 54%,transparent 54%),var(--road)}
+.building{position:absolute;z-index:3;pointer-events:none;border-radius:8px;box-shadow:0 4px 12px #0008}
+.house{width:calc(var(--cell)*2 - 6px);height:calc(var(--cell)*2 - 6px);margin:3px;background:linear-gradient(135deg,#b97045 0 44%,#7f3c31 44% 56%,#a55a3e 56%);border:2px solid #e0b184}
+.house:before{content:"";position:absolute;left:10px;bottom:7px;width:15px;height:17px;background:#d6c28a;border:2px solid #5c432e}.house:after{content:"";position:absolute;right:9px;bottom:0;width:14px;height:25px;background:#54372d;border:2px solid #2a211d;border-bottom:0}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}
+.box{width:14px;height:14px;border-radius:3px;display:inline-block;vertical-align:-2px;margin-right:4px}.g{background:#38d97845;border:2px solid var(--green)}.r{background:#ff5a5f50;border:2px solid var(--red)}.o{background:#555}
+.toast{position:fixed;left:50%;bottom:18px;transform:translate(-50%,20px);opacity:0;background:#101a13;border:1px solid #ffffff20;padding:9px 13px;border-radius:999px;transition:.18s;pointer-events:none}.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:680px){:root{--cell:32px}.app{padding:10px}h1{font-size:28px}.actions{flex-direction:column;align-items:end}.tool{min-height:72px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div><div class="eyebrow">PWA · AUFBAUSTRATEGIE</div><h1>Rasterstadt</h1></div><div class="actions"><span id="stat">0 / 400 belegt</span><button class="reset" id="reset">Neu starten</button></div></header>
+<section class="tools">
+<button class="tool active" data-tool="house"><b>🏠 Wohnhaus</b><small>2 × 2 Felder</small></button>
+<button class="tool" data-tool="road"><b>🛣️ Straße</b><small>1 × 1 Feld</small></button>
+<button class="tool" data-tool="bulldozer"><b>✕ Abreißen</b><small>Objekt entfernen</small></button>
+</section>
+<div class="hint" id="hint">Wohnhaus gewählt. Grün = bauen möglich, Rot = belegt oder außerhalb.</div>
+<div class="shell"><div class="stage"><div id="board" class="board"></div></div></div>
+<div class="legend"><span><i class="box g"></i>Bauen möglich</span><span><i class="box r"></i>Nicht möglich</span><span><i class="box o"></i>Belegt</span></div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const S=20,board=document.querySelector('#board'),stat=document.querySelector('#stat'),hint=document.querySelector('#hint'),toast=document.querySelector('#toast');
+const occ=Array.from({length:S},()=>Array(S).fill(null)),objs=new Map();let tool='house',n=0,preview=[],timer;
+const cfg={house:{w:2,h:2,label:'Wohnhaus'},road:{w:1,h:1,label:'Straße'}};
+function cell(r,c){return board.querySelector('[data-r="'+r+'"][data-c="'+c+'"]')}
+function init(){board.innerHTML='';for(let r=0;r<S;r++)for(let c=0;c<S;c++){const e=document.createElement('div');e.className='cell';e.dataset.r=r;e.dataset.c=c;e.onpointerenter=()=>show(r,c);e.onpointermove=()=>show(r,c);e.onclick=()=>tap(r,c);board.appendChild(e)}}
+function foot(r,c,w,h){const a=[];for(let y=r;y<r+h;y++)for(let x=c;x<c+w;x++)a.push([y,x]);return a}
+function can(r,c,w,h){return r>=0&&c>=0&&r+h<=S&&c+w<=S&&foot(r,c,w,h).every(([y,x])=>!occ[y][x])}
+function clear(){preview.forEach(e=>e.classList.remove('ok','bad'));preview=[]}
+function show(r,c){clear();if(tool==='bulldozer')return;const q=cfg[tool],ok=can(r,c,q.w,q.h);foot(r,c,q.w,q.h).forEach(([y,x])=>{if(y<S&&x<S){const e=cell(y,x);e.classList.add(ok?'ok':'bad');preview.push(e)}})}
+function tap(r,c){if(tool==='bulldozer')return demolish(r,c);const q=cfg[tool];if(!can(r,c,q.w,q.h)){msg('Hier kann nicht gebaut werden.');return show(r,c)}const id=tool+'-'+(++n),f=foot(r,c,q.w,q.h),o={id,type:tool,r,c,w:q.w,h:q.h,f};objs.set(id,o);f.forEach(([y,x])=>{occ[y][x]=id;const e=cell(y,x);e.dataset.id=id;if(tool==='road')e.classList.add('road')});if(tool==='house'){const e=document.createElement('div');e.className='building house';e.dataset.id=id;e.style.left='calc('+c+' * var(--cell))';e.style.top='calc('+r+' * var(--cell))';board.appendChild(e)}clear();update();msg(q.label+' gebaut.')}
+function demolish(r,c){const id=occ[r][c];if(!id)return msg('Dieses Feld ist leer.');const o=objs.get(id);o.f.forEach(([y,x])=>{occ[y][x]=null;const e=cell(y,x);e.classList.remove('road');delete e.dataset.id});board.querySelector('.building[data-id="'+id+'"]')?.remove();objs.delete(id);update();msg('Objekt entfernt.')}
+function update(){stat.textContent=occ.flat().filter(Boolean).length+' / 400 belegt'}
+function msg(t){toast.textContent=t;toast.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>toast.classList.remove('show'),1400)}
+document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{tool=b.dataset.tool;clear();document.querySelectorAll('.tool').forEach(x=>x.classList.toggle('active',x===b));hint.textContent=tool==='house'?'Wohnhaus gewählt. Grün = bauen möglich, Rot = belegt oder außerhalb.':tool==='road'?'Straße gewählt. Jede Straße belegt genau 1 Feld.':'Abreißen gewählt. Tippe ein vorhandenes Objekt an.'});
+document.querySelector('#reset').onclick=()=>{if(!confirm('Spielfeld wirklich leeren?'))return;for(let r=0;r<S;r++)for(let c=0;c<S;c++)occ[r][c]=null;objs.clear();n=0;init();update();msg('Spielfeld zurückgesetzt.')};
+board.onpointerleave=clear;init();update();
+if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));
+</script>
+</body></html>
