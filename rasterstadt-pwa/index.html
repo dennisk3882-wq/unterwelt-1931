@@ -44,7 +44,8 @@ header{display:flex;justify-content:space-between;align-items:end;gap:12px;margi
 .villager .leg{position:absolute;bottom:0;width:3px;height:3px;background:#4b382c}
 .villager .leg.a{left:1px}.villager .leg.b{right:1px}
 \n
-.voxel-building{background-position:center;background-repeat:no-repeat;background-size:contain;filter:drop-shadow(0 7px 7px #0008)}.building{border-radius:8px}.building.inactive{animation:buildingPulse 1.15s ease-in-out infinite;box-shadow:inset 0 0 0 3px #ff5b64,0 0 16px #ff3d4b88}.building-alert{display:none;position:absolute;right:-7px;top:-7px;width:23px;height:23px;border-radius:50%;place-items:center;background:#d93440;color:#fff;border:2px solid #ffe0e3;font-weight:900;z-index:9;box-shadow:0 3px 8px #0008}.building.inactive .building-alert{display:grid}.house-entrance{display:none}.building.connected .house-entrance{display:block}@keyframes buildingPulse{0%,100%{filter:drop-shadow(0 6px 6px #0008) brightness(.88)}50%{filter:drop-shadow(0 6px 8px #ff3e4966) brightness(1.12)}}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}
+
+.board{transition:filter 1.2s ease}.board.evening{filter:brightness(.82) sepia(.12)}.board.night{filter:brightness(.62) saturate(.88)}.board.rain:after{content:"";position:absolute;inset:0;z-index:20;pointer-events:none;background:repeating-linear-gradient(105deg,transparent 0 13px,#b9d9e844 13px 15px,transparent 15px 27px);animation:rainMove .38s linear infinite}.board.cloud{filter:brightness(.88) saturate(.92)}.board.night.cloud{filter:brightness(.58) saturate(.78)}@keyframes rainMove{from{background-position:0 0}to{background-position:38px 70px}}.cell.road.lamp:before{content:"";display:none;position:absolute;z-index:8;right:3px;top:3px;width:4px;height:4px;border-radius:50%;background:#ffd773}.board.night .cell.road.lamp:before{display:block;box-shadow:0 0 5px 3px #ffc84d88,0 0 11px 5px #ffb62e33}.vehicle{position:absolute;z-index:8;width:14px;height:8px;border-radius:2px;background:var(--cart,#895a34);border:1px solid #3d2b21;box-shadow:inset 0 2px #ffffff22,0 2px 2px #0007;pointer-events:none}.vehicle:before,.vehicle:after{content:"";position:absolute;bottom:-3px;width:4px;height:4px;border-radius:50%;background:#292621}.vehicle:before{left:1px}.vehicle:after{right:1px}.board.night .vehicle{box-shadow:0 0 5px #ffd36f88,0 2px 2px #000}.animal{position:absolute;z-index:7;font-size:13px;pointer-events:none;filter:drop-shadow(0 2px 1px #0008);animation:animalBob 1.4s ease-in-out infinite}@keyframes animalBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}.voxel-building{background-position:center;background-repeat:no-repeat;background-size:contain;filter:drop-shadow(0 7px 7px #0008)}.building{border-radius:8px}.building.inactive{animation:buildingPulse 1.15s ease-in-out infinite;box-shadow:inset 0 0 0 3px #ff5b64,0 0 16px #ff3d4b88}.building-alert{display:none;position:absolute;right:-7px;top:-7px;width:23px;height:23px;border-radius:50%;place-items:center;background:#d93440;color:#fff;border:2px solid #ffe0e3;font-weight:900;z-index:9;box-shadow:0 3px 8px #0008}.building.inactive .building-alert{display:grid}.house-entrance{display:none}.building.connected .house-entrance{display:block}@keyframes buildingPulse{0%,100%{filter:drop-shadow(0 6px 6px #0008) brightness(.88)}50%{filter:drop-shadow(0 6px 8px #ff3e4966) brightness(1.12)}}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}
 .box{width:14px;height:14px;border-radius:3px;display:inline-block;vertical-align:-2px;margin-right:4px}.g{background:#38d97845;border:2px solid var(--green)}.r{background:#ff5a5f50;border:2px solid var(--red)}.o{background:#555}
 .toast{position:fixed;left:50%;bottom:18px;transform:translate(-50%,20px);opacity:0;background:#101a13;border:1px solid #ffffff20;padding:9px 13px;border-radius:999px;transition:.18s;pointer-events:none}.toast.show{opacity:1;transform:translate(-50%,0)}
 
@@ -64,6 +65,7 @@ header{display:flex;justify-content:space-between;align-items:end;gap:12px;margi
   <div class="statcard"><span>💼</span><b id="jobStat">0/0</b><small>Arbeit</small></div>
   <div class="statcard"><span>🙂</span><b id="happyStat">70%</b><small>Zufriedenheit</small></div>
   <div class="statcard level"><span>🏘️</span><b id="levelStat">Siedlung</b><small id="levelSmall">Stufe 1</small></div>
+  <div class="statcard world"><span id="weatherIcon">☀️</span><b id="timeStat">08:00</b><small id="weatherStat">Sonne</small></div>
 </section>
 <section class="modebar">
   <div><b id="modeTitle">Wohnhaus</b><small id="modeSub">2 × 2 · benötigt Straßenanschluss</small></div>
@@ -89,9 +91,9 @@ header{display:flex;justify-content:space-between;align-items:end;gap:12px;margi
 <div class="toast" id="toast"></div>
 <script>
 const S=20,board=document.querySelector('#board'),stat=document.querySelector('#stat'),residentStat=document.querySelector('#residentStat'),hint=document.querySelector('#hint'),toast=document.querySelector('#toast');
-const moneyStat=document.querySelector('#moneyStat'),woodStat=document.querySelector('#woodStat'),stoneStat=document.querySelector('#stoneStat'),foodStat=document.querySelector('#foodStat'),jobStat=document.querySelector('#jobStat'),happyStat=document.querySelector('#happyStat'),levelStat=document.querySelector('#levelStat'),levelSmall=document.querySelector('#levelSmall'),modeTitle=document.querySelector('#modeTitle'),modeSub=document.querySelector('#modeSub'),ticker=document.querySelector('#ticker'),gamePanel=document.querySelector('#gamePanel'),panelTitle=document.querySelector('#panelTitle'),panelContent=document.querySelector('#panelContent'),detailSheet=document.querySelector('#detailSheet'),detailContent=document.querySelector('#detailContent');
-const occ=Array.from({length:S},()=>Array(S).fill(null)),objs=new Map(),residents=[];
-let tool='house',n=0,preview=[],timer,lastTs=0,animId=0,currentPanel='build',activeCategory='all',economy={money:5000,wood:60,stone:20,food:25,happiness:70,lastIncome:0,lastUpkeep:0,lastNet:0,lastWood:0,lastStone:0,lastFood:0,tick:0},nextEconomyAt=Date.now()+10000,lastSim=null;
+const moneyStat=document.querySelector('#moneyStat'),woodStat=document.querySelector('#woodStat'),stoneStat=document.querySelector('#stoneStat'),foodStat=document.querySelector('#foodStat'),jobStat=document.querySelector('#jobStat'),happyStat=document.querySelector('#happyStat'),levelStat=document.querySelector('#levelStat'),levelSmall=document.querySelector('#levelSmall'),timeStat=document.querySelector('#timeStat'),weatherStat=document.querySelector('#weatherStat'),weatherIcon=document.querySelector('#weatherIcon'),modeTitle=document.querySelector('#modeTitle'),modeSub=document.querySelector('#modeSub'),ticker=document.querySelector('#ticker'),gamePanel=document.querySelector('#gamePanel'),panelTitle=document.querySelector('#panelTitle'),panelContent=document.querySelector('#panelContent'),detailSheet=document.querySelector('#detailSheet'),detailContent=document.querySelector('#detailContent');
+const occ=Array.from({length:S},()=>Array(S).fill(null)),objs=new Map(),residents=[],vehicles=[],animals=[];
+let tool='house',n=0,preview=[],timer,lastTs=0,animId=0,currentPanel='build',activeCategory='all',economy={money:5000,wood:60,stone:20,food:25,happiness:70,lastIncome:0,lastUpkeep:0,lastNet:0,lastWood:0,lastStone:0,lastFood:0,tick:0},nextEconomyAt=Date.now()+10000,lastSim=null,worldMinutes=480,weather='sun',weatherUntil=Date.now()+60000;
 const cfg={
  house:{w:2,h:2,label:'Wohnhaus',residents:4,jobs:0,upkeep:1,cost:{money:350,wood:8},category:'living',desc:'Bietet 4 Bewohnern ein Zuhause. Ohne Straßenanschluss bleibt es inaktiv.'},
  lumberjack:{w:3,h:3,label:'Holzfäller',residents:0,jobs:4,upkeep:4,cost:{money:600,wood:10},category:'production',desc:'Vier Arbeitsplätze. Beschäftigte erzeugen Holz.'},
@@ -287,7 +289,7 @@ function roadSvg(mask){
 
   return 'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg)
 }
-function renderRoad(r,c){if(r<0||c<0||r>=S||c>=S)return;const e=cell(r,c);if(!e)return;if(isRoad(r,c)){const m=roadMask(r,c);e.classList.add('road');e.dataset.roadMask=m;e.style.backgroundImage='url("'+roadSvg(m)+'")'}else{e.classList.remove('road');e.style.backgroundImage='';delete e.dataset.roadMask}}
+function renderRoad(r,c){if(r<0||c<0||r>=S||c>=S)return;const e=cell(r,c);if(!e)return;if(isRoad(r,c)){const m=roadMask(r,c);e.classList.add('road');e.classList.toggle('lamp',((r*3+c*5)%11===0));e.dataset.roadMask=m;e.style.backgroundImage='url("'+roadSvg(m)+'")'}else{e.classList.remove('road','lamp');e.style.backgroundImage='';delete e.dataset.roadMask}}
 function updateRoadsAround(r,c){renderRoad(r,c);renderRoad(r-1,c);renderRoad(r+1,c);renderRoad(r,c-1);renderRoad(r,c+1)}
 
 
@@ -336,7 +338,7 @@ function makeResident(home,index){
   el.style.setProperty('--robe',robes[(index+residents.length)%robes.length]);
   el.innerHTML='<span class="head"></span><span class="body"></span><span class="leg a"></span><span class="leg b"></span>';board.appendChild(el);
   const p=home.connection,pt=pxCenter(p.r,p.c),off=residentOffsets[index%residentOffsets.length];
-  return{el,name:citizenNames[(n+index+residents.length)%citizenNames.length],homeId:home.id,jobId:null,network:p.network,r:p.r,c:p.c,pr:null,pc:null,fx:pt.x,fy:pt.y,tx:pt.x,ty:pt.y,t:1,speed:.42+Math.random()*.38,ox:off[0],oy:off[1]}
+  return{el,name:citizenNames[(n+index+residents.length)%citizenNames.length],age:18+((n*7+index*11+residents.length*3)%55),homeId:home.id,jobId:null,network:p.network,r:p.r,c:p.c,pr:null,pc:null,fx:pt.x,fy:pt.y,tx:pt.x,ty:pt.y,t:1,speed:.42+Math.random()*.38,ox:off[0],oy:off[1]}
 }
 function nextRoad(v){
   let ns=roadNeighbors(v.r,v.c).filter(([r,c])=>roadComp[r][c]===v.network);
@@ -355,7 +357,24 @@ function rebuildResidents(){
   });
   const slots=[];
   objs.forEach(o=>{if(o.type==='road'||!o.active||!o.connection)return;const jobs=cfg[o.type].jobs||0;for(let i=0;i<jobs;i++)slots.push({id:o.id,network:o.connection.network})});
-  residents.forEach(v=>{const i=slots.findIndex(s=>s.network===v.network);if(i>=0){v.jobId=slots[i].id;slots.splice(i,1)}})
+  residents.forEach(v=>{const i=slots.findIndex(s=>s.network===v.network);if(i>=0){v.jobId=slots[i].id;slots.splice(i,1)}});rebuildVehicles()
+}
+function rebuildVehicles(){
+ vehicles.forEach(v=>v.el.remove());vehicles.length=0;animals.forEach(a=>a.remove());animals.length=0;
+ const kinds={lumberjack:'#8a5a34',farm:'#c89a42',quarry:'#81817d',market:'#bd4a45'};
+ objs.forEach(o=>{
+  if(!o.active||!o.connection)return;
+  if(kinds[o.type]){
+   const el=document.createElement('div');el.className='vehicle';el.style.setProperty('--cart',kinds[o.type]);board.appendChild(el);
+   const p=pxCenter(o.connection.r,o.connection.c);vehicles.push({el,network:o.connection.network,r:o.connection.r,c:o.connection.c,pr:null,pc:null,fx:p.x,fy:p.y,tx:p.x,ty:p.y,t:1,speed:.25+Math.random()*.18})
+  }
+  if(o.type==='farm'){
+   for(let i=0;i<2;i++){const a=document.createElement('div');a.className='animal';a.textContent=i?'🐔':'🐑';a.style.left='calc('+(o.c+.55+i*.7)+' * var(--cell))';a.style.top='calc('+(o.r+1.05+i*.55)+' * var(--cell))';a.style.animationDelay=(-i*.55)+'s';board.appendChild(a);animals.push(a)}
+  }
+ })
+}
+function renderVehicles(dt){
+ vehicles.forEach(v=>{if(v.t>=1)setTarget(v,nextRoad(v));v.t=Math.min(1,v.t+dt*v.speed);const x=v.fx+(v.tx-v.fx)*v.t,y=v.fy+(v.ty-v.fy)*v.t;v.el.style.left=(x-7)+'px';v.el.style.top=(y-4)+'px'})
 }
 function renderResidents(dt){
   residents.forEach(v=>{
@@ -368,7 +387,7 @@ function renderResidents(dt){
 function animate(ts){
   if(!lastTs)lastTs=ts;
   const dt=Math.min(.05,(ts-lastTs)/1000);lastTs=ts;
-  renderResidents(dt);animId=requestAnimationFrame(animate)
+  renderResidents(dt);renderVehicles(dt);animId=requestAnimationFrame(animate)
 }
 function residentTotals(){
   let capacity=0;objs.forEach(o=>{if(o.type==='house')capacity+=houseLevels[o.level||1].capacity});
@@ -388,7 +407,7 @@ function simState(){
 function calcHappiness(s){
   if(!s.population)return 70;
   const employment=s.employed/s.population,foodCover=Math.max(0,Math.min(1,economy.food/Math.max(1,s.population*1.2)));
-  let h=42+employment*28+foodCover*18+s.market*5+s.townhall*4+s.parks*3;if(s.level.level>=2)h+=s.education*3+s.safety*3+s.power*3;if(s.level.level>=3)h+=s.health*4;return Math.max(15,Math.min(100,Math.round(h)))
+  let h=42+employment*28+foodCover*18+s.market*5+s.townhall*4+s.parks*3;if(s.level.level>=2)h+=s.education*3+s.safety*3+s.power*3;if(s.level.level>=3)h+=s.health*4;h+=weather==='sun'?2:weather==='rain'?-2:0;return Math.max(15,Math.min(100,Math.round(h)))
 }
 function economyTick(){
   const s=simState();let woodGain=0,stoneGain=0,foodGain=0,marketIncome=0,upkeep=0;
@@ -407,12 +426,25 @@ function economyTick(){
   ticker.textContent='Abrechnung: '+(economy.lastNet>=0?'+':'')+Math.round(economy.lastNet)+' Münzen · '+(woodGain?('+'+Math.round(woodGain)+' Holz · '):'')+(stoneGain?('+'+Math.round(stoneGain)+' Stein · '):'')+(economy.lastFood>=0?'+':'')+Math.round(economy.lastFood)+' Nahrung';
   setTimeout(()=>{ticker.textContent='Inaktive Gebäude pulsieren rot. Nächste Abrechnung läuft automatisch.'},2600)
 }
+
+function worldLabel(){
+ const h=Math.floor(worldMinutes/60),m=Math.floor(worldMinutes%60),time=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+ const labels={sun:['☀️','Sonne'],cloud:['☁️','Bewölkt'],rain:['🌧️','Regen']},w=labels[weather]||labels.sun;
+ timeStat.textContent=time;weatherIcon.textContent=w[0];weatherStat.textContent=w[1];
+ board.classList.toggle('night',h<6||h>=20);board.classList.toggle('evening',h>=18&&h<20);board.classList.toggle('rain',weather==='rain');board.classList.toggle('cloud',weather==='cloud')
+}
+function worldTick(){
+ worldMinutes=(worldMinutes+10)%1440;
+ if(Date.now()>=weatherUntil){const a=['sun','sun','cloud','cloud','rain'];weather=a[Math.floor(Math.random()*a.length)];weatherUntil=Date.now()+60000;msg(weather==='rain'?'Regen zieht über die Stadt.':weather==='cloud'?'Es wird bewölkt.':'Die Sonne kommt heraus.')}
+ worldLabel()
+}
+
 function update(){
   stat.textContent=occ.flat().filter(Boolean).length+' / 400 belegt';
   lastSim=simState();economy.happiness=calcHappiness(lastSim);
   residentStat.textContent=lastSim.population+'/'+lastSim.capacity;
   moneyStat.textContent=Math.round(economy.money).toLocaleString('de-DE');woodStat.textContent=Math.round(economy.wood).toLocaleString('de-DE');stoneStat.textContent=Math.round(economy.stone).toLocaleString('de-DE');foodStat.textContent=Math.round(economy.food).toLocaleString('de-DE');
-  jobStat.textContent=lastSim.employed+'/'+lastSim.population;happyStat.textContent=economy.happiness+'%';levelStat.textContent=lastSim.level.name;levelSmall.textContent='Stufe '+lastSim.level.level
+  jobStat.textContent=lastSim.employed+'/'+lastSim.population;happyStat.textContent=economy.happiness+'%';levelStat.textContent=lastSim.level.name;levelSmall.textContent='Stufe '+lastSim.level.level;worldLabel()
 }
 function msg(t){toast.textContent=t;toast.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>toast.classList.remove('show'),1400)}
 
@@ -449,7 +481,7 @@ function renderCity(){
  panelContent.innerHTML='<div class="panel-grid"><div class="panel-card"><b>'+s.level.name+' · Stufe '+s.level.level+'</b><small>Stadtentwicklung</small><div class="progress"><i style="width:'+progress+'%"></i></div></div><div class="panel-card"><b>'+active+'/'+total+'</b><small>Gebäude aktiv</small></div><div class="panel-card"><b>'+(s.townhall?'Ja':'Nein')+'</b><small>Rathaus aktiv</small></div></div><div class="goal-list">'+goals.map(g=>'<div class="goal '+(g.ok?'ok':'')+'">'+(g.ok?'✓':'○')+' '+g.t+'</div>').join('')+'</div><div class="panel-grid needs-grid"><div class="panel-card"><b>'+Math.round(s.education*100)+'%</b><small>Bildung</small></div><div class="panel-card"><b>'+Math.round(s.health*100)+'%</b><small>Gesundheit</small></div><div class="panel-card"><b>'+Math.round(s.safety*100)+'%</b><small>Sicherheit</small></div><div class="panel-card"><b>'+Math.round(s.leisure*100)+'%</b><small>Freizeit</small></div><div class="panel-card"><b>'+Math.round(s.power*100)+'%</b><small>Strom</small></div></div>'
 }
 function renderResidentsPanel(){
- panelTitle.textContent='Bewohner';const s=simState(),chips=residents.slice(0,10).map(v=>'<div class="resident-chip"><b>'+v.name+'</b>'+(v.jobId?cfg[objs.get(v.jobId)?.type]?.label:'Arbeitslos')+'<br>'+v.homeId+'</div>').join('');
+ panelTitle.textContent='Bewohner';const s=simState(),chips=residents.slice(0,10).map(v=>'<div class="resident-chip"><b>'+v.name+' · '+v.age+'</b>'+(v.jobId?cfg[objs.get(v.jobId)?.type]?.label:'Arbeitslos')+'<br>'+(v.jobId?'Unterwegs / Arbeit':'Spaziergang')+'</div>').join('');
  panelContent.innerHTML='<div class="panel-grid"><div class="panel-card"><b>'+s.population+'/'+s.capacity+'</b><small>Bewohner / Kapazität</small></div><div class="panel-card"><b>'+s.employed+'</b><small>Beschäftigt</small></div><div class="panel-card"><b>'+s.unemployed+'</b><small>Arbeitslos</small></div><div class="panel-card"><b>'+s.jobs+'</b><small>Arbeitsplätze</small></div><div class="panel-card"><b>'+economy.happiness+'%</b><small>Zufriedenheit</small></div></div>'+(chips?'<div class="resident-list">'+chips+'</div>':'')
 }
 function renderFinance(){
@@ -473,10 +505,10 @@ function upgradeHouse(id){
  pay(nx.cost);o.level=nl;o.residentCount=nx.capacity;o.residentCapacity=nx.capacity;rebuildResidents();update();renderPanel(currentPanel);saveGame();openDetail(o);msg('Wohnhaus auf Stufe '+nl+' ausgebaut.')
 }
 function saveGame(){
- try{localStorage.setItem('rasterstadt-save-v13',JSON.stringify({economy,n,objects:[...objs.values()].map(o=>({id:o.id,type:o.type,r:o.r,c:o.c,w:o.w,h:o.h,level:o.level||1}))}))}catch(e){}
+ try{localStorage.setItem('rasterstadt-save-v13',JSON.stringify({economy,n,worldMinutes,weather,objects:[...objs.values()].map(o=>({id:o.id,type:o.type,r:o.r,c:o.c,w:o.w,h:o.h,level:o.level||1}))}))}catch(e){}
 }
 function loadGame(){
- try{const s=JSON.parse(localStorage.getItem('rasterstadt-save-v13')||'null');if(!s)return false;economy={...economy,...s.economy};n=s.n||0;(s.objects||[]).forEach(x=>{const q=cfg[x.type];if(!q)return;const o={...x,f:foot(x.r,x.c,x.w,x.h),residentCount:x.type==='house'?houseLevels[x.level||1].capacity:0,residentCapacity:x.type==='house'?houseLevels[x.level||1].capacity:0};objs.set(o.id,o);o.f.forEach(([y,z])=>{if(y<S&&z<S){occ[y][z]=o.id;const e=cell(y,z);e.dataset.id=o.id;if(o.type==='road')e.classList.add('road')}});if(o.type!=='road')addBuildingVisual(o)});return true}catch(e){return false}
+ try{const s=JSON.parse(localStorage.getItem('rasterstadt-save-v13')||'null');if(!s)return false;economy={...economy,...s.economy};n=s.n||0;worldMinutes=s.worldMinutes??worldMinutes;weather=s.weather||weather;(s.objects||[]).forEach(x=>{const q=cfg[x.type];if(!q)return;const o={...x,f:foot(x.r,x.c,x.w,x.h),residentCount:x.type==='house'?houseLevels[x.level||1].capacity:0,residentCapacity:x.type==='house'?houseLevels[x.level||1].capacity:0};objs.set(o.id,o);o.f.forEach(([y,z])=>{if(y<S&&z<S){occ[y][z]=o.id;const e=cell(y,z);e.dataset.id=o.id;if(o.type==='road')e.classList.add('road')}});if(o.type!=='road')addBuildingVisual(o)});return true}catch(e){return false}
 }
 document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>activatePanel(b.dataset.panel));
 document.querySelector('#panelClose').onclick=()=>gamePanel.classList.toggle('open');
@@ -486,7 +518,7 @@ document.querySelector('#detailClose').onclick=()=>detailSheet.classList.remove(
 detailSheet.onclick=e=>{if(e.target===detailSheet)detailSheet.classList.remove('show')};
 document.querySelector('#reset').onclick=()=>{if(!confirm('Wirklich eine neue Stadt starten?'))return;localStorage.removeItem('rasterstadt-save-v13');location.reload()};
 board.onpointerleave=clear;init();loadGame();refreshHouseConnections();objs.forEach(o=>{if(o.type==='road')renderRoad(o.r,o.c)});rebuildResidents();update();setTool('house');renderPanel('build');cancelAnimationFrame(animId);animId=requestAnimationFrame(animate);
-setInterval(()=>{if(Date.now()>=nextEconomyAt)economyTick();else{update();if(currentPanel==='finance')renderFinance()}},1000);
+setInterval(()=>{worldTick();if(Date.now()>=nextEconomyAt)economyTick();else{update();if(currentPanel==='finance')renderFinance()}},1000);
 if('serviceWorker'in navigator)addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=13',{updateViaCache:'none'});await reg.update();let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}})}catch(e){console.warn('Service Worker Update fehlgeschlagen',e)}});
 </script>
 </body></html>
