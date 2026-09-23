@@ -43,7 +43,8 @@ header{display:flex;justify-content:space-between;align-items:end;gap:12px;margi
 .villager .body{position:absolute;left:0;top:6px;width:10px;height:6px;background:var(--robe,#765038);border:1px solid #493326;box-sizing:border-box}
 .villager .leg{position:absolute;bottom:0;width:3px;height:3px;background:#4b382c}
 .villager .leg.a{left:1px}.villager .leg.b{right:1px}
-\n.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}
+\n
+.voxel-building{background-position:center;background-repeat:no-repeat;background-size:contain;filter:drop-shadow(0 7px 7px #0008)}.building{border-radius:8px}.building.inactive{animation:buildingPulse 1.15s ease-in-out infinite;box-shadow:inset 0 0 0 3px #ff5b64,0 0 16px #ff3d4b88}.building-alert{display:none;position:absolute;right:-7px;top:-7px;width:23px;height:23px;border-radius:50%;place-items:center;background:#d93440;color:#fff;border:2px solid #ffe0e3;font-weight:900;z-index:9;box-shadow:0 3px 8px #0008}.building.inactive .building-alert{display:grid}.house-entrance{display:none}.building.connected .house-entrance{display:block}@keyframes buildingPulse{0%,100%{filter:drop-shadow(0 6px 6px #0008) brightness(.88)}50%{filter:drop-shadow(0 6px 8px #ff3e4966) brightness(1.12)}}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}
 .box{width:14px;height:14px;border-radius:3px;display:inline-block;vertical-align:-2px;margin-right:4px}.g{background:#38d97845;border:2px solid var(--green)}.r{background:#ff5a5f50;border:2px solid var(--red)}.o{background:#555}
 .toast{position:fixed;left:50%;bottom:18px;transform:translate(-50%,20px);opacity:0;background:#101a13;border:1px solid #ffffff20;padding:9px 13px;border-radius:999px;transition:.18s;pointer-events:none}.toast.show{opacity:1;transform:translate(-50%,0)}
 
@@ -117,26 +118,36 @@ function init(){board.innerHTML='';for(let r=0;r<S;r++)for(let c=0;c<S;c++){cons
 function foot(r,c,w,h){const a=[];for(let y=r;y<r+h;y++)for(let x=c;x<c+w;x++)a.push([y,x]);return a}
 function can(r,c,w,h){return r>=0&&c>=0&&r+h<=S&&c+w<=S&&foot(r,c,w,h).every(([y,x])=>!occ[y][x])}
 function clear(){preview.forEach(e=>e.classList.remove('ok','bad'));preview=[]}
-function show(r,c){clear();if(tool==='bulldozer')return;const q=cfg[tool],ok=can(r,c,q.w,q.h);foot(r,c,q.w,q.h).forEach(([y,x])=>{if(y<S&&x<S){const e=cell(y,x);e.classList.add(ok?'ok':'bad');preview.push(e)}})}
+function show(r,c){clear();if(tool==='bulldozer'||tool==='inspect')return;const q=cfg[tool];if(!q)return;const ok=can(r,c,q.w,q.h);foot(r,c,q.w,q.h).forEach(([y,x])=>{if(y<S&&x<S){const e=cell(y,x);e.classList.add(ok?'ok':'bad');preview.push(e)}})}
+
+function activePopulation(){let n=0;objs.forEach(o=>{if(o.type==='house'&&o.active)n+=houseLevels[o.level||1].capacity});return n}
+function unlockReason(type){const q=cfg[type],p=activePopulation();return q&&q.unlockPop&&p<q.unlockPop?'Ab '+q.unlockPop+' aktiven Bewohnern':''}
+function hasCost(cost){return economy.money>=cost.money&&economy.wood>=cost.wood}
+function pay(cost){economy.money-=cost.money;economy.wood-=cost.wood}
+function costText(cost){return '💰 '+Math.round(cost.money).toLocaleString('de-DE')+' · 🪵 '+Math.round(cost.wood).toLocaleString('de-DE')}
+function addBuildingVisual(o){
+ const q=cfg[o.type],e=document.createElement('div');e.dataset.id=o.id;e.style.left='calc('+o.c+' * var(--cell))';e.style.top='calc('+o.r+' * var(--cell))';e.style.zIndex=5+o.r+o.h;
+ if(o.type==='house'){e.className='building house'}else{e.className='building voxel-building '+o.type;e.style.width='calc('+o.w+' * var(--cell))';e.style.height='calc('+o.h+' * var(--cell))';e.style.backgroundImage=spriteUri(o.type)}
+ const alert=document.createElement('span');alert.className='building-alert';alert.textContent='!';e.appendChild(alert);
+ const ent=document.createElement('div');ent.className='house-entrance';e.appendChild(ent);board.appendChild(e)
+}
+
 function tap(r,c){
   if(tool==='bulldozer')return demolish(r,c);
-  const q=cfg[tool];
+  const existing=occ[r]?.[c]?objs.get(occ[r][c]):null;
+  if(existing){openDetail(existing);return}
+  if(tool==='inspect'){msg('Tippe ein Gebäude an.');return}
+  const q=cfg[tool];if(!q)return;
+  const reason=unlockReason(tool);if(reason){msg(reason);return}
+  if(!hasCost(q.cost)){msg('Nicht genug Münzen oder Holz.');return}
   if(!can(r,c,q.w,q.h)){msg('Hier kann nicht gebaut werden.');return show(r,c)}
+  pay(q.cost);
   const id=tool+'-'+(++n),f=foot(r,c,q.w,q.h);
-  const o={id,type:tool,r,c,w:q.w,h:q.h,f,residentCount:q.residents||0,residentCapacity:q.residents||0,connection:null};
-  objs.set(id,o);
-  f.forEach(([y,x])=>{occ[y][x]=id;const e=cell(y,x);e.dataset.id=id;if(tool==='road')e.classList.add('road')});
-  if(tool==='house'){
-    const e=document.createElement('div');
-    e.className='building house';
-    e.dataset.id=id;
-    e.style.left='calc('+c+' * var(--cell))';
-    e.style.top='calc('+r+' * var(--cell))';
-    const ent=document.createElement('div');ent.className='house-entrance';e.appendChild(ent);
-    board.appendChild(e)
-  }
+  const o={id,type:tool,r,c,w:q.w,h:q.h,f,level:1,residentCount:q.residents||0,residentCapacity:q.residents||0,connection:null,active:tool==='road'};
+  objs.set(id,o);f.forEach(([y,x])=>{occ[y][x]=id;const e=cell(y,x);e.dataset.id=id;if(tool==='road')e.classList.add('road')});
+  if(tool!=='road')addBuildingVisual(o);
   if(tool==='road')updateRoadsAround(r,c);
-  clear();refreshHouseConnections();rebuildResidents();update();msg(q.label+' gebaut.')
+  clear();refreshHouseConnections();rebuildResidents();update();renderPanel(currentPanel);msg(q.label+' gebaut.')
 }
 function demolish(r,c){
   const id=occ[r][c];if(!id)return msg('Dieses Feld ist leer.');
@@ -277,14 +288,15 @@ function houseConnection(o){
 }
 function refreshHouseConnections(){
   objs.forEach(o=>{
-    if(o.type!=='house')return;
-    o.connection=houseConnection(o);
-    const e=board.querySelector('.building[data-id="'+o.id+'"]');
-    if(!e)return;
+    if(o.type==='road'){o.active=true;return}
+    o.connection=houseConnection(o);o.active=!!o.connection;
+    const e=board.querySelector('.building[data-id="'+o.id+'"]');if(!e)return;
+    e.classList.toggle('inactive',!o.active);e.classList.toggle('active',o.active);
     e.classList.remove('connected','dir-north','dir-south','dir-east','dir-west');
     if(o.connection){
       e.classList.add('connected','dir-'+o.connection.dir);
-      e.style.setProperty('--entrance-pos',(25+o.connection.slot*50)+'%')
+      const side=(o.connection.dir==='north'||o.connection.dir==='south')?o.w:o.h;
+      e.style.setProperty('--entrance-pos',(((o.connection.slot+.5)/side)*100)+'%')
     }
   })
 }
