@@ -163,7 +163,7 @@ function pay(cost){economy.money-=cost.money||0;economy.wood-=cost.wood||0;econo
 function costText(cost){return '💰 '+Math.round(cost.money||0).toLocaleString('de-DE')+' · 🪵 '+Math.round(cost.wood||0).toLocaleString('de-DE')+((cost.stone||0)?' · 🪨 '+Math.round(cost.stone):'')}
 function addBuildingVisual(o){
  const q=cfg[o.type],e=document.createElement('div');e.dataset.id=o.id;e.style.left='calc('+o.c+' * var(--cell))';e.style.top='calc('+o.r+' * var(--cell))';e.style.zIndex=5+o.r+o.h;
- e.className=o.type==='house'?'building house':'building voxel-building '+o.type;
+ e.className=(o.type==='house'?'building house':'building voxel-building '+o.type)+((o.level||1)>1?' level-'+Math.min(3,o.level):'');
  e.style.width='calc('+o.w+' * var(--cell))';e.style.height='calc('+o.h+' * var(--cell))';e.style.backgroundImage=spriteUri(o.type);e.style.backgroundPosition='center';e.style.backgroundRepeat='no-repeat';e.style.backgroundSize='contain';
  const alert=document.createElement('span');alert.className='building-alert';alert.textContent='!';e.appendChild(alert);
  const ent=document.createElement('div');ent.className='house-entrance';e.appendChild(ent);const badge=document.createElement('span');badge.className='level-badge';badge.textContent=(o.level||1)>1?'Lv.'+(o.level||1):'';e.appendChild(badge);board.appendChild(e)
