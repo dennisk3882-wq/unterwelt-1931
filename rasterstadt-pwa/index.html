@@ -28,7 +28,22 @@ header{display:flex;justify-content:space-between;align-items:end;gap:12px;margi
 .cell.road{background-position:center;background-repeat:no-repeat;background-size:100% 100%;image-rendering:auto}
 .building{position:absolute;z-index:3;pointer-events:none}
 .house{width:calc(var(--cell)*2);height:calc(var(--cell)*2);margin:0;background-image:url("data:image/webp;base64,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");background-repeat:no-repeat;background-position:center;background-size:contain;filter:drop-shadow(0 5px 5px #0008);}
-.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}
+
+#residentStat{color:#edf5dc;font-weight:800}
+.house-entrance{position:absolute;display:none;z-index:4;width:13px;height:13px;background:linear-gradient(135deg,#c9c2b4,#82796d);border:1px solid rgba(69,62,55,.7);box-shadow:0 1px 3px #0007}
+.building.connected .house-entrance{display:block}
+.building.dir-north .house-entrance{top:-5px;left:calc((var(--slot) + .5)*var(--cell) - 6px)}
+.building.dir-south .house-entrance{bottom:-5px;left:calc((var(--slot) + .5)*var(--cell) - 6px)}
+.building.dir-west .house-entrance{left:-5px;top:calc((var(--slot) + .5)*var(--cell) - 6px)}
+.building.dir-east .house-entrance{right:-5px;top:calc((var(--slot) + .5)*var(--cell) - 6px)}
+.villager{position:absolute;z-index:7;width:10px;height:14px;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 2px 1px #0007)}
+.villager .head{position:absolute;left:1px;top:0;width:8px;height:6px;background:#d6ae88;border:1px solid #5d4432;box-sizing:border-box}
+.villager .head:before,.villager .head:after{content:"";position:absolute;top:2px;width:1px;height:1px;background:#241a14}
+.villager .head:before{left:2px}.villager .head:after{right:2px}
+.villager .body{position:absolute;left:0;top:6px;width:10px;height:6px;background:var(--robe,#765038);border:1px solid #493326;box-sizing:border-box}
+.villager .leg{position:absolute;bottom:0;width:3px;height:3px;background:#4b382c}
+.villager .leg.a{left:1px}.villager .leg.b{right:1px}
+\n.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}
 .box{width:14px;height:14px;border-radius:3px;display:inline-block;vertical-align:-2px;margin-right:4px}.g{background:#38d97845;border:2px solid var(--green)}.r{background:#ff5a5f50;border:2px solid var(--red)}.o{background:#555}
 .toast{position:fixed;left:50%;bottom:18px;transform:translate(-50%,20px);opacity:0;background:#101a13;border:1px solid #ffffff20;padding:9px 13px;border-radius:999px;transition:.18s;pointer-events:none}.toast.show{opacity:1;transform:translate(-50%,0)}
 @media(max-width:680px){:root{--cell:32px}.app{padding:10px}h1{font-size:28px}.actions{flex-direction:column;align-items:end}.tool{min-height:72px}}
@@ -36,9 +51,9 @@ header{display:flex;justify-content:space-between;align-items:end;gap:12px;margi
 </head>
 <body>
 <div class="app">
-<header><div><div class="eyebrow">PWA · AUFBAUSTRATEGIE</div><h1>Rasterstadt</h1></div><div class="actions"><span id="stat">0 / 400 belegt</span><button class="reset" id="reset">Neu starten</button></div></header>
+<header><div><div class="eyebrow">PWA · AUFBAUSTRATEGIE</div><h1>Rasterstadt</h1></div><div class="actions"><span id="residentStat">Bewohner 0/0</span><span id="stat">0 / 400 belegt</span><button class="reset" id="reset">Neu starten</button></div></header>
 <section class="tools">
-<button class="tool active" data-tool="house"><b>🏠 Wohnhaus</b><small>2 × 2 Felder</small></button>
+<button class="tool active" data-tool="house"><b>🏠 Wohnhaus</b><small>2 × 2 Felder · 4 Bewohner</small></button>
 <button class="tool" data-tool="road"><b>🛣️ Straße</b><small>1 × 1 Feld</small></button>
 <button class="tool" data-tool="bulldozer"><b>✕ Abreißen</b><small>Objekt entfernen</small></button>
 </section>
@@ -48,17 +63,44 @@ header{display:flex;justify-content:space-between;align-items:end;gap:12px;margi
 </div>
 <div class="toast" id="toast"></div>
 <script>
-const S=20,board=document.querySelector('#board'),stat=document.querySelector('#stat'),hint=document.querySelector('#hint'),toast=document.querySelector('#toast');
-const occ=Array.from({length:S},()=>Array(S).fill(null)),objs=new Map();let tool='house',n=0,preview=[],timer;
-const cfg={house:{w:2,h:2,label:'Wohnhaus'},road:{w:1,h:1,label:'Straße'}};
+const S=20,board=document.querySelector('#board'),stat=document.querySelector('#stat'),residentStat=document.querySelector('#residentStat'),hint=document.querySelector('#hint'),toast=document.querySelector('#toast');
+const occ=Array.from({length:S},()=>Array(S).fill(null)),objs=new Map(),residents=[];let tool='house',n=0,preview=[],timer,lastTs=0,animId=0;
+const cfg={house:{w:2,h:2,label:'Wohnhaus',residents:4},road:{w:1,h:1,label:'Straße'}};
 function cell(r,c){return board.querySelector('[data-r="'+r+'"][data-c="'+c+'"]')}
 function init(){board.innerHTML='';for(let r=0;r<S;r++)for(let c=0;c<S;c++){const e=document.createElement('div');e.className='cell';e.dataset.r=r;e.dataset.c=c;e.onpointerenter=()=>show(r,c);e.onpointermove=()=>show(r,c);e.onclick=()=>tap(r,c);board.appendChild(e)}}
 function foot(r,c,w,h){const a=[];for(let y=r;y<r+h;y++)for(let x=c;x<c+w;x++)a.push([y,x]);return a}
 function can(r,c,w,h){return r>=0&&c>=0&&r+h<=S&&c+w<=S&&foot(r,c,w,h).every(([y,x])=>!occ[y][x])}
 function clear(){preview.forEach(e=>e.classList.remove('ok','bad'));preview=[]}
 function show(r,c){clear();if(tool==='bulldozer')return;const q=cfg[tool],ok=can(r,c,q.w,q.h);foot(r,c,q.w,q.h).forEach(([y,x])=>{if(y<S&&x<S){const e=cell(y,x);e.classList.add(ok?'ok':'bad');preview.push(e)}})}
-function tap(r,c){if(tool==='bulldozer')return demolish(r,c);const q=cfg[tool];if(!can(r,c,q.w,q.h)){msg('Hier kann nicht gebaut werden.');return show(r,c)}const id=tool+'-'+(++n),f=foot(r,c,q.w,q.h),o={id,type:tool,r,c,w:q.w,h:q.h,f};objs.set(id,o);f.forEach(([y,x])=>{occ[y][x]=id;const e=cell(y,x);e.dataset.id=id;if(tool==='road')e.classList.add('road')});if(tool==='house'){const e=document.createElement('div');e.className='building house';e.dataset.id=id;e.style.left='calc('+c+' * var(--cell))';e.style.top='calc('+r+' * var(--cell))';board.appendChild(e)}if(tool==='road')updateRoadsAround(r,c);clear();update();msg(q.label+' gebaut.')}
-function demolish(r,c){const id=occ[r][c];if(!id)return msg('Dieses Feld ist leer.');const o=objs.get(id);const wasRoad=o.type==='road';o.f.forEach(([y,x])=>{occ[y][x]=null;const e=cell(y,x);e.classList.remove('road');e.style.backgroundImage='';delete e.dataset.id;delete e.dataset.roadMask});board.querySelector('.building[data-id="'+id+'"]')?.remove();objs.delete(id);if(wasRoad)updateRoadsAround(r,c);update();msg('Objekt entfernt.')}
+function tap(r,c){
+  if(tool==='bulldozer')return demolish(r,c);
+  const q=cfg[tool];
+  if(!can(r,c,q.w,q.h)){msg('Hier kann nicht gebaut werden.');return show(r,c)}
+  const id=tool+'-'+(++n),f=foot(r,c,q.w,q.h);
+  const o={id,type:tool,r,c,w:q.w,h:q.h,f,residentCount:q.residents||0,residentCapacity:q.residents||0,connection:null};
+  objs.set(id,o);
+  f.forEach(([y,x])=>{occ[y][x]=id;const e=cell(y,x);e.dataset.id=id;if(tool==='road')e.classList.add('road')});
+  if(tool==='house'){
+    const e=document.createElement('div');
+    e.className='building house';
+    e.dataset.id=id;
+    e.style.left='calc('+c+' * var(--cell))';
+    e.style.top='calc('+r+' * var(--cell))';
+    const ent=document.createElement('div');ent.className='house-entrance';e.appendChild(ent);
+    board.appendChild(e)
+  }
+  if(tool==='road')updateRoadsAround(r,c);
+  clear();refreshHouseConnections();rebuildResidents();update();msg(q.label+' gebaut.')
+}
+function demolish(r,c){
+  const id=occ[r][c];if(!id)return msg('Dieses Feld ist leer.');
+  const o=objs.get(id);const wasRoad=o.type==='road';
+  o.f.forEach(([y,x])=>{occ[y][x]=null;const e=cell(y,x);e.classList.remove('road');e.style.backgroundImage='';delete e.dataset.id;delete e.dataset.roadMask});
+  board.querySelector('.building[data-id="'+id+'"]')?.remove();
+  objs.delete(id);
+  if(wasRoad)updateRoadsAround(r,c);
+  refreshHouseConnections();rebuildResidents();update();msg('Objekt entfernt.')
+}
 
 function objAt(r,c){const id=occ[r]?.[c];return id?objs.get(id):null}
 function isRoad(r,c){return objAt(r,c)?.type==='road'}
@@ -177,11 +219,90 @@ function roadSvg(mask){
 function renderRoad(r,c){if(r<0||c<0||r>=S||c>=S)return;const e=cell(r,c);if(!e)return;if(isRoad(r,c)){const m=roadMask(r,c);e.classList.add('road');e.dataset.roadMask=m;e.style.backgroundImage='url("'+roadSvg(m)+'")'}else{e.classList.remove('road');e.style.backgroundImage='';delete e.dataset.roadMask}}
 function updateRoadsAround(r,c){renderRoad(r,c);renderRoad(r-1,c);renderRoad(r+1,c);renderRoad(r,c-1);renderRoad(r,c+1)}
 
-function update(){stat.textContent=occ.flat().filter(Boolean).length+' / 400 belegt'}
+
+function roadNeighbors(r,c){
+  return [[r-1,c],[r,c+1],[r+1,c],[r,c-1]].filter(([y,x])=>y>=0&&x>=0&&y<S&&x<S&&isRoad(y,x))
+}
+function houseConnection(o){
+  const a=[];
+  for(let i=0;i<o.w;i++){a.push({r:o.r-1,c:o.c+i,dir:'north',slot:i});a.push({r:o.r+o.h,c:o.c+i,dir:'south',slot:i})}
+  for(let i=0;i<o.h;i++){a.push({r:o.r+i,c:o.c-1,dir:'west',slot:i});a.push({r:o.r+i,c:o.c+o.w,dir:'east',slot:i})}
+  return a.find(p=>p.r>=0&&p.c>=0&&p.r<S&&p.c<S&&isRoad(p.r,p.c))||null
+}
+function refreshHouseConnections(){
+  objs.forEach(o=>{
+    if(o.type!=='house')return;
+    o.connection=houseConnection(o);
+    const e=board.querySelector('.building[data-id="'+o.id+'"]');
+    if(!e)return;
+    e.classList.remove('connected','dir-north','dir-south','dir-east','dir-west');
+    if(o.connection){
+      e.classList.add('connected','dir-'+o.connection.dir);
+      e.style.setProperty('--slot',o.connection.slot)
+    }
+  })
+}
+function pxCenter(r,c){
+  const s=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell'));
+  return{x:c*s+s/2,y:r*s+s/2}
+}
+const residentOffsets=[[-4,-4],[4,-4],[-4,4],[4,4]];
+function makeResident(home,index){
+  const el=document.createElement('div');
+  el.className='villager';
+  const robes=['#79513a','#536f87','#6b5a89','#4f774a','#8a6c3e','#7b4b60'];
+  el.style.setProperty('--robe',robes[(index+residents.length)%robes.length]);
+  el.innerHTML='<span class="head"></span><span class="body"></span><span class="leg a"></span><span class="leg b"></span>';
+  board.appendChild(el);
+  const p=home.connection,pt=pxCenter(p.r,p.c),off=residentOffsets[index%residentOffsets.length];
+  return{el,homeId:home.id,r:p.r,c:p.c,pr:null,pc:null,fx:pt.x,fy:pt.y,tx:pt.x,ty:pt.y,t:1,speed:.45+Math.random()*.45,ox:off[0],oy:off[1]}
+}
+function nextRoad(v){
+  let n=roadNeighbors(v.r,v.c);
+  if(!n.length)return[v.r,v.c];
+  const forward=n.filter(([r,c])=>!(r===v.pr&&c===v.pc));
+  if(forward.length)n=forward;
+  return n[Math.floor(Math.random()*n.length)]
+}
+function setTarget(v,nx){
+  const a=pxCenter(v.r,v.c),b=pxCenter(nx[0],nx[1]);
+  v.fx=a.x;v.fy=a.y;v.tx=b.x;v.ty=b.y;v.pr=v.r;v.pc=v.c;v.r=nx[0];v.c=nx[1];v.t=0
+}
+function rebuildResidents(){
+  residents.forEach(v=>v.el.remove());residents.length=0;
+  objs.forEach(o=>{
+    if(o.type!=='house'||!o.connection)return;
+    for(let i=0;i<o.residentCount;i++)residents.push(makeResident(o,i))
+  })
+}
+function renderResidents(dt){
+  residents.forEach(v=>{
+    if(v.t>=1)setTarget(v,nextRoad(v));
+    v.t=Math.min(1,v.t+dt*v.speed);
+    const x=v.fx+(v.tx-v.fx)*v.t+v.ox,y=v.fy+(v.ty-v.fy)*v.t+v.oy;
+    v.el.style.left=x+'px';v.el.style.top=y+'px'
+  })
+}
+function animate(ts){
+  if(!lastTs)lastTs=ts;
+  const dt=Math.min(.05,(ts-lastTs)/1000);lastTs=ts;
+  renderResidents(dt);animId=requestAnimationFrame(animate)
+}
+function residentTotals(){
+  let current=0,capacity=0;
+  objs.forEach(o=>{if(o.type==='house'){current+=o.residentCount||0;capacity+=o.residentCapacity||0}});
+  return{current,capacity}
+}
+
+
+function update(){
+  stat.textContent=occ.flat().filter(Boolean).length+' / 400 belegt';
+  const t=residentTotals();residentStat.textContent='Bewohner '+t.current+'/'+t.capacity
+}
 function msg(t){toast.textContent=t;toast.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>toast.classList.remove('show'),1400)}
-document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{tool=b.dataset.tool;clear();document.querySelectorAll('.tool').forEach(x=>x.classList.toggle('active',x===b));hint.textContent=tool==='house'?'Wohnhaus gewählt. Grün = bauen möglich, Rot = belegt oder außerhalb.':tool==='road'?'Straße gewählt. Jede Straße belegt genau 1 Feld.':'Abreißen gewählt. Tippe ein vorhandenes Objekt an.'});
-document.querySelector('#reset').onclick=()=>{if(!confirm('Spielfeld wirklich leeren?'))return;for(let r=0;r<S;r++)for(let c=0;c<S;c++)occ[r][c]=null;objs.clear();n=0;init();update();msg('Spielfeld zurückgesetzt.')};
-board.onpointerleave=clear;init();update();
-if('serviceWorker'in navigator)addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=6',{updateViaCache:'none'});await reg.update();let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}})}catch(e){console.warn('Service Worker Update fehlgeschlagen',e)}});
+document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{tool=b.dataset.tool;clear();document.querySelectorAll('.tool').forEach(x=>x.classList.toggle('active',x===b));hint.textContent=tool==='house'?'Wohnhaus gewählt. Grün = bauen möglich, Rot = belegt oder außerhalb.':tool==='road'?'Straße gewählt. Pflasterstraßen verbinden sich automatisch; Bewohner laufen nur auf verbundenen Wegen.':'Abreißen gewählt. Tippe ein vorhandenes Objekt an.'});
+document.querySelector('#reset').onclick=()=>{if(!confirm('Spielfeld wirklich leeren?'))return;for(let r=0;r<S;r++)for(let c=0;c<S;c++)occ[r][c]=null;objs.clear();residents.forEach(v=>v.el.remove());residents.length=0;n=0;init();refreshHouseConnections();update();msg('Spielfeld zurückgesetzt.')};
+board.onpointerleave=clear;init();refreshHouseConnections();rebuildResidents();update();cancelAnimationFrame(animId);animId=requestAnimationFrame(animate);
+if('serviceWorker'in navigator)addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=9',{updateViaCache:'none'});await reg.update();let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}})}catch(e){console.warn('Service Worker Update fehlgeschlagen',e)}});
 </script>
 </body></html>
