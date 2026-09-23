@@ -1,5 +1,5 @@
-const C='rasterstadt-v21';
-const A=['./','./index.html','./manifest.webmanifest','./icon.svg'];
+const C='rasterstadt-v22';
+const A=['./','./index.html','./manifest.webmanifest','./icon.svg','./assets/house.webp','./assets/quarry.webp','./assets/townhall.webp','./assets/park.webp','./assets/school.webp'];
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(C).then(c=>c.addAll(A)));
