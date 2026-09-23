@@ -336,7 +336,7 @@ function pxCenter(r,c){
   const s=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell'));
   return{x:c*s+s/2,y:r*s+s/2}
 }
-const residentOffsets=[[-4,-4],[4,-4],[-4,4],[4,4]];
+const residentOffsets=[[-7,-5],[0,-5],[7,-5],[-7,0],[0,0],[7,0],[-7,5],[0,5],[7,5],[-4,8],[4,8],[0,-8]];
 function makeResident(home,index){
   const el=document.createElement('div');el.className='villager';
   const robes=['#79513a','#536f87','#6b5a89','#4f774a','#8a6c3e','#7b4b60'];
@@ -353,6 +353,13 @@ function nextRoad(v){
 function setTarget(v,nx){
   const a=pxCenter(v.r,v.c),b=pxCenter(nx[0],nx[1]);v.fx=a.x;v.fy=a.y;v.tx=b.x;v.ty=b.y;v.pr=v.r;v.pc=v.c;v.r=nx[0];v.c=nx[1];v.t=0
 }
+
+function roadPath(start,end){
+ if(!start||!end||start.network!==end.network)return[];const key=(r,c)=>r+','+c,q=[[start.r,start.c]],prev=new Map([[key(start.r,start.c),null]]);
+ for(let i=0;i<q.length;i++){const [r,c]=q[i];if(r===end.r&&c===end.c)break;roadNeighbors(r,c).forEach(([nr,nc])=>{const k=key(nr,nc);if(!prev.has(k)&&roadComp[nr][nc]===start.network){prev.set(k,[r,c]);q.push([nr,nc])}})}
+ const ek=key(end.r,end.c);if(!prev.has(ek))return[];const out=[];let cur=[end.r,end.c];while(cur){out.push(cur);cur=prev.get(key(cur[0],cur[1]))}return out.reverse()
+}
+
 function rebuildResidents(){
   residents.forEach(v=>v.el.remove());residents.length=0;
   objs.forEach(o=>{
@@ -362,7 +369,9 @@ function rebuildResidents(){
   });
   const slots=[];
   objs.forEach(o=>{if(o.type==='road'||!o.active||!o.connection)return;const jobs=cfg[o.type].jobs||0;for(let i=0;i<jobs;i++)slots.push({id:o.id,network:o.connection.network})});
-  residents.forEach(v=>{const i=slots.findIndex(s=>s.network===v.network);if(i>=0){v.jobId=slots[i].id;slots.splice(i,1)}});rebuildVehicles()
+  residents.forEach(v=>{const i=slots.findIndex(s=>s.network===v.network);if(i>=0){v.jobId=slots[i].id;slots.splice(i,1)}});
+ residents.forEach(v=>{if(!v.jobId)return;const h=objs.get(v.homeId),j=objs.get(v.jobId),p=roadPath(h?.connection,j?.connection);if(p.length>1){v.path=p.concat(p.slice(1,-1).reverse());v.pathIndex=0}});
+ rebuildVehicles()
 }
 function rebuildVehicles(){
  vehicles.forEach(v=>v.el.remove());vehicles.length=0;animals.forEach(a=>a.remove());animals.length=0;
@@ -383,7 +392,10 @@ function renderVehicles(dt){
 }
 function renderResidents(dt){
   residents.forEach(v=>{
-    if(v.t>=1)setTarget(v,nextRoad(v));
+    if(v.t>=1){
+      if(v.path&&v.path.length>1){v.pathIndex=(v.pathIndex+1)%v.path.length;setTarget(v,v.path[v.pathIndex])}
+      else setTarget(v,nextRoad(v))
+    }
     v.t=Math.min(1,v.t+dt*v.speed);
     const x=v.fx+(v.tx-v.fx)*v.t+v.ox,y=v.fy+(v.ty-v.fy)*v.t+v.oy;
     v.el.style.left=x+'px';v.el.style.top=y+'px'
@@ -486,7 +498,7 @@ function renderCity(){
  panelContent.innerHTML='<div class="panel-grid"><div class="panel-card"><b>'+s.level.name+' · Stufe '+s.level.level+'</b><small>Stadtentwicklung</small><div class="progress"><i style="width:'+progress+'%"></i></div></div><div class="panel-card"><b>'+active+'/'+total+'</b><small>Gebäude aktiv</small></div><div class="panel-card"><b>'+(s.townhall?'Ja':'Nein')+'</b><small>Rathaus aktiv</small></div></div><div class="goal-list">'+goals.map(g=>'<div class="goal '+(g.ok?'ok':'')+'">'+(g.ok?'✓':'○')+' '+g.t+'</div>').join('')+'</div><div class="panel-grid needs-grid"><div class="panel-card"><b>'+Math.round(s.education*100)+'%</b><small>Bildung</small></div><div class="panel-card"><b>'+Math.round(s.health*100)+'%</b><small>Gesundheit</small></div><div class="panel-card"><b>'+Math.round(s.safety*100)+'%</b><small>Sicherheit</small></div><div class="panel-card"><b>'+Math.round(s.leisure*100)+'%</b><small>Freizeit</small></div><div class="panel-card"><b>'+Math.round(s.power*100)+'%</b><small>Strom</small></div></div>'
 }
 function renderResidentsPanel(){
- panelTitle.textContent='Bewohner';const s=simState(),chips=residents.slice(0,10).map(v=>'<div class="resident-chip"><b>'+v.name+' · '+v.age+'</b>'+(v.jobId?cfg[objs.get(v.jobId)?.type]?.label:'Arbeitslos')+'<br>'+(v.jobId?'Unterwegs / Arbeit':'Spaziergang')+'</div>').join('');
+ panelTitle.textContent='Bewohner';const s=simState(),chips=residents.slice(0,10).map(v=>'<div class="resident-chip"><b>'+v.name+' · '+v.age+'</b>'+(v.jobId?cfg[objs.get(v.jobId)?.type]?.label:'Arbeitslos')+'<br>'+(v.jobId?('Arbeitsweg → '+(cfg[objs.get(v.jobId)?.type]?.label||'Arbeit')):'Spaziergang')+'</div>').join('');
  panelContent.innerHTML='<div class="panel-grid"><div class="panel-card"><b>'+s.population+'/'+s.capacity+'</b><small>Bewohner / Kapazität</small></div><div class="panel-card"><b>'+s.employed+'</b><small>Beschäftigt</small></div><div class="panel-card"><b>'+s.unemployed+'</b><small>Arbeitslos</small></div><div class="panel-card"><b>'+s.jobs+'</b><small>Arbeitsplätze</small></div><div class="panel-card"><b>'+economy.happiness+'%</b><small>Zufriedenheit</small></div></div>'+(chips?'<div class="resident-list">'+chips+'</div>':'')
 }
 function renderFinance(){
