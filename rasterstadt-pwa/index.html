@@ -314,9 +314,14 @@ function houseConnection(o){
 }
 function refreshHouseConnections(){
   computeRoadComponents();
+  const residentialNetworks=new Set();
   objs.forEach(o=>{
     if(o.type==='road'){o.active=true;return}
-    o.connection=houseConnection(o);if(o.connection)o.connection.network=roadComp[o.connection.r][o.connection.c];o.active=!!o.connection;
+    o.connection=houseConnection(o);if(o.connection){o.connection.network=roadComp[o.connection.r][o.connection.c];if(o.type==='house')residentialNetworks.add(o.connection.network)}
+  });
+  objs.forEach(o=>{
+    if(o.type==='road')return;
+    o.active=!!o.connection&&(o.type==='house'||residentialNetworks.has(o.connection.network));
     const e=board.querySelector('.building[data-id="'+o.id+'"]');if(!e)return;
     e.classList.toggle('inactive',!o.active);e.classList.toggle('active',o.active);
     e.classList.remove('connected','dir-north','dir-south','dir-east','dir-west');
@@ -410,13 +415,13 @@ function calcHappiness(s){
   let h=42+employment*28+foodCover*18+s.market*5+s.townhall*4+s.parks*3;if(s.level.level>=2)h+=s.education*3+s.safety*3+s.power*3;if(s.level.level>=3)h+=s.health*4;h+=weather==='sun'?2:weather==='rain'?-2:0;return Math.max(15,Math.min(100,Math.round(h)))
 }
 function economyTick(){
-  const s=simState();let woodGain=0,stoneGain=0,foodGain=0,marketIncome=0,upkeep=0;
+  const s=simState(),powerEff=s.level.level>=2?(.6+.4*s.power):1;let woodGain=0,stoneGain=0,foodGain=0,marketIncome=0,upkeep=0;
   objs.forEach(o=>{
     if(o.type==='road'){upkeep+=cfg.road.upkeep;return}
     if(!o.active)return;const workers=employedIn(o.id),q=cfg[o.type];upkeep+=q.upkeep||0;
     if(o.type==='lumberjack')woodGain+=workers*1.1;
     if(o.type==='farm')foodGain+=workers*1.45;if(o.type==='quarry')stoneGain+=workers*.95;
-    if(o.type==='market')marketIncome+=workers*2.1
+    if(o.type==='market')marketIncome+=workers*2.1*powerEff
   });
   const tax=s.population*1.15*(.72+economy.happiness/250),income=tax+marketIncome+s.townhall*8,foodUse=s.population*.22;
   economy.wood+=woodGain;economy.stone+=stoneGain;economy.food=Math.max(0,economy.food+foodGain-foodUse);economy.money=Math.max(0,economy.money+income-upkeep);
@@ -495,7 +500,7 @@ function activatePanel(p){
 function openDetail(o){
  if(!o)return;const q=cfg[o.type];
  if(o.type==='road'){detailContent.innerHTML='<h2>Pflasterstraße</h2><p>Verbundenes Straßenelement. Kosten: 8 Münzen + 1 Stein.</p>';detailSheet.classList.add('show');return}
- const workers=employedIn(o.id),bad=o.active?'':' bad',status=o.active?'Aktiv':'Kein Straßenanschluss';let upgrade='';
+ const workers=employedIn(o.id),bad=o.active?'':' bad',status=o.active?'Aktiv':(o.connection?'Nicht mit Wohngebiet verbunden':'Kein Straßenanschluss');let upgrade='';
  if(o.type==='house'&&(o.level||1)<3){const nl=(o.level||1)+1,nx=houseLevels[nl],s=simState(),can=s.level.level>=nx.level&&hasCost(nx.cost);upgrade='<button class="upgradebtn" data-upgrade="'+o.id+'" '+(can?'':'disabled')+'>Auf Stufe '+nl+' ausbauen · '+costText(nx.cost)+(s.level.level<nx.level?' · benötigt Stadtstufe '+nx.level:'')+'</button>'}
  detailContent.innerHTML='<div class="detail-hero"><div class="detail-thumb" style="background-image:'+spriteUri(o.type)+'"></div><div><h2>'+q.label+'</h2><span class="statuspill'+bad+'">'+status+'</span><p>'+q.desc+'</p></div></div><div class="detail-stats"><div class="detail-stat"><b>'+(o.type==='house'?houseLevels[o.level||1].capacity:q.jobs)+'</b><small>'+(o.type==='house'?'Bewohner':'Arbeitsplätze')+'</small></div><div class="detail-stat"><b>'+(o.active?'Ja':'Nein')+'</b><small>Straßenanschluss</small></div>'+(q.jobs?'<div class="detail-stat"><b>'+workers+'/'+q.jobs+'</b><small>Beschäftigt</small></div>':'')+'<div class="detail-stat"><b>Stufe '+(o.level||1)+'</b><small>Gebäude</small></div></div>'+upgrade;
  detailSheet.classList.add('show');const b=detailContent.querySelector('[data-upgrade]');if(b)b.onclick=()=>upgradeHouse(b.dataset.upgrade)
