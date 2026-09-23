@@ -100,6 +100,7 @@ const cfg={
  road:{w:1,h:1,label:'Straße',residents:0,jobs:0,upkeep:.12,cost:{money:8,wood:0},category:'road'}
 };
 const houseLevels={1:{capacity:4},2:{capacity:8,cost:{money:700,wood:12},level:2},3:{capacity:12,cost:{money:1200,wood:18},level:3}};
+let roadComp=Array.from({length:S},()=>Array(S).fill(-1));
 const citizenNames=['Lena','Noah','Emma','Finn','Mia','Ben','Lina','Paul','Ella','Leo','Nora','Luis','Ida','Jonas','Maja','Theo','Clara','Max','Sophie','Anton','Leni','Tom','Marie','Oskar'];
 
 function spriteUri(type){
@@ -147,7 +148,7 @@ function tap(r,c){
   objs.set(id,o);f.forEach(([y,x])=>{occ[y][x]=id;const e=cell(y,x);e.dataset.id=id;if(tool==='road')e.classList.add('road')});
   if(tool!=='road')addBuildingVisual(o);
   if(tool==='road')updateRoadsAround(r,c);
-  clear();refreshHouseConnections();rebuildResidents();update();renderPanel(currentPanel);msg(q.label+' gebaut.')
+  clear();refreshHouseConnections();rebuildResidents();update();renderPanel(currentPanel);saveGame();msg(q.label+' gebaut.')
 }
 function demolish(r,c){
   const id=occ[r][c];if(!id)return msg('Dieses Feld ist leer.');
@@ -156,7 +157,7 @@ function demolish(r,c){
   board.querySelector('.building[data-id="'+id+'"]')?.remove();
   objs.delete(id);
   if(wasRoad)updateRoadsAround(r,c);
-  refreshHouseConnections();rebuildResidents();update();msg('Objekt entfernt.')
+  refreshHouseConnections();rebuildResidents();update();renderPanel(currentPanel);saveGame();msg('Objekt entfernt.')
 }
 
 function objAt(r,c){const id=occ[r]?.[c];return id?objs.get(id):null}
@@ -280,6 +281,16 @@ function updateRoadsAround(r,c){renderRoad(r,c);renderRoad(r-1,c);renderRoad(r+1
 function roadNeighbors(r,c){
   return [[r-1,c],[r,c+1],[r+1,c],[r,c-1]].filter(([y,x])=>y>=0&&x>=0&&y<S&&x<S&&isRoad(y,x))
 }
+
+function computeRoadComponents(){
+ roadComp=Array.from({length:S},()=>Array(S).fill(-1));let id=0;
+ for(let r=0;r<S;r++)for(let c=0;c<S;c++)if(isRoad(r,c)&&roadComp[r][c]<0){
+  const q=[[r,c]];roadComp[r][c]=id;
+  for(let i=0;i<q.length;i++){const [y,x]=q[i];roadNeighbors(y,x).forEach(([ny,nx])=>{if(roadComp[ny][nx]<0){roadComp[ny][nx]=id;q.push([ny,nx])}})}
+  id++
+ }
+}
+
 function houseConnection(o){
   const a=[];
   for(let i=0;i<o.w;i++){a.push({r:o.r-1,c:o.c+i,dir:'north',slot:i});a.push({r:o.r+o.h,c:o.c+i,dir:'south',slot:i})}
@@ -287,9 +298,10 @@ function houseConnection(o){
   return a.find(p=>p.r>=0&&p.c>=0&&p.r<S&&p.c<S&&isRoad(p.r,p.c))||null
 }
 function refreshHouseConnections(){
+  computeRoadComponents();
   objs.forEach(o=>{
     if(o.type==='road'){o.active=true;return}
-    o.connection=houseConnection(o);o.active=!!o.connection;
+    o.connection=houseConnection(o);if(o.connection)o.connection.network=roadComp[o.connection.r][o.connection.c];o.active=!!o.connection;
     const e=board.querySelector('.building[data-id="'+o.id+'"]');if(!e)return;
     e.classList.toggle('inactive',!o.active);e.classList.toggle('active',o.active);
     e.classList.remove('connected','dir-north','dir-south','dir-east','dir-west');
@@ -306,32 +318,31 @@ function pxCenter(r,c){
 }
 const residentOffsets=[[-4,-4],[4,-4],[-4,4],[4,4]];
 function makeResident(home,index){
-  const el=document.createElement('div');
-  el.className='villager';
+  const el=document.createElement('div');el.className='villager';
   const robes=['#79513a','#536f87','#6b5a89','#4f774a','#8a6c3e','#7b4b60'];
   el.style.setProperty('--robe',robes[(index+residents.length)%robes.length]);
-  el.innerHTML='<span class="head"></span><span class="body"></span><span class="leg a"></span><span class="leg b"></span>';
-  board.appendChild(el);
+  el.innerHTML='<span class="head"></span><span class="body"></span><span class="leg a"></span><span class="leg b"></span>';board.appendChild(el);
   const p=home.connection,pt=pxCenter(p.r,p.c),off=residentOffsets[index%residentOffsets.length];
-  return{el,homeId:home.id,r:p.r,c:p.c,pr:null,pc:null,fx:pt.x,fy:pt.y,tx:pt.x,ty:pt.y,t:1,speed:.45+Math.random()*.45,ox:off[0],oy:off[1]}
+  return{el,name:citizenNames[(n+index+residents.length)%citizenNames.length],homeId:home.id,jobId:null,network:p.network,r:p.r,c:p.c,pr:null,pc:null,fx:pt.x,fy:pt.y,tx:pt.x,ty:pt.y,t:1,speed:.42+Math.random()*.38,ox:off[0],oy:off[1]}
 }
 function nextRoad(v){
-  let n=roadNeighbors(v.r,v.c);
-  if(!n.length)return[v.r,v.c];
-  const forward=n.filter(([r,c])=>!(r===v.pr&&c===v.pc));
-  if(forward.length)n=forward;
-  return n[Math.floor(Math.random()*n.length)]
+  let ns=roadNeighbors(v.r,v.c).filter(([r,c])=>roadComp[r][c]===v.network);
+  if(!ns.length)return[v.r,v.c];const forward=ns.filter(([r,c])=>!(r===v.pr&&c===v.pc));if(forward.length)ns=forward;
+  return ns[Math.floor(Math.random()*ns.length)]
 }
 function setTarget(v,nx){
-  const a=pxCenter(v.r,v.c),b=pxCenter(nx[0],nx[1]);
-  v.fx=a.x;v.fy=a.y;v.tx=b.x;v.ty=b.y;v.pr=v.r;v.pc=v.c;v.r=nx[0];v.c=nx[1];v.t=0
+  const a=pxCenter(v.r,v.c),b=pxCenter(nx[0],nx[1]);v.fx=a.x;v.fy=a.y;v.tx=b.x;v.ty=b.y;v.pr=v.r;v.pc=v.c;v.r=nx[0];v.c=nx[1];v.t=0
 }
 function rebuildResidents(){
   residents.forEach(v=>v.el.remove());residents.length=0;
   objs.forEach(o=>{
-    if(o.type!=='house'||!o.connection)return;
-    for(let i=0;i<o.residentCount;i++)residents.push(makeResident(o,i))
-  })
+    if(o.type!=='house'||!o.active||!o.connection)return;
+    const cap=houseLevels[o.level||1].capacity;o.residentCount=cap;o.residentCapacity=cap;
+    for(let i=0;i<cap;i++)residents.push(makeResident(o,i))
+  });
+  const slots=[];
+  objs.forEach(o=>{if(o.type==='road'||!o.active||!o.connection)return;const jobs=cfg[o.type].jobs||0;for(let i=0;i<jobs;i++)slots.push({id:o.id,network:o.connection.network})});
+  residents.forEach(v=>{const i=slots.findIndex(s=>s.network===v.network);if(i>=0){v.jobId=slots[i].id;slots.splice(i,1)}})
 }
 function renderResidents(dt){
   residents.forEach(v=>{
@@ -347,20 +358,122 @@ function animate(ts){
   renderResidents(dt);animId=requestAnimationFrame(animate)
 }
 function residentTotals(){
-  let current=0,capacity=0;
-  objs.forEach(o=>{if(o.type==='house'){current+=o.residentCount||0;capacity+=o.residentCapacity||0}});
-  return{current,capacity}
+  let capacity=0;objs.forEach(o=>{if(o.type==='house')capacity+=houseLevels[o.level||1].capacity});
+  return{current:residents.length,capacity}
 }
-
-
+function employedIn(id){return residents.filter(v=>v.jobId===id).length}
+function simState(){
+  const t=residentTotals();let jobs=0,market=0,townhall=0;
+  objs.forEach(o=>{if(o.type!=='road'&&o.active){jobs+=cfg[o.type].jobs||0;if(o.type==='market')market++;if(o.type==='townhall')townhall++}});
+  const employed=residents.filter(v=>v.jobId).length;
+  let level={name:'Siedlung',level:1,next:20};
+  if(t.current>=120&&townhall&&market>=2)level={name:'Stadt',level:4,next:200};
+  else if(t.current>=60&&townhall&&market)level={name:'Kleinstadt',level:3,next:120};
+  else if(t.current>=20&&townhall)level={name:'Dorf',level:2,next:60};
+  return{population:t.current,capacity:t.capacity,jobs,employed,unemployed:Math.max(0,t.current-employed),market,townhall,level}
+}
+function calcHappiness(s){
+  if(!s.population)return 70;
+  const employment=s.employed/s.population,foodCover=Math.max(0,Math.min(1,economy.food/Math.max(1,s.population*1.2)));
+  return Math.max(15,Math.min(100,Math.round(42+employment*28+foodCover*18+s.market*5+s.townhall*4)))
+}
+function economyTick(){
+  const s=simState();let woodGain=0,foodGain=0,marketIncome=0,upkeep=0;
+  objs.forEach(o=>{
+    if(o.type==='road'){upkeep+=cfg.road.upkeep;return}
+    if(!o.active)return;const workers=employedIn(o.id),q=cfg[o.type];upkeep+=q.upkeep||0;
+    if(o.type==='lumberjack')woodGain+=workers*1.1;
+    if(o.type==='farm')foodGain+=workers*1.45;
+    if(o.type==='market')marketIncome+=workers*2.1
+  });
+  const tax=s.population*1.15*(.72+economy.happiness/250),income=tax+marketIncome+s.townhall*8,foodUse=s.population*.22;
+  economy.wood+=woodGain;economy.food=Math.max(0,economy.food+foodGain-foodUse);economy.money=Math.max(0,economy.money+income-upkeep);
+  economy.lastIncome=income;economy.lastUpkeep=upkeep;economy.lastNet=income-upkeep;economy.lastWood=woodGain;economy.lastFood=foodGain-foodUse;economy.tick++;
+  const after=simState();economy.happiness=calcHappiness(after);nextEconomyAt=Date.now()+10000;
+  update();renderPanel(currentPanel);saveGame();
+  ticker.textContent='Abrechnung: '+(economy.lastNet>=0?'+':'')+Math.round(economy.lastNet)+' Münzen · '+(woodGain?('+'+Math.round(woodGain)+' Holz · '):'')+(economy.lastFood>=0?'+':'')+Math.round(economy.lastFood)+' Nahrung';
+  setTimeout(()=>{ticker.textContent='Inaktive Gebäude pulsieren rot. Nächste Abrechnung läuft automatisch.'},2600)
+}
 function update(){
   stat.textContent=occ.flat().filter(Boolean).length+' / 400 belegt';
-  const t=residentTotals();residentStat.textContent='Bewohner '+t.current+'/'+t.capacity
+  lastSim=simState();economy.happiness=calcHappiness(lastSim);
+  residentStat.textContent=lastSim.population+'/'+lastSim.capacity;
+  moneyStat.textContent=Math.round(economy.money).toLocaleString('de-DE');woodStat.textContent=Math.round(economy.wood).toLocaleString('de-DE');foodStat.textContent=Math.round(economy.food).toLocaleString('de-DE');
+  jobStat.textContent=lastSim.employed+'/'+lastSim.population;happyStat.textContent=economy.happiness+'%';levelStat.textContent=lastSim.level.name;levelSmall.textContent='Stufe '+lastSim.level.level
 }
 function msg(t){toast.textContent=t;toast.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>toast.classList.remove('show'),1400)}
-document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{tool=b.dataset.tool;clear();document.querySelectorAll('.tool').forEach(x=>x.classList.toggle('active',x===b));hint.textContent=tool==='house'?'Wohnhaus gewählt. Grün = bauen möglich, Rot = belegt oder außerhalb.':tool==='road'?'Straße gewählt. Pflasterstraßen verbinden sich automatisch; Bewohner laufen nur auf verbundenen Wegen.':'Abreißen gewählt. Tippe ein vorhandenes Objekt an.'});
-document.querySelector('#reset').onclick=()=>{if(!confirm('Spielfeld wirklich leeren?'))return;for(let r=0;r<S;r++)for(let c=0;c<S;c++)occ[r][c]=null;objs.clear();residents.forEach(v=>v.el.remove());residents.length=0;n=0;init();refreshHouseConnections();update();msg('Spielfeld zurückgesetzt.')};
-board.onpointerleave=clear;init();refreshHouseConnections();rebuildResidents();update();cancelAnimationFrame(animId);animId=requestAnimationFrame(animate);
-if('serviceWorker'in navigator)addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=10',{updateViaCache:'none'});await reg.update();let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}})}catch(e){console.warn('Service Worker Update fehlgeschlagen',e)}});
+
+function setTool(t){
+ tool=t;clear();document.querySelector('#bulldozerBtn').classList.toggle('active',t==='bulldozer');document.querySelector('#inspectBtn').classList.toggle('active',t==='inspect');
+ if(t==='road'){modeTitle.textContent='Pflasterstraße';modeSub.textContent='1 × 1 · 8 Münzen · verbindet Gebäude';hint.textContent='Straße gewählt. Kurven und Kreuzungen verbinden sich automatisch.'}
+ else if(cfg[t]){modeTitle.textContent=cfg[t].label;modeSub.textContent=cfg[t].w+' × '+cfg[t].h+' · benötigt Straßenanschluss';hint.textContent=cfg[t].label+' gewählt. Grün = bauen möglich, Rot = belegt.'}
+ else{modeTitle.textContent=t==='bulldozer'?'Abreißen':'Gebäude ansehen';modeSub.textContent=t==='bulldozer'?'Tippe ein Objekt zum Entfernen an':'Tippe ein Gebäude für Details an';hint.textContent=modeSub.textContent}
+}
+function buildCard(type){
+ const q=cfg[type],reason=unlockReason(type),locked=!!reason,sel=tool===type?' selected':'',lock=locked?' locked':'';
+ return '<button class="buildcard'+sel+lock+'" data-build="'+type+'"><span class="buildthumb" style="background-image:'+spriteUri(type)+'"></span><span><strong>'+q.label+'</strong><small>'+q.w+'×'+q.h+' · '+(q.residents?(q.residents+' Bewohner'):(q.jobs+' Jobs'))+'</small><span class="costline">'+costText(q.cost)+'</span></span>'+(locked?'<i class="lockmark">🔒</i>':'')+'</button>'
+}
+function renderBuild(){
+ panelTitle.textContent='Bauen';const cats=[['all','Alle'],['living','Wohnen'],['production','Produktion'],['service','Versorgung'],['public','Öffentlich']];
+ const tabs='<div class="category-tabs">'+cats.map(x=>'<button class="catbtn '+(activeCategory===x[0]?'active':'')+'" data-cat="'+x[0]+'">'+x[1]+'</button>').join('')+'</div>';
+ const types=['house','lumberjack','farm','market','townhall'].filter(t=>activeCategory==='all'||cfg[t].category===activeCategory);
+ panelContent.innerHTML=tabs+'<div class="build-grid">'+types.map(buildCard).join('')+'</div>';
+ panelContent.querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>{activeCategory=b.dataset.cat;renderBuild()});
+ panelContent.querySelectorAll('[data-build]').forEach(b=>b.onclick=()=>{const reason=unlockReason(b.dataset.build);if(reason)return msg(reason);setTool(b.dataset.build);gamePanel.classList.remove('open');renderBuild()})
+}
+function renderRoads(){
+ panelTitle.textContent='Straßen';const roads=[...objs.values()].filter(o=>o.type==='road').length;
+ panelContent.innerHTML='<div class="panel-grid"><div class="panel-card"><b>🛣️ Pflasterstraße</b><small>Verbindet Gebäude und Bewohnerwege.</small><span class="costline">💰 8 je Feld</span></div><div class="panel-card"><b>'+roads+'</b><small>Straßenfelder</small></div><div class="panel-card"><b>Automatisch</b><small>Geraden, Kurven, T-Stücke und Kreuzungen.</small></div></div>'
+}
+function levelGoals(s){
+ if(s.level.level===1)return[{ok:s.population>=20,t:'20 Bewohner ('+s.population+'/20)'},{ok:s.townhall>0,t:'Aktives Rathaus'}];
+ if(s.level.level===2)return[{ok:s.population>=60,t:'60 Bewohner ('+s.population+'/60)'},{ok:s.market>0,t:'Aktiver Markt'}];
+ if(s.level.level===3)return[{ok:s.population>=120,t:'120 Bewohner ('+s.population+'/120)'},{ok:s.market>=2,t:'2 aktive Märkte ('+s.market+'/2)'}];
+ return[{ok:true,t:'Aktuell höchste Stadtstufe erreicht'}]
+}
+function renderCity(){
+ panelTitle.textContent='Stadt';const s=simState(),goals=levelGoals(s),progress=Math.min(100,s.population/s.level.next*100),active=[...objs.values()].filter(o=>o.type!=='road'&&o.active).length,total=[...objs.values()].filter(o=>o.type!=='road').length;
+ panelContent.innerHTML='<div class="panel-grid"><div class="panel-card"><b>'+s.level.name+' · Stufe '+s.level.level+'</b><small>Stadtentwicklung</small><div class="progress"><i style="width:'+progress+'%"></i></div></div><div class="panel-card"><b>'+active+'/'+total+'</b><small>Gebäude aktiv</small></div><div class="panel-card"><b>'+(s.townhall?'Ja':'Nein')+'</b><small>Rathaus aktiv</small></div></div><div class="goal-list">'+goals.map(g=>'<div class="goal '+(g.ok?'ok':'')+'">'+(g.ok?'✓':'○')+' '+g.t+'</div>').join('')+'</div>'
+}
+function renderResidentsPanel(){
+ panelTitle.textContent='Bewohner';const s=simState(),chips=residents.slice(0,10).map(v=>'<div class="resident-chip"><b>'+v.name+'</b>'+(v.jobId?cfg[objs.get(v.jobId)?.type]?.label:'Arbeitslos')+'<br>'+v.homeId+'</div>').join('');
+ panelContent.innerHTML='<div class="panel-grid"><div class="panel-card"><b>'+s.population+'/'+s.capacity+'</b><small>Bewohner / Kapazität</small></div><div class="panel-card"><b>'+s.employed+'</b><small>Beschäftigt</small></div><div class="panel-card"><b>'+s.unemployed+'</b><small>Arbeitslos</small></div><div class="panel-card"><b>'+s.jobs+'</b><small>Arbeitsplätze</small></div><div class="panel-card"><b>'+economy.happiness+'%</b><small>Zufriedenheit</small></div></div>'+(chips?'<div class="resident-list">'+chips+'</div>':'')
+}
+function renderFinance(){
+ panelTitle.textContent='Finanzen';panelContent.innerHTML='<div class="finance-table"><span>Einnahmen / Abrechnung</span><b>+'+Math.round(economy.lastIncome)+'</b><span>Unterhalt</span><b>-'+Math.round(economy.lastUpkeep)+'</b><span>Saldo</span><b>'+(economy.lastNet>=0?'+':'')+Math.round(economy.lastNet)+'</b><span>Holzproduktion</span><b>+'+Math.round(economy.lastWood)+'</b><span>Nahrungsbilanz</span><b>'+(economy.lastFood>=0?'+':'')+Math.round(economy.lastFood)+'</b><span>Nächste Abrechnung</span><b>'+Math.max(0,Math.ceil((nextEconomyAt-Date.now())/1000))+'s</b></div>'
+}
+function renderPanel(p){if(p==='build')renderBuild();else if(p==='roads')renderRoads();else if(p==='city')renderCity();else if(p==='residents')renderResidentsPanel();else renderFinance()}
+function activatePanel(p){
+ currentPanel=p;document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.panel===p));gamePanel.classList.add('open');renderPanel(p);
+ if(p==='roads')setTool('road');else if(p!=='build')setTool('inspect')
+}
+function openDetail(o){
+ if(!o)return;const q=cfg[o.type];
+ if(o.type==='road'){detailContent.innerHTML='<h2>Pflasterstraße</h2><p>Verbundenes Straßenelement. Kosten: 8 Münzen.</p>';detailSheet.classList.add('show');return}
+ const workers=employedIn(o.id),bad=o.active?'':' bad',status=o.active?'Aktiv':'Kein Straßenanschluss';let upgrade='';
+ if(o.type==='house'&&(o.level||1)<3){const nl=(o.level||1)+1,nx=houseLevels[nl],s=simState(),can=s.level.level>=nx.level&&hasCost(nx.cost);upgrade='<button class="upgradebtn" data-upgrade="'+o.id+'" '+(can?'':'disabled')+'>Auf Stufe '+nl+' ausbauen · '+costText(nx.cost)+(s.level.level<nx.level?' · benötigt Stadtstufe '+nx.level:'')+'</button>'}
+ detailContent.innerHTML='<div class="detail-hero"><div class="detail-thumb" style="background-image:'+spriteUri(o.type)+'"></div><div><h2>'+q.label+'</h2><span class="statuspill'+bad+'">'+status+'</span><p>'+q.desc+'</p></div></div><div class="detail-stats"><div class="detail-stat"><b>'+(o.type==='house'?houseLevels[o.level||1].capacity:q.jobs)+'</b><small>'+(o.type==='house'?'Bewohner':'Arbeitsplätze')+'</small></div><div class="detail-stat"><b>'+(o.active?'Ja':'Nein')+'</b><small>Straßenanschluss</small></div>'+(q.jobs?'<div class="detail-stat"><b>'+workers+'/'+q.jobs+'</b><small>Beschäftigt</small></div>':'')+'<div class="detail-stat"><b>Stufe '+(o.level||1)+'</b><small>Gebäude</small></div></div>'+upgrade;
+ detailSheet.classList.add('show');const b=detailContent.querySelector('[data-upgrade]');if(b)b.onclick=()=>upgradeHouse(b.dataset.upgrade)
+}
+function upgradeHouse(id){
+ const o=objs.get(id);if(!o||o.type!=='house')return;const nl=(o.level||1)+1,nx=houseLevels[nl],s=simState();if(!nx||s.level.level<nx.level||!hasCost(nx.cost))return;
+ pay(nx.cost);o.level=nl;o.residentCount=nx.capacity;o.residentCapacity=nx.capacity;rebuildResidents();update();renderPanel(currentPanel);saveGame();openDetail(o);msg('Wohnhaus auf Stufe '+nl+' ausgebaut.')
+}
+function saveGame(){
+ try{localStorage.setItem('rasterstadt-save-v13',JSON.stringify({economy,n,objects:[...objs.values()].map(o=>({id:o.id,type:o.type,r:o.r,c:o.c,w:o.w,h:o.h,level:o.level||1}))}))}catch(e){}
+}
+function loadGame(){
+ try{const s=JSON.parse(localStorage.getItem('rasterstadt-save-v13')||'null');if(!s)return false;economy={...economy,...s.economy};n=s.n||0;(s.objects||[]).forEach(x=>{const q=cfg[x.type];if(!q)return;const o={...x,f:foot(x.r,x.c,x.w,x.h),residentCount:x.type==='house'?houseLevels[x.level||1].capacity:0,residentCapacity:x.type==='house'?houseLevels[x.level||1].capacity:0};objs.set(o.id,o);o.f.forEach(([y,z])=>{if(y<S&&z<S){occ[y][z]=o.id;const e=cell(y,z);e.dataset.id=o.id;if(o.type==='road')e.classList.add('road')}});if(o.type!=='road')addBuildingVisual(o)});return true}catch(e){return false}
+}
+document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>activatePanel(b.dataset.panel));
+document.querySelector('#panelClose').onclick=()=>gamePanel.classList.toggle('open');
+document.querySelector('#bulldozerBtn').onclick=()=>setTool(tool==='bulldozer'?'inspect':'bulldozer');
+document.querySelector('#inspectBtn').onclick=()=>setTool('inspect');
+document.querySelector('#detailClose').onclick=()=>detailSheet.classList.remove('show');
+detailSheet.onclick=e=>{if(e.target===detailSheet)detailSheet.classList.remove('show')};
+document.querySelector('#reset').onclick=()=>{if(!confirm('Wirklich eine neue Stadt starten?'))return;localStorage.removeItem('rasterstadt-save-v13');location.reload()};
+board.onpointerleave=clear;init();loadGame();refreshHouseConnections();updateRoadsAround(0,0);rebuildResidents();update();setTool('house');renderPanel('build');cancelAnimationFrame(animId);animId=requestAnimationFrame(animate);
+setInterval(()=>{if(Date.now()>=nextEconomyAt)economyTick();else{update();if(currentPanel==='finance')renderFinance()}},1000);
+if('serviceWorker'in navigator)addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=13',{updateViaCache:'none'});await reg.update();let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}})}catch(e){console.warn('Service Worker Update fehlgeschlagen',e)}});
 </script>
 </body></html>
