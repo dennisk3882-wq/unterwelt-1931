@@ -59,6 +59,7 @@ header{display:flex;justify-content:space-between;align-items:end;gap:12px;margi
   <div class="statcard"><span>👥</span><b id="residentStat">0/0</b><small>Bewohner</small></div>
   <div class="statcard"><span>💰</span><b id="moneyStat">5.000</b><small>Münzen</small></div>
   <div class="statcard"><span>🪵</span><b id="woodStat">60</b><small>Holz</small></div>
+  <div class="statcard"><span>🪨</span><b id="stoneStat">20</b><small>Stein</small></div>
   <div class="statcard"><span>🌾</span><b id="foodStat">25</b><small>Nahrung</small></div>
   <div class="statcard"><span>💼</span><b id="jobStat">0/0</b><small>Arbeit</small></div>
   <div class="statcard"><span>🙂</span><b id="happyStat">70%</b><small>Zufriedenheit</small></div>
@@ -88,16 +89,17 @@ header{display:flex;justify-content:space-between;align-items:end;gap:12px;margi
 <div class="toast" id="toast"></div>
 <script>
 const S=20,board=document.querySelector('#board'),stat=document.querySelector('#stat'),residentStat=document.querySelector('#residentStat'),hint=document.querySelector('#hint'),toast=document.querySelector('#toast');
-const moneyStat=document.querySelector('#moneyStat'),woodStat=document.querySelector('#woodStat'),foodStat=document.querySelector('#foodStat'),jobStat=document.querySelector('#jobStat'),happyStat=document.querySelector('#happyStat'),levelStat=document.querySelector('#levelStat'),levelSmall=document.querySelector('#levelSmall'),modeTitle=document.querySelector('#modeTitle'),modeSub=document.querySelector('#modeSub'),ticker=document.querySelector('#ticker'),gamePanel=document.querySelector('#gamePanel'),panelTitle=document.querySelector('#panelTitle'),panelContent=document.querySelector('#panelContent'),detailSheet=document.querySelector('#detailSheet'),detailContent=document.querySelector('#detailContent');
+const moneyStat=document.querySelector('#moneyStat'),woodStat=document.querySelector('#woodStat'),stoneStat=document.querySelector('#stoneStat'),foodStat=document.querySelector('#foodStat'),jobStat=document.querySelector('#jobStat'),happyStat=document.querySelector('#happyStat'),levelStat=document.querySelector('#levelStat'),levelSmall=document.querySelector('#levelSmall'),modeTitle=document.querySelector('#modeTitle'),modeSub=document.querySelector('#modeSub'),ticker=document.querySelector('#ticker'),gamePanel=document.querySelector('#gamePanel'),panelTitle=document.querySelector('#panelTitle'),panelContent=document.querySelector('#panelContent'),detailSheet=document.querySelector('#detailSheet'),detailContent=document.querySelector('#detailContent');
 const occ=Array.from({length:S},()=>Array(S).fill(null)),objs=new Map(),residents=[];
-let tool='house',n=0,preview=[],timer,lastTs=0,animId=0,currentPanel='build',activeCategory='all',economy={money:5000,wood:60,food:25,happiness:70,lastIncome:0,lastUpkeep:0,lastNet:0,lastWood:0,lastFood:0,tick:0},nextEconomyAt=Date.now()+10000,lastSim=null;
+let tool='house',n=0,preview=[],timer,lastTs=0,animId=0,currentPanel='build',activeCategory='all',economy={money:5000,wood:60,stone:20,food:25,happiness:70,lastIncome:0,lastUpkeep:0,lastNet:0,lastWood:0,lastStone:0,lastFood:0,tick:0},nextEconomyAt=Date.now()+10000,lastSim=null;
 const cfg={
  house:{w:2,h:2,label:'Wohnhaus',residents:4,jobs:0,upkeep:1,cost:{money:350,wood:8},category:'living',desc:'Bietet 4 Bewohnern ein Zuhause. Ohne Straßenanschluss bleibt es inaktiv.'},
  lumberjack:{w:3,h:3,label:'Holzfäller',residents:0,jobs:4,upkeep:4,cost:{money:600,wood:10},category:'production',desc:'Vier Arbeitsplätze. Beschäftigte erzeugen Holz.'},
  farm:{w:3,h:3,label:'Bauernhof',residents:0,jobs:4,upkeep:4,cost:{money:650,wood:10},category:'production',desc:'Vier Arbeitsplätze. Produziert Nahrung für deine Stadt.'},
- market:{w:2,h:2,label:'Markt',residents:0,jobs:2,upkeep:5,cost:{money:750,wood:12},category:'service',unlockPop:12,desc:'Versorgung, zwei Arbeitsplätze und ein Bonus auf die Zufriedenheit.'},
- townhall:{w:4,h:4,label:'Rathaus',residents:0,jobs:2,upkeep:8,cost:{money:1200,wood:20},category:'public',unlockPop:16,desc:'Verwaltung, Steuerbonus und Voraussetzung für höhere Stadtstufen.'},
- road:{w:1,h:1,label:'Straße',residents:0,jobs:0,upkeep:.12,cost:{money:8,wood:0},category:'road'}
+ quarry:{w:3,h:3,label:'Steinbruch',residents:0,jobs:4,upkeep:4,cost:{money:700,wood:8,stone:0},category:'production',unlockPop:8,desc:'Vier Arbeitsplätze. Liefert Stein für Straßen und öffentliche Gebäude.'},
+ market:{w:2,h:2,label:'Markt',residents:0,jobs:2,upkeep:5,cost:{money:750,wood:12,stone:4},category:'service',unlockPop:12,desc:'Versorgung, zwei Arbeitsplätze und ein Bonus auf die Zufriedenheit.'},
+ townhall:{w:4,h:4,label:'Rathaus',residents:0,jobs:2,upkeep:8,cost:{money:1200,wood:20,stone:10},category:'public',unlockPop:16,desc:'Verwaltung, Steuerbonus und Voraussetzung für höhere Stadtstufen.'},
+ road:{w:1,h:1,label:'Straße',residents:0,jobs:0,upkeep:.12,cost:{money:8,wood:0,stone:1},category:'road'}
 };
 const houseLevels={1:{capacity:4},2:{capacity:8,cost:{money:700,wood:12},level:2},3:{capacity:12,cost:{money:1200,wood:18},level:3}};
 let roadComp=Array.from({length:S},()=>Array(S).fill(-1));
@@ -109,6 +111,7 @@ function spriteUri(type){
  if(type==='house')body='<path d="M18 50 48 24l30 26v30H18z" fill="url(#w)"/><path d="m12 51 36-33 36 33-9 9-27-24-27 24z" fill="#70503f"/><rect x="42" y="58" width="13" height="22" fill="#493127"/><rect x="25" y="56" width="11" height="10" fill="#f8c85d"/><rect x="61" y="56" width="11" height="10" fill="#f8c85d"/>';
  if(type==='lumberjack')body='<rect x="14" y="48" width="68" height="31" fill="url(#w)"/><path d="M10 51 48 25l38 26-8 10-30-20-30 20z" fill="#6d4932"/><rect x="20" y="63" width="28" height="7" fill="#8f5a31"/><circle cx="64" cy="65" r="10" fill="none" stroke="#c7c2b9" stroke-width="5"/><path d="M64 53v24M52 65h24M56 57l16 16M72 57 56 73" stroke="#817b73" stroke-width="2"/>';
  if(type==='farm')body='<rect x="16" y="45" width="48" height="34" fill="#a74f3d"/><path d="M10 47 40 23l30 24-7 9-23-18-23 18z" fill="#6f4931"/><rect x="33" y="57" width="15" height="22" fill="#493027"/><g fill="#e7ba38"><rect x="67" y="47" width="4" height="31"/><rect x="75" y="42" width="4" height="36"/><rect x="83" y="49" width="4" height="29"/></g><g fill="#78a84b"><rect x="66" y="54" width="6" height="3"/><rect x="74" y="51" width="6" height="3"/><rect x="82" y="57" width="6" height="3"/></g>';
+ if(type==='quarry')body='<path d="M12 72 28 34l20-18 23 12 14 44z" fill="#77736d"/><path d="M22 64 34 39l17-14 17 9 8 30z" fill="#aaa69d"/><path d="M26 60 38 43l11 8-7 13z" fill="#5d5954"/><rect x="58" y="55" width="24" height="16" fill="url(#w)"/><rect x="62" y="50" width="16" height="8" fill="#80522f"/><circle cx="67" cy="73" r="5" fill="#3e3c39"/><circle cx="78" cy="73" r="5" fill="#3e3c39"/>';
  if(type==='market')body='<rect x="20" y="48" width="56" height="30" fill="url(#w)"/><path d="M14 50h68L75 32H21z" fill="#f1efe8"/><path d="M14 50h17l5-18H21zM48 50h17l-1-18H49zM76 50h6l-7-18H64z" fill="#c94843"/><rect x="28" y="60" width="40" height="9" fill="#8d582f"/><circle cx="35" cy="58" r="4" fill="#75aa4b"/><circle cx="47" cy="58" r="4" fill="#d74b3e"/><circle cx="59" cy="58" r="4" fill="#e6bd3d"/>';
  if(type==='townhall')body='<rect x="13" y="43" width="70" height="37" fill="url(#w)"/><path d="M9 45 48 20l39 25-8 10-31-19-31 19z" fill="url(#s)"/><rect x="37" y="17" width="22" height="31" fill="#8b5a35"/><path d="m34 19 14-14 14 14z" fill="#c2beb4"/><rect x="45" y="10" width="6" height="14" fill="#e9c047"/><path d="M51 10h17l-7 6 7 6H51z" fill="#b53a3c"/><rect x="39" y="60" width="18" height="20" fill="#4b3228"/>';
  return 'url(data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(common+body+'</svg>')+')'
@@ -123,9 +126,9 @@ function show(r,c){clear();if(tool==='bulldozer'||tool==='inspect')return;const 
 
 function activePopulation(){let n=0;objs.forEach(o=>{if(o.type==='house'&&o.active)n+=houseLevels[o.level||1].capacity});return n}
 function unlockReason(type){const q=cfg[type],p=activePopulation();return q&&q.unlockPop&&p<q.unlockPop?'Ab '+q.unlockPop+' aktiven Bewohnern':''}
-function hasCost(cost){return economy.money>=cost.money&&economy.wood>=cost.wood}
-function pay(cost){economy.money-=cost.money;economy.wood-=cost.wood}
-function costText(cost){return '💰 '+Math.round(cost.money).toLocaleString('de-DE')+' · 🪵 '+Math.round(cost.wood).toLocaleString('de-DE')}
+function hasCost(cost){return economy.money>=(cost.money||0)&&economy.wood>=(cost.wood||0)&&economy.stone>=(cost.stone||0)}
+function pay(cost){economy.money-=cost.money||0;economy.wood-=cost.wood||0;economy.stone-=cost.stone||0}
+function costText(cost){return '💰 '+Math.round(cost.money||0).toLocaleString('de-DE')+' · 🪵 '+Math.round(cost.wood||0).toLocaleString('de-DE')+((cost.stone||0)?' · 🪨 '+Math.round(cost.stone):'')}
 function addBuildingVisual(o){
  const q=cfg[o.type],e=document.createElement('div');e.dataset.id=o.id;e.style.left='calc('+o.c+' * var(--cell))';e.style.top='calc('+o.r+' * var(--cell))';e.style.zIndex=5+o.r+o.h;
  if(o.type==='house'){e.className='building house'}else{e.className='building voxel-building '+o.type;e.style.width='calc('+o.w+' * var(--cell))';e.style.height='calc('+o.h+' * var(--cell))';e.style.backgroundImage=spriteUri(o.type)}
@@ -140,7 +143,7 @@ function tap(r,c){
   if(tool==='inspect'){msg('Tippe ein Gebäude an.');return}
   const q=cfg[tool];if(!q)return;
   const reason=unlockReason(tool);if(reason){msg(reason);return}
-  if(!hasCost(q.cost)){msg('Nicht genug Münzen oder Holz.');return}
+  if(!hasCost(q.cost)){msg('Nicht genug Münzen, Holz oder Stein.');return}
   if(!can(r,c,q.w,q.h)){msg('Hier kann nicht gebaut werden.');return show(r,c)}
   pay(q.cost);
   const id=tool+'-'+(++n),f=foot(r,c,q.w,q.h);
@@ -378,34 +381,34 @@ function calcHappiness(s){
   return Math.max(15,Math.min(100,Math.round(42+employment*28+foodCover*18+s.market*5+s.townhall*4)))
 }
 function economyTick(){
-  const s=simState();let woodGain=0,foodGain=0,marketIncome=0,upkeep=0;
+  const s=simState();let woodGain=0,stoneGain=0,foodGain=0,marketIncome=0,upkeep=0;
   objs.forEach(o=>{
     if(o.type==='road'){upkeep+=cfg.road.upkeep;return}
     if(!o.active)return;const workers=employedIn(o.id),q=cfg[o.type];upkeep+=q.upkeep||0;
     if(o.type==='lumberjack')woodGain+=workers*1.1;
-    if(o.type==='farm')foodGain+=workers*1.45;
+    if(o.type==='farm')foodGain+=workers*1.45;if(o.type==='quarry')stoneGain+=workers*.95;
     if(o.type==='market')marketIncome+=workers*2.1
   });
   const tax=s.population*1.15*(.72+economy.happiness/250),income=tax+marketIncome+s.townhall*8,foodUse=s.population*.22;
-  economy.wood+=woodGain;economy.food=Math.max(0,economy.food+foodGain-foodUse);economy.money=Math.max(0,economy.money+income-upkeep);
-  economy.lastIncome=income;economy.lastUpkeep=upkeep;economy.lastNet=income-upkeep;economy.lastWood=woodGain;economy.lastFood=foodGain-foodUse;economy.tick++;
+  economy.wood+=woodGain;economy.stone+=stoneGain;economy.food=Math.max(0,economy.food+foodGain-foodUse);economy.money=Math.max(0,economy.money+income-upkeep);
+  economy.lastIncome=income;economy.lastUpkeep=upkeep;economy.lastNet=income-upkeep;economy.lastWood=woodGain;economy.lastStone=stoneGain;economy.lastFood=foodGain-foodUse;economy.tick++;
   const after=simState();economy.happiness=calcHappiness(after);nextEconomyAt=Date.now()+10000;
   update();renderPanel(currentPanel);saveGame();
-  ticker.textContent='Abrechnung: '+(economy.lastNet>=0?'+':'')+Math.round(economy.lastNet)+' Münzen · '+(woodGain?('+'+Math.round(woodGain)+' Holz · '):'')+(economy.lastFood>=0?'+':'')+Math.round(economy.lastFood)+' Nahrung';
+  ticker.textContent='Abrechnung: '+(economy.lastNet>=0?'+':'')+Math.round(economy.lastNet)+' Münzen · '+(woodGain?('+'+Math.round(woodGain)+' Holz · '):'')+(stoneGain?('+'+Math.round(stoneGain)+' Stein · '):'')+(economy.lastFood>=0?'+':'')+Math.round(economy.lastFood)+' Nahrung';
   setTimeout(()=>{ticker.textContent='Inaktive Gebäude pulsieren rot. Nächste Abrechnung läuft automatisch.'},2600)
 }
 function update(){
   stat.textContent=occ.flat().filter(Boolean).length+' / 400 belegt';
   lastSim=simState();economy.happiness=calcHappiness(lastSim);
   residentStat.textContent=lastSim.population+'/'+lastSim.capacity;
-  moneyStat.textContent=Math.round(economy.money).toLocaleString('de-DE');woodStat.textContent=Math.round(economy.wood).toLocaleString('de-DE');foodStat.textContent=Math.round(economy.food).toLocaleString('de-DE');
+  moneyStat.textContent=Math.round(economy.money).toLocaleString('de-DE');woodStat.textContent=Math.round(economy.wood).toLocaleString('de-DE');stoneStat.textContent=Math.round(economy.stone).toLocaleString('de-DE');foodStat.textContent=Math.round(economy.food).toLocaleString('de-DE');
   jobStat.textContent=lastSim.employed+'/'+lastSim.population;happyStat.textContent=economy.happiness+'%';levelStat.textContent=lastSim.level.name;levelSmall.textContent='Stufe '+lastSim.level.level
 }
 function msg(t){toast.textContent=t;toast.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>toast.classList.remove('show'),1400)}
 
 function setTool(t){
  tool=t;clear();document.querySelector('#bulldozerBtn').classList.toggle('active',t==='bulldozer');document.querySelector('#inspectBtn').classList.toggle('active',t==='inspect');
- if(t==='road'){modeTitle.textContent='Pflasterstraße';modeSub.textContent='1 × 1 · 8 Münzen · verbindet Gebäude';hint.textContent='Straße gewählt. Kurven und Kreuzungen verbinden sich automatisch.'}
+ if(t==='road'){modeTitle.textContent='Pflasterstraße';modeSub.textContent='1 × 1 · 8 Münzen + 1 Stein · verbindet Gebäude';hint.textContent='Straße gewählt. Kurven und Kreuzungen verbinden sich automatisch.'}
  else if(cfg[t]){modeTitle.textContent=cfg[t].label;modeSub.textContent=cfg[t].w+' × '+cfg[t].h+' · benötigt Straßenanschluss';hint.textContent=cfg[t].label+' gewählt. Grün = bauen möglich, Rot = belegt.'}
  else{modeTitle.textContent=t==='bulldozer'?'Abreißen':'Gebäude ansehen';modeSub.textContent=t==='bulldozer'?'Tippe ein Objekt zum Entfernen an':'Tippe ein Gebäude für Details an';hint.textContent=modeSub.textContent}
 }
@@ -416,14 +419,14 @@ function buildCard(type){
 function renderBuild(){
  panelTitle.textContent='Bauen';const cats=[['all','Alle'],['living','Wohnen'],['production','Produktion'],['service','Versorgung'],['public','Öffentlich']];
  const tabs='<div class="category-tabs">'+cats.map(x=>'<button class="catbtn '+(activeCategory===x[0]?'active':'')+'" data-cat="'+x[0]+'">'+x[1]+'</button>').join('')+'</div>';
- const types=['house','lumberjack','farm','market','townhall'].filter(t=>activeCategory==='all'||cfg[t].category===activeCategory);
+ const types=['house','lumberjack','farm','quarry','market','townhall'].filter(t=>activeCategory==='all'||cfg[t].category===activeCategory);
  panelContent.innerHTML=tabs+'<div class="build-grid">'+types.map(buildCard).join('')+'</div>';
  panelContent.querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>{activeCategory=b.dataset.cat;renderBuild()});
  panelContent.querySelectorAll('[data-build]').forEach(b=>b.onclick=()=>{const reason=unlockReason(b.dataset.build);if(reason)return msg(reason);setTool(b.dataset.build);gamePanel.classList.remove('open');renderBuild()})
 }
 function renderRoads(){
  panelTitle.textContent='Straßen';const roads=[...objs.values()].filter(o=>o.type==='road').length;
- panelContent.innerHTML='<div class="panel-grid"><div class="panel-card"><b>🛣️ Pflasterstraße</b><small>Verbindet Gebäude und Bewohnerwege.</small><span class="costline">💰 8 je Feld</span></div><div class="panel-card"><b>'+roads+'</b><small>Straßenfelder</small></div><div class="panel-card"><b>Automatisch</b><small>Geraden, Kurven, T-Stücke und Kreuzungen.</small></div></div>'
+ panelContent.innerHTML='<div class="panel-grid"><div class="panel-card"><b>🛣️ Pflasterstraße</b><small>Verbindet Gebäude und Bewohnerwege.</small><span class="costline">💰 8 · 🪨 1 je Feld</span></div><div class="panel-card"><b>'+roads+'</b><small>Straßenfelder</small></div><div class="panel-card"><b>Automatisch</b><small>Geraden, Kurven, T-Stücke und Kreuzungen.</small></div></div>'
 }
 function levelGoals(s){
  if(s.level.level===1)return[{ok:s.population>=20,t:'20 Bewohner ('+s.population+'/20)'},{ok:s.townhall>0,t:'Aktives Rathaus'}];
@@ -440,7 +443,7 @@ function renderResidentsPanel(){
  panelContent.innerHTML='<div class="panel-grid"><div class="panel-card"><b>'+s.population+'/'+s.capacity+'</b><small>Bewohner / Kapazität</small></div><div class="panel-card"><b>'+s.employed+'</b><small>Beschäftigt</small></div><div class="panel-card"><b>'+s.unemployed+'</b><small>Arbeitslos</small></div><div class="panel-card"><b>'+s.jobs+'</b><small>Arbeitsplätze</small></div><div class="panel-card"><b>'+economy.happiness+'%</b><small>Zufriedenheit</small></div></div>'+(chips?'<div class="resident-list">'+chips+'</div>':'')
 }
 function renderFinance(){
- panelTitle.textContent='Finanzen';panelContent.innerHTML='<div class="finance-table"><span>Einnahmen / Abrechnung</span><b>+'+Math.round(economy.lastIncome)+'</b><span>Unterhalt</span><b>-'+Math.round(economy.lastUpkeep)+'</b><span>Saldo</span><b>'+(economy.lastNet>=0?'+':'')+Math.round(economy.lastNet)+'</b><span>Holzproduktion</span><b>+'+Math.round(economy.lastWood)+'</b><span>Nahrungsbilanz</span><b>'+(economy.lastFood>=0?'+':'')+Math.round(economy.lastFood)+'</b><span>Nächste Abrechnung</span><b>'+Math.max(0,Math.ceil((nextEconomyAt-Date.now())/1000))+'s</b></div>'
+ panelTitle.textContent='Finanzen';panelContent.innerHTML='<div class="finance-table"><span>Einnahmen / Abrechnung</span><b>+'+Math.round(economy.lastIncome)+'</b><span>Unterhalt</span><b>-'+Math.round(economy.lastUpkeep)+'</b><span>Saldo</span><b>'+(economy.lastNet>=0?'+':'')+Math.round(economy.lastNet)+'</b><span>Holzproduktion</span><b>+'+Math.round(economy.lastWood)+'</b><span>Steinproduktion</span><b>+'+Math.round(economy.lastStone)+'</b><span>Nahrungsbilanz</span><b>'+(economy.lastFood>=0?'+':'')+Math.round(economy.lastFood)+'</b><span>Nächste Abrechnung</span><b>'+Math.max(0,Math.ceil((nextEconomyAt-Date.now())/1000))+'s</b></div>'
 }
 function renderPanel(p){if(p==='build')renderBuild();else if(p==='roads')renderRoads();else if(p==='city')renderCity();else if(p==='residents')renderResidentsPanel();else renderFinance()}
 function activatePanel(p){
@@ -449,7 +452,7 @@ function activatePanel(p){
 }
 function openDetail(o){
  if(!o)return;const q=cfg[o.type];
- if(o.type==='road'){detailContent.innerHTML='<h2>Pflasterstraße</h2><p>Verbundenes Straßenelement. Kosten: 8 Münzen.</p>';detailSheet.classList.add('show');return}
+ if(o.type==='road'){detailContent.innerHTML='<h2>Pflasterstraße</h2><p>Verbundenes Straßenelement. Kosten: 8 Münzen + 1 Stein.</p>';detailSheet.classList.add('show');return}
  const workers=employedIn(o.id),bad=o.active?'':' bad',status=o.active?'Aktiv':'Kein Straßenanschluss';let upgrade='';
  if(o.type==='house'&&(o.level||1)<3){const nl=(o.level||1)+1,nx=houseLevels[nl],s=simState(),can=s.level.level>=nx.level&&hasCost(nx.cost);upgrade='<button class="upgradebtn" data-upgrade="'+o.id+'" '+(can?'':'disabled')+'>Auf Stufe '+nl+' ausbauen · '+costText(nx.cost)+(s.level.level<nx.level?' · benötigt Stadtstufe '+nx.level:'')+'</button>'}
  detailContent.innerHTML='<div class="detail-hero"><div class="detail-thumb" style="background-image:'+spriteUri(o.type)+'"></div><div><h2>'+q.label+'</h2><span class="statuspill'+bad+'">'+status+'</span><p>'+q.desc+'</p></div></div><div class="detail-stats"><div class="detail-stat"><b>'+(o.type==='house'?houseLevels[o.level||1].capacity:q.jobs)+'</b><small>'+(o.type==='house'?'Bewohner':'Arbeitsplätze')+'</small></div><div class="detail-stat"><b>'+(o.active?'Ja':'Nein')+'</b><small>Straßenanschluss</small></div>'+(q.jobs?'<div class="detail-stat"><b>'+workers+'/'+q.jobs+'</b><small>Beschäftigt</small></div>':'')+'<div class="detail-stat"><b>Stufe '+(o.level||1)+'</b><small>Gebäude</small></div></div>'+upgrade;
