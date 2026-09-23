@@ -32,9 +32,9 @@ header{display:flex;justify-content:space-between;align-items:end;gap:12px;margi
 #residentStat{color:#edf5dc;font-weight:800}
 .house-entrance{position:absolute;display:none;z-index:4;width:13px;height:13px;background:linear-gradient(135deg,#c9c2b4,#82796d);border:1px solid rgba(69,62,55,.7);box-shadow:0 1px 3px #0007}
 .building.connected .house-entrance{display:block}
-.building.dir-north .house-entrance{top:-5px;left:calc((var(--slot) + .5)*var(--cell) - 6px)}
+.building.dir-north .house-entrance{top:-5px;left:calc(var(--entrance-pos,50%) - 6px)}
 .building.dir-south .house-entrance{bottom:-5px;left:calc((var(--slot) + .5)*var(--cell) - 6px)}
-.building.dir-west .house-entrance{left:-5px;top:calc((var(--slot) + .5)*var(--cell) - 6px)}
+.building.dir-west .house-entrance{left:-5px;top:calc(var(--entrance-pos,50%) - 6px)}
 .building.dir-east .house-entrance{right:-5px;top:calc((var(--slot) + .5)*var(--cell) - 6px)}
 .villager{position:absolute;z-index:7;width:10px;height:14px;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 2px 1px #0007)}
 .villager .head{position:absolute;left:1px;top:0;width:8px;height:6px;background:#d6ae88;border:1px solid #5d4432;box-sizing:border-box}
@@ -238,7 +238,7 @@ function refreshHouseConnections(){
     e.classList.remove('connected','dir-north','dir-south','dir-east','dir-west');
     if(o.connection){
       e.classList.add('connected','dir-'+o.connection.dir);
-      e.style.setProperty('--slot',o.connection.slot)
+      e.style.setProperty('--entrance-pos',(25+o.connection.slot*50)+'%')
     }
   })
 }
@@ -303,6 +303,6 @@ function msg(t){toast.textContent=t;toast.classList.add('show');clearTimeout(tim
 document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{tool=b.dataset.tool;clear();document.querySelectorAll('.tool').forEach(x=>x.classList.toggle('active',x===b));hint.textContent=tool==='house'?'Wohnhaus gewählt. Grün = bauen möglich, Rot = belegt oder außerhalb.':tool==='road'?'Straße gewählt. Pflasterstraßen verbinden sich automatisch; Bewohner laufen nur auf verbundenen Wegen.':'Abreißen gewählt. Tippe ein vorhandenes Objekt an.'});
 document.querySelector('#reset').onclick=()=>{if(!confirm('Spielfeld wirklich leeren?'))return;for(let r=0;r<S;r++)for(let c=0;c<S;c++)occ[r][c]=null;objs.clear();residents.forEach(v=>v.el.remove());residents.length=0;n=0;init();refreshHouseConnections();update();msg('Spielfeld zurückgesetzt.')};
 board.onpointerleave=clear;init();refreshHouseConnections();rebuildResidents();update();cancelAnimationFrame(animId);animId=requestAnimationFrame(animate);
-if('serviceWorker'in navigator)addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=9',{updateViaCache:'none'});await reg.update();let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}})}catch(e){console.warn('Service Worker Update fehlgeschlagen',e)}});
+if('serviceWorker'in navigator)addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=10',{updateViaCache:'none'});await reg.update();let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}})}catch(e){console.warn('Service Worker Update fehlgeschlagen',e)}});
 </script>
 </body></html>
