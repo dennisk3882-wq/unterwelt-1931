@@ -685,6 +685,142 @@ function logisticsDaily(){
  let moved={wood:0,stone:0,food:0};objs.forEach(o=>{if(!o.active||!o.connection||!['lumberjack','farm','quarry'].includes(o.type))return;const st=ensureStorage(o);if(!warehouseOnNetwork(o.connection.network))return;const m=lastNetworks.get(o.connection.network),limit=18*(o.level||1)*(m?.trafficQuality||.5);['wood','stone','food'].forEach(k=>{const x=Math.min(st[k]||0,limit);st[k]-=x;economy[k]+=x;moved[k]+=x})});return moved
 }
 
+
+function workingAgeCount(){return residents.filter(v=>v.age>=18&&v.age<67).length}
+function weightedHouseAverage(fn){
+ let sum=0,w=0;objs.forEach(h=>{if(h.type!=='house'||!h.active||(h.occupancy||0)<=0)return;const n=h.occupancy||0;sum+=fn(h)*n;w+=n});return w?sum/w:0
+}
+simState=function(){
+ const t=residentTotals(),nets=networkMetrics();let jobs=0,market=0,townhall=0,parks=0,schools=0,clinics=0,fires=0,powers=0,wells=0,sewage=0,waste=0,tradingposts=0,monuments=0;
+ objs.forEach(o=>{if(o.type!=='road'&&o.active){jobs+=effectiveJobs(o);if(o.type==='market')market++;if(o.type==='townhall')townhall++;if(o.type==='park')parks++;if(o.type==='school')schools++;if(o.type==='clinic')clinics++;if(o.type==='firehouse')fires++;if(o.type==='power')powers++;if(o.type==='well')wells++;if(o.type==='sewage')sewage++;if(o.type==='waste')waste++;if(o.type==='tradingpost')tradingposts++;if(o.type==='monument')monuments++}});
+ const employed=residents.filter(v=>v.jobId).length,working=workingAgeCount();
+ const education=weightedHouseAverage(h=>houseNeeds(h).education),health=weightedHouseAverage(h=>houseNeeds(h).health),safety=weightedHouseAverage(h=>houseNeeds(h).safety),leisure=weightedHouseAverage(h=>houseNeeds(h).leisure),power=weightedHouseAverage(h=>houseNeeds(h).power),water=weightedHouseAverage(h=>houseNeeds(h).water),sewer=weightedHouseAverage(h=>houseNeeds(h).sewer),wasteCoverage=weightedHouseAverage(h=>houseNeeds(h).waste),traffic=weightedHouseAverage(h=>houseNeeds(h).traffic);
+ let level={name:'Siedlung',level:1,next:20};
+ const happy=economy.happiness||70,foodOk=economy.food>=Math.max(4,t.current*.35);
+ if(t.current>=120&&townhall&&market>=2&&clinics&&fires&&power>=.8&&water>=.8&&sewer>=.7&&wasteCoverage>=.7&&happy>=70)level={name:'Stadt',level:4,next:200};
+ else if(t.current>=60&&townhall&&market&&schools&&power>=.6&&water>=.7&&happy>=62)level={name:'Kleinstadt',level:3,next:120};
+ else if(t.current>=20&&townhall&&foodOk)level={name:'Dorf',level:2,next:60};
+ return{population:t.current,capacity:t.capacity,jobs,employed,working,unemployed:Math.max(0,working-employed),market,townhall,parks,schools,clinics,fires,powers,wells,sewage,waste:wasteCoverage,tradingposts,monuments,education,health,safety,leisure,power,water,sewer,wasteCoverage,traffic,level,networks:nets}
+};
+calcHappiness=function(s){
+ if(!s.population)return 70;
+ const employment=s.working?Math.min(1,s.employed/s.working):1,foodCover=Math.max(0,Math.min(1,economy.food/Math.max(1,s.population*.9)));
+ let h=24+employment*18+foodCover*17+s.leisure*8+s.education*6+s.health*7+s.safety*7+s.power*7+s.water*7+s.sewer*4+s.wasteCoverage*4+s.traffic*7+s.monuments*3;
+ if(s.level.level===1){h+=8;if(s.population<8)h+=6}
+ if(admin.taxRate>.014)h-=6;if(admin.taxRate<.01)h+=3;
+ if(economy.food<1)h-=18;if(s.unemployed>Math.max(2,s.working*.25))h-=8;
+ h+=(eventMoodUntil>=gameDay?eventMood:0)+(weather==='sun'?2:weather==='rain'?-2:weather==='snow'?-1:0);
+ return Math.max(8,Math.min(100,Math.round(h)))
+};
+residentTotals=function(){let capacity=0;objs.forEach(o=>{if(o.type==='house')capacity+=houseLevels[o.level||1].capacity});return{current:residents.length,capacity}};
+
+function buildingUpkeep(o){
+ if(o.type==='road')return cfg.road.upkeep*(1+.35*((o.level||1)-1));
+ let mult=1;if(o.type==='school')mult*=admin.educationBudget;if(o.type==='firehouse')mult*=admin.safetyBudget;if(o.type==='clinic')mult*=admin.healthBudget;
+ return (cfg[o.type]?.upkeep||0)*(1+.45*((o.level||1)-1))*mult
+}
+function tradePrice(k){const base={wood:7,stone:9,food:5}[k]||0;const s=lastSim||simState();return base*(s.tradingposts?1.25:1)*(seasonName()==='Winter'&&k==='food'?1.2:1)}
+function tradeResource(k,amount,quiet=false){
+ const s=lastSim||simState();if(!s.market&&!s.tradingposts){if(!quiet)msg('Für Handel brauchst du einen aktiven Markt oder ein Handelshaus.');return false}if((economy[k]||0)<amount){if(!quiet)msg('Nicht genug '+k+'.');return false}
+ economy[k]-=amount;const gain=Math.round(amount*tradePrice(k));economy.money+=gain;tradeVolume+=gain;if(!quiet)msg(amount+' '+(k==='wood'?'Holz':k==='stone'?'Stein':'Nahrung')+' verkauft: +'+gain+' Münzen');saveGame();update();return true
+}
+function autoTradeDaily(){
+ const s=lastSim||simState();if(!autoTrade||!s.tradingposts)return;
+ if(economy.wood>140)tradeResource('wood',Math.min(30,Math.floor(economy.wood-120)),true);
+ if(economy.stone>110)tradeResource('stone',Math.min(25,Math.floor(economy.stone-95)),true);
+ if(economy.food>160)tradeResource('food',Math.min(35,Math.floor(economy.food-135)),true)
+}
+function dailyEconomyTick(){
+ lastSim=simState();updateLandValues();const produced=dailyProduction(),moved=logisticsDaily();lastSim=simState();
+ const propertyTax=[...objs.values()].filter(o=>o.type==='house'&&o.active).reduce((a,h)=>a+(h.landValue||500)*admin.taxRate,0);
+ const marketIncome=[...objs.values()].filter(o=>o.active&&['market','tradingpost'].includes(o.type)).reduce((a,o)=>a+employedIn(o.id)*2.5*outputLevel(o),0);
+ const townIncome=lastSim.townhall*10,upkeep=[...objs.values()].reduce((a,o)=>a+buildingUpkeep(o),0),foodUse=lastSim.population*.35;
+ economy.food=Math.max(0,economy.food-foodUse);const income=propertyTax+marketIncome+townIncome;economy.money=Math.max(0,economy.money+income-upkeep);
+ economy.lastIncome=income;economy.lastUpkeep=upkeep;economy.lastNet=income-upkeep;economy.lastWood=moved.wood;economy.lastStone=moved.stone;economy.lastFood=moved.food-foodUse;economy.tick=(economy.tick||0)+1;
+ autoTradeDaily();lastSim=simState();economy.happiness=calcHappiness(lastSim);checkTasks();saveGame();
+ ticker.textContent='Tag '+gameDay+': '+(economy.lastNet>=0?'+':'')+Math.round(economy.lastNet)+' Münzen · geliefert '+Math.round(moved.wood)+' Holz / '+Math.round(moved.stone)+' Stein / '+Math.round(moved.food)+' Nahrung'
+}
+economyTick=dailyEconomyTick;
+
+const tasksV30=[
+ {id:'roads',title:'Ein Straßennetz schaffen',reward:180,check:()=>[...objs.values()].filter(o=>o.type==='road').length>=6},
+ {id:'pop8',title:'8 Bewohner ansiedeln',reward:250,check:()=>residents.length>=8},
+ {id:'production',title:'Holzfäller und Bauernhof betreiben',reward:350,check:()=>['lumberjack','farm'].every(t=>[...objs.values()].some(o=>o.type===t&&o.active))},
+ {id:'market',title:'Einen aktiven Markt eröffnen',reward:450,check:()=>[...objs.values()].some(o=>o.type==='market'&&o.active)},
+ {id:'village',title:'Zum Dorf aufsteigen',reward:700,check:()=>simState().level.level>=2},
+ {id:'utilities',title:'Wasser, Strom und Müll absichern',reward:900,check:()=>{const s=simState();return s.power>=.75&&s.water>=.75&&s.wasteCoverage>=.65}},
+ {id:'smallcity',title:'Kleinstadt erreichen',reward:1200,check:()=>simState().level.level>=3},
+ {id:'trade',title:'500 Münzen Handelsumsatz',reward:700,check:()=>tradeVolume>=500}
+];
+function checkTasks(){
+ const done=[];tasksV30.forEach(t=>{if(!taskClaims[t.id]&&t.check()){taskClaims[t.id]=true;economy.money+=t.reward;done.push(t)}});if(done.length){ticker.textContent='Aufgabe geschafft: '+done.map(t=>t.title).join(', ')+' · +'+done.reduce((a,t)=>a+t.reward,0)+' Münzen'}
+}
+function eventPush(text){eventLog.unshift('Tag '+gameDay+': '+text);eventLog=eventLog.slice(0,6);ticker.textContent=text}
+function buildingProtected(o,type){
+ if(!o.connection)return false;let ok=false;objs.forEach(s=>{if(ok||!s.active||s.type!==type||!s.connection||s.connection.network!==o.connection.network)return;ok=roadDistance(o.connection,s.connection)<=serviceRadius(s)});return ok
+}
+function dailyEvent(){
+ if(gameDay<3||gameDay%2!==0||Math.random()>.55)return;
+ const s=simState(),roll=Math.floor(Math.random()*6);
+ if(roll===0){const gain=18+Math.floor(Math.random()*18);economy.food+=gain;eventPush('🌾 Gute Ernte: +'+gain+' Nahrung.')}
+ else if(roll===1&&economy.wood>=10){economy.wood-=10;const gain=120+Math.floor(Math.random()*80);economy.money+=gain;tradeVolume+=gain;eventPush('📈 Hohe Holznachfrage: 10 Holz verkauft, +'+gain+' Münzen.')}
+ else if(roll===2){const list=[...objs.values()].filter(o=>o.type!=='road'&&o.active);if(list.length){const o=list[Math.floor(Math.random()*list.length)];if(buildingProtected(o,'firehouse'))eventPush('🔥 Kleiner Brand bei '+cfg[o.type].label+' – Feuerwehr hat ihn sofort gelöscht.');else{o.damagedUntil=gameDay+2;eventMood=-5;eventMoodUntil=gameDay+2;refreshHouseConnections();eventPush('🔥 Brand: '+cfg[o.type].label+' ist beschädigt. Ohne Feuerwache dauert die Reparatur länger.')}}}
+ else if(roll===3){const list=[...objs.values()].filter(o=>o.type!=='road'&&o.active);if(list.length){const o=list[Math.floor(Math.random()*list.length)];o.damagedUntil=gameDay+1;eventMood=-2;eventMoodUntil=gameDay+1;refreshHouseConnections();eventPush('🌧 Sturm beschädigt '+cfg[o.type].label+' bis morgen.')}}
+ else if(roll===4&&s.parks&&s.market){economy.money=Math.max(0,economy.money-80);eventMood=8;eventMoodUntil=gameDay+2;eventPush('🎉 Stadtfest: -80 Münzen, dafür steigt die Stimmung deutlich.')}
+ else{if(s.health<.45&&s.population>15){eventMood=-6;eventMoodUntil=gameDay+2;eventPush('🤒 Krankheitswelle: fehlende Gesundheitsversorgung belastet die Stadt.')}else{economy.money+=100;eventPush('🏅 Gute Stadtentwicklung: +100 Münzen Förderbonus.')}}}
+}
+function rollWeather(){
+ const si=seasonIndex(),sets=[['sun','sun','cloud','rain'],['sun','sun','sun','cloud','rain'],['cloud','rain','sun','cloud'],['cloud','snow','snow','sun']];const a=sets[si];weather=a[Math.floor(Math.random()*a.length)];weatherUntil=Date.now()+60000
+}
+worldLabel=function(){
+ const h=Math.floor(worldMinutes/60),m=Math.floor(worldMinutes%60),labels={sun:['☀️','Sonne'],cloud:['☁️','Bewölkt'],rain:['🌧️','Regen'],snow:['🌨️','Schnee']},w=labels[weather]||labels.sun;
+ timeStat.textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');weatherIcon.textContent=w[0];weatherStat.textContent=w[1];board.classList.toggle('night',h<6||h>=20);board.classList.toggle('evening',h>=18&&h<20);board.classList.toggle('rain',weather==='rain');board.classList.toggle('cloud',weather==='cloud'||weather==='snow');updateSeasonVisual()
+};
+function processHour(){
+ refreshResidentRoutes();if(lastProcessedHour%2===0)housingTick();if([6,12,18].includes(lastProcessedHour))rollWeather();update()
+}
+function processDay(){
+ if(gameDay%120===1&&gameDay>1)yearsElapsed++;dailyEconomyTick();dailyEvent();checkTasks();refreshHouseConnections();rebuildResidents();updateLandValues();update();renderPanel(currentPanel);saveGame()
+}
+function advancedRealTick(){
+ if(simSpeed>0){const beforeDay=gameDay;worldMinutes+=10*simSpeed;while(worldMinutes>=1440){worldMinutes-=1440;gameDay++;processDay()}const h=Math.floor(worldMinutes/60);if(h!==lastProcessedHour){lastProcessedHour=h;processHour()}if(beforeDay===gameDay)worldLabel()}
+ update();if(currentPanel==='finance')renderFinance();if(!ticker.textContent.startsWith('Tag ')&&!ticker.textContent.startsWith('Aufgabe'))ticker.textContent=cityAlertText()
+}
+function setSpeed(v){simSpeed=+v;document.querySelectorAll('.speedbtn').forEach(b=>b.classList.toggle('active',+b.dataset.speed===simSpeed));msg(simSpeed?'Spielgeschwindigkeit '+simSpeed+'×':'Spiel pausiert')}
+document.querySelectorAll('.speedbtn').forEach(b=>b.onclick=()=>setSpeed(b.dataset.speed));
+
+function upgradeRoad(o){
+ const nl=(o.level||1)+1,nx=roadTiers[nl],s=simState();if(!nx)return;if(s.level.level<nl){msg('Benötigt Stadtstufe '+nl+'.');return}if(!hasCost(nx.cost)){msg('Nicht genug Ressourcen.');return}pay(nx.cost);o.level=nl;renderRoad(o.r,o.c);networkMetrics();update();saveGame();openDetail(o)
+}
+function genericUpgradeCost(o){const q=cfg[o.type],nl=(o.level||1)+1;return{money:Math.round((q.cost.money||0)*(.65+.25*nl)),wood:Math.round((q.cost.wood||0)*.45*nl),stone:Math.round(Math.max(2,(q.cost.stone||2)*.55*nl))}}
+function upgradeBuilding(o){
+ if(o.type==='house')return upgradeHouse(o.id);if(o.type==='road')return upgradeRoad(o);const nl=(o.level||1)+1;if(nl>3)return;if(simState().level.level<nl){msg('Benötigt Stadtstufe '+nl+'.');return}const cost=genericUpgradeCost(o);if(!hasCost(cost)){msg('Nicht genug Ressourcen.');return}pay(cost);o.level=nl;rebuildResidents();networkMetrics();update();saveGame();openDetail(o);msg(cfg[o.type].label+' auf Stufe '+nl+' ausgebaut.')
+}
+
+tap=function(r,c){
+ if(tool==='bulldozer')return demolish(r,c);const existing=occ[r]?.[c]?objs.get(occ[r][c]):null;if(existing){openDetail(existing);return}if(tool==='inspect'){msg('Tippe ein Gebäude an.');return}
+ const q=cfg[tool];if(!q)return;const reason=unlockReason(tool);if(reason){msg(reason);return}if(!hasCost(q.cost)){msg('Nicht genug Münzen, Holz oder Stein.');return}if(!can(r,c,q.w,q.h)){msg(r>=unlockedSize||c>=unlockedSize?'Dieser Kartenbereich ist noch nicht freigeschaltet.':'Hier kann nicht gebaut werden.');return show(r,c)}
+ pay(q.cost);const id=tool+'-'+(++n),f=foot(r,c,q.w,q.h),o={id,type:tool,r,c,w:q.w,h:q.h,f,level:1,residentCount:0,residentCapacity:q.residents||0,occupancy:tool==='house'?0:undefined,householdType:tool==='house'?householdTypes[n%householdTypes.length]:undefined,storage:['lumberjack','farm','quarry'].includes(tool)?{wood:0,stone:0,food:0}:undefined,connection:null,active:tool==='road'};
+ objs.set(id,o);f.forEach(([y,x])=>{occ[y][x]=id;const e=cell(y,x);e.dataset.id=id;if(tool==='road')e.classList.add('road')});if(tool!=='road')addBuildingVisual(o);if(tool==='road')updateRoadsAround(r,c);clear();refreshHouseConnections();rebuildResidents();lastSim=simState();updateLandValues();checkTasks();update();renderPanel(currentPanel);saveGame();msg(q.label+' gebaut.')
+};
+const baseDemolishV30=demolish;
+demolish=function(r,c){
+ const id=occ[r]?.[c];if(!id)return msg('Dieses Feld ist leer.');const o=objs.get(id),q=cfg[o.type];o.f.forEach(([y,x])=>{occ[y][x]=null;const e=cell(y,x);e.classList.remove('road','road-tier-2','road-tier-3');e.style.backgroundImage='';delete e.dataset.id;delete e.dataset.roadMask});board.querySelector('.building[data-id="'+id+'"]')?.remove();objs.delete(id);economy.money+=Math.round((q.cost.money||0)*.25);economy.wood+=Math.round((q.cost.wood||0)*.15);economy.stone+=Math.round((q.cost.stone||0)*.15);if(o.type==='road')updateRoadsAround(r,c);refreshHouseConnections();rebuildResidents();update();renderPanel(currentPanel);saveGame();msg('Objekt entfernt · Teil der Baukosten erstattet.')
+};
+
+function buildListV30(){return['house','lumberjack','farm','quarry','market','park','well','townhall','school','firehouse','power','sewage','waste','clinic','tradingpost','monument']}
+renderBuild=function(){
+ panelTitle.textContent='Bauen';const cats=[['all','Alle'],['living','Wohnen'],['production','Produktion'],['service','Versorgung'],['public','Öffentlich']],tabs='<div class="category-tabs">'+cats.map(x=>'<button class="catbtn '+(activeCategory===x[0]?'active':'')+'" data-cat="'+x[0]+'">'+x[1]+'</button>').join('')+'</div>',types=buildListV30().filter(t=>activeCategory==='all'||cfg[t].category===activeCategory);
+ panelContent.innerHTML=tabs+'<div class="build-grid">'+types.map(buildCard).join('')+'</div>';panelContent.querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>{activeCategory=b.dataset.cat;renderBuild()});panelContent.querySelectorAll('[data-build]').forEach(b=>b.onclick=()=>{const reason=unlockReason(b.dataset.build);if(reason)return msg(reason);setTool(b.dataset.build);gamePanel.classList.remove('open');renderBuild()})
+};
+
+saveGame=function(){
+ try{localStorage.setItem('rasterstadt-save-v13',JSON.stringify({economy,n,worldMinutes,weather,gameDay,yearsElapsed,admin,autoTrade,taskClaims,eventLog,tradeVolume,objects:[...objs.values()].map(o=>({id:o.id,type:o.type,r:o.r,c:o.c,w:o.w,h:o.h,level:o.level||1,occupancy:o.occupancy,householdType:o.householdType,storage:o.storage,landValue:o.landValue,damagedUntil:o.damagedUntil}))}))}catch(e){}
+};
+loadGame=function(){
+ try{const s=JSON.parse(localStorage.getItem('rasterstadt-save-v13')||'null');if(!s)return false;economy={...economy,...s.economy};n=s.n||0;worldMinutes=s.worldMinutes??worldMinutes;weather=s.weather||weather;gameDay=s.gameDay||1;yearsElapsed=s.yearsElapsed||0;admin={...admin,...(s.admin||{})};autoTrade=!!s.autoTrade;taskClaims=s.taskClaims||{};eventLog=s.eventLog||[];tradeVolume=s.tradeVolume||0;(s.objects||[]).forEach(x=>{const q=cfg[x.type];if(!q)return;const cap=x.type==='house'?houseLevels[x.level||1].capacity:0,o={...x,f:foot(x.r,x.c,x.w,x.h),occupancy:x.type==='house'?(x.occupancy==null?cap:x.occupancy):undefined,residentCount:x.type==='house'?(x.occupancy==null?cap:x.occupancy):0,residentCapacity:cap,storage:x.storage||(['lumberjack','farm','quarry'].includes(x.type)?{wood:0,stone:0,food:0}:undefined)};objs.set(o.id,o);o.f.forEach(([y,z])=>{if(y<S&&z<S){occ[y][z]=o.id;const e=cell(y,z);e.dataset.id=o.id;if(o.type==='road')e.classList.add('road')}});if(o.type!=='road')addBuildingVisual(o)});updateAllRoads?.();return true}catch(e){console.warn(e);return false}
+};
+
 document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.panel===p));gamePanel.classList.add('open');renderPanel(p);
  if(p==='roads')setTool('road');else if(p!=='build')setTool('inspect')
 }
@@ -728,7 +864,7 @@ document.querySelector('#detailClose').onclick=()=>detailSheet.classList.remove(
 detailSheet.onclick=e=>{if(e.target===detailSheet)detailSheet.classList.remove('show')};
 document.querySelector('#reset').onclick=()=>{if(!confirm('Wirklich eine neue Stadt starten?'))return;localStorage.removeItem('rasterstadt-save-v13');location.reload()};
 board.onpointerleave=clear;init();loadGame();refreshHouseConnections();objs.forEach(o=>{if(o.type==='road')renderRoad(o.r,o.c)});rebuildResidents();update();setTool('house');renderPanel('build');cancelAnimationFrame(animId);animId=requestAnimationFrame(animate);
-setInterval(()=>{worldTick();if(Date.now()>=nextEconomyAt)economyTick();else{update();if(currentPanel==='finance')renderFinance();if(!ticker.textContent.startsWith('Abrechnung:'))ticker.textContent=cityAlertText()}},1000);
-if('serviceWorker'in navigator)addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=22',{updateViaCache:'none'});await reg.update();let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}})}catch(e){console.warn('Service Worker Update fehlgeschlagen',e)}});
+lastProcessedHour=Math.floor(worldMinutes/60);setInterval(advancedRealTick,1000);
+if('serviceWorker'in navigator)addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=30',{updateViaCache:'none'});await reg.update();let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}})}catch(e){console.warn('Service Worker Update fehlgeschlagen',e)}});
 </script>
 </body></html>
