@@ -1,4 +1,4 @@
-const C='rasterstadt-v13';
+const C='rasterstadt-v21';
 const A=['./','./index.html','./manifest.webmanifest','./icon.svg'];
 
 self.addEventListener('install',e=>{
