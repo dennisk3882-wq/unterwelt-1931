@@ -1,1 +1,1 @@
-Build trigger for the isolated Tiberian Dawn Android APK workflow.
+Build trigger for the isolated Tiberian Dawn Android APK workflow. Retry 2.\n
