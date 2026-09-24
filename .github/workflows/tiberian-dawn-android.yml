@@ -1,0 +1,98 @@
+name: Build Tiberian Dawn Android
+
+on:
+  push:
+    branches:
+      - tiberian-dawn-android
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tiberian-dawn-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-mobile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout port package
+        uses: actions/checkout@v4
+
+      - name: Restore Phase 2 package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p td-mobile-port/work
+          base64 -d td-mobile-port/phase2.zip.b64 > td-mobile-port/phase2.zip
+          echo "39405d2e500c41881e5bf95aa33f63daf483549227babdcd7eecd9032a3a0fad  td-mobile-port/phase2.zip" | sha256sum -c -
+          unzip -q td-mobile-port/phase2.zip -d td-mobile-port/work
+          python3 td-mobile-port/work/tiberian-dawn-android-phase2/tests/test_apply_phase2.py
+
+      - name: Checkout pinned Android upstream
+        uses: actions/checkout@v4
+        with:
+          repository: Cesarus85/Tiberian-Dawn-for-Android-and-Meta-Quest
+          ref: f80b8aef0877ed0fc6ca7ca5771f4ca217327c6c
+          path: upstream
+
+      - name: Apply no-disc and touch-first Android changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 td-mobile-port/work/tiberian-dawn-android-phase2/tools/apply_phase2.py upstream
+          grep -q 'mobile_touch_help_title' upstream/android/app/src/main/res/values-de/strings.xml
+          grep -q 'FreewareDataActivity' upstream/android/app/src/mobile/AndroidManifest.xml
+          grep -q 'installMobileTouchControls' upstream/android/app/src/main/java/org/tiberiandawn/android/TiberianDawnActivity.java
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: upstream/android/**/*.gradle*
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.0.12077973"
+          cmake_root=$(dirname "$(dirname "$(command -v cmake)")")
+          printf 'sdk.dir=%s\ncmake.dir=%s\n' "$ANDROID_HOME" "$cmake_root" > upstream/android/local.properties
+          cmake --version
+          java -version
+
+      - name: Build mobile debug APK
+        working-directory: upstream/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake_version=$(cmake --version | sed -n '1s/.* //p')
+          ./gradlew --no-daemon -PandroidCmakeVersion="$cmake_version"             :app:testMobileDebugUnitTest             :app:assembleMobileDebug
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=upstream/android/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk
+          test -s "$apk"
+          unzip -Z1 "$apk" | grep -q '^lib/arm64-v8a/libmain\.so$'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$apk"
+          sha256sum "$apk" | tee td-mobile-port/mobile-apk.sha256
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiberian-dawn-mobile-debug
+          path: |
+            upstream/android/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk
+            td-mobile-port/mobile-apk.sha256
+          if-no-files-found: error
+          retention-days: 14
