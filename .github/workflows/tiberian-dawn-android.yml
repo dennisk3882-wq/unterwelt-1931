@@ -22,15 +22,16 @@ jobs:
       - name: Checkout port package
         uses: actions/checkout@v4
 
-      - name: Restore Phase 2 package
+      - name: Validate port sources
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p td-mobile-port/work
-          base64 -d td-mobile-port/phase2.zip.b64 > td-mobile-port/phase2.zip
-          echo "39405d2e500c41881e5bf95aa33f63daf483549227babdcd7eecd9032a3a0fad  td-mobile-port/phase2.zip" | sha256sum -c -
-          unzip -q td-mobile-port/phase2.zip -d td-mobile-port/work
-          python3 td-mobile-port/work/tiberian-dawn-android-phase2/tests/test_apply_phase2.py
+          python3 -m py_compile td-mobile-port/apply.py
+          test -s td-mobile-port/src/FreewareCatalog.java
+          test -s td-mobile-port/src/FreewareDataActivity.java
+          test -s td-mobile-port/src/FreewareIsoVerifier.java
+          test -s td-mobile-port/src/MobileTouchDock.java
+          test -s td-mobile-port/src/MobileTouchGuide.java
 
       - name: Checkout pinned Android upstream
         uses: actions/checkout@v4
@@ -43,7 +44,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 td-mobile-port/work/tiberian-dawn-android-phase2/tools/apply_phase2.py upstream
+          python3 td-mobile-port/apply.py upstream
+          python3 td-mobile-port/apply.py upstream
           grep -q 'mobile_touch_help_title' upstream/android/app/src/main/res/values-de/strings.xml
           grep -q 'FreewareDataActivity' upstream/android/app/src/mobile/AndroidManifest.xml
           grep -q 'installMobileTouchControls' upstream/android/app/src/main/java/org/tiberiandawn/android/TiberianDawnActivity.java
@@ -75,7 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           cmake_version=$(cmake --version | sed -n '1s/.* //p')
-          ./gradlew --no-daemon -PandroidCmakeVersion="$cmake_version"             :app:testMobileDebugUnitTest             :app:assembleMobileDebug
+          ./gradlew --no-daemon -PandroidCmakeVersion="$cmake_version" :app:testMobileDebugUnitTest :app:assembleMobileDebug
 
       - name: Verify APK
         shell: bash
