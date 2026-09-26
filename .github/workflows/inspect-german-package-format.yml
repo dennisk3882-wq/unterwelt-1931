@@ -1,0 +1,62 @@
+name: Inspect German C&C package format
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and identify package format
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re, urllib.request, html, pathlib, hashlib
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36'
+          files=[(41773,'/tmp/full.exe'),(71455,'/tmp/ger.exe')]
+          for fid,out in files:
+              start=f'https://www.moddb.com/downloads/start/{fid}'
+              h=urllib.request.urlopen(urllib.request.Request(start,headers={'User-Agent':UA}),timeout=30).read().decode('utf-8','replace')
+              m=re.search(r'href=["\']([^"\']*/downloads/mirror/%d/[^"\']+)["\']'%fid,h)
+              if not m: raise SystemExit(f'no mirror for {fid}')
+              u=html.unescape(m.group(1))
+              if u.startswith('/'): u='https://www.moddb.com'+u
+              req=urllib.request.Request(u,headers={'User-Agent':UA,'Referer':start})
+              with urllib.request.urlopen(req,timeout=60) as src, open(out,'wb') as dst:
+                  while True:
+                      b=src.read(1024*1024)
+                      if not b: break
+                      dst.write(b)
+              data=pathlib.Path(out).read_bytes()
+              print(out, len(data), hashlib.md5(data).hexdigest())
+          PY
+          python3 -m pip install --quiet pefile
+          python3 - <<'PY'
+          import pefile
+          for path in ['/tmp/full.exe','/tmp/ger.exe']:
+              pe=pefile.PE(path, fast_load=False)
+              ov=pe.get_overlay_data_start_offset()
+              print(f'=== {path} ===')
+              print('entry',hex(pe.OPTIONAL_HEADER.AddressOfEntryPoint),'image',hex(pe.OPTIONAL_HEADER.SizeOfImage),'overlay',ov,'overlay_size',0 if ov is None else len(open(path,'rb').read())-ov)
+              if hasattr(pe,'FileInfo'):
+                  for x in pe.FileInfo:
+                      for fi in x:
+                          if fi.Key == b'StringFileInfo':
+                              for st in fi.StringTable:
+                                  print({k.decode(errors='replace'):v.decode(errors='replace') for k,v in st.entries.items()})
+          PY
+          echo '=== FULL SIGNATURE STRINGS ==='
+          strings -a -n 5 /tmp/full.exe | grep -Ei -m 120 'inno|nsis|nullsoft|installshield|wise|setup factory|indigo rose|installaware|winrar|sfx|lzma|installer|uninstall|extract|cabinet|7-zip' || true
+          echo '=== VIDEO SIGNATURE STRINGS ==='
+          strings -a -n 5 /tmp/ger.exe | grep -Ei -m 120 'inno|nsis|nullsoft|installshield|wise|setup factory|indigo rose|installaware|winrar|sfx|lzma|installer|uninstall|extract|cabinet|7-zip' || true
+          echo '=== FULL ASCII NAMES ==='
+          strings -a -n 6 /tmp/full.exe | grep -Ei -m 120 'conquer\.(ger|eng)|speecger|talkger|tempiger|deseiger|wintiger|cclocal|movies\.mix|lang_ger|\.mix' || true
+          echo '=== VIDEO ASCII NAMES ==='
+          strings -a -n 6 /tmp/ger.exe | grep -Ei -m 120 'movies\.mix|\.vqa|gdi|nod|german|ger' || true
