@@ -1,0 +1,1 @@
+Build trigger for compact gear controls, pinch zoom, and sharp/ModernArt rendering.
