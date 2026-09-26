@@ -35,6 +35,7 @@ jobs:
           test -s td-mobile-port/src/FreewareIsoVerifier.java
           test -s td-mobile-port/src/MobileTouchDock.java
           test -s td-mobile-port/src/MobileTouchGuide.java
+          test -s td-mobile-port/src/MobileDisplayController.java
 
       - name: Checkout pinned Android upstream
         uses: actions/checkout@v4
@@ -52,6 +53,8 @@ jobs:
           grep -q 'mobile_touch_help_title' upstream/android/app/src/main/res/values-de/strings.xml
           grep -q 'FreewareDataActivity' upstream/android/app/src/mobile/AndroidManifest.xml
           grep -q 'installMobileTouchControls' upstream/android/app/src/main/java/org/tiberiandawn/android/TiberianDawnActivity.java
+          grep -q 'mobileDisplayController.onDispatchTouchEvent' upstream/android/app/src/main/java/org/tiberiandawn/android/TiberianDawnActivity.java
+          grep -q 'mobile_touch_menu' upstream/android/app/src/main/res/values-de/strings.xml
           grep -q 'installDownloadedGameData' upstream/android/app/src/main/java/org/tiberiandawn/android/GameDataImportActivity.java
           grep -q 'FreewareDownloadClient' upstream/android/app/src/main/java/org/tiberiandawn/android/FreewareDataActivity.java
 
