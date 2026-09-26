@@ -24,8 +24,11 @@ def insert_before_once(s, anchor, insertion, marker, label):
 def copy_sources(root):
     dst=root/'android/app/src/main/java/org/tiberiandawn/android'
     dst.mkdir(parents=True,exist_ok=True)
-    for name in ['FreewareCatalog.java','FreewareDataActivity.java','FreewareDownloadClient.java','FreewareIsoVerifier.java','MobileTouchDock.java','MobileTouchGuide.java','MobileDisplayController.java']:
+    for name in ['FreewareCatalog.java','FreewareDataActivity.java','FreewareDownloadClient.java','FreewareIsoVerifier.java','GermanPackageInstaller.java','MobileTouchDock.java','MobileTouchGuide.java','MobileDisplayController.java']:
         shutil.copy2(SRC/name,dst/name)
+    native_dst=root/'platform/android'
+    native_dst.mkdir(parents=True,exist_ok=True)
+    shutil.copy2(HERE/'native/android_inno_bridge.cpp', native_dst/'android_inno_bridge.cpp')
 
 def patch_import(root):
     p=root/'android/app/src/main/java/org/tiberiandawn/android/GameDataImportActivity.java'; require(p); s=read(p)
@@ -42,6 +45,14 @@ def patch_import(root):
     s=insert_before_once(s,
 '''    @Override
     protected void attachBaseContext(Context newBase) {''',wrapper,'installDownloadedGameData(File firstIso','downloaded-data native wrapper')
+    helper='''    static void ensureNativeLibrariesForDataTools() {
+        ensureNativeLibrariesLoaded();
+    }
+
+'''
+    s=insert_before_once(s,
+'''    @Override
+    protected void attachBaseContext(Context newBase) {''',helper,'ensureNativeLibrariesForDataTools()','data-tools native loader')
     s=replace_once(s,
 '''        content.addView(languageButton, matchWrapParams(dp(12)));\n\n        firstIsoButton = new Button(this);''',
 '''        content.addView(languageButton, matchWrapParams(dp(12)));\n\n        Button freewareButton = new Button(this);\n        freewareButton.setText(R.string.import_no_discs);\n        freewareButton.setAllCaps(false);\n        freewareButton.setOnClickListener(view ->\n            startActivity(new Intent(this, FreewareDataActivity.class)));\n        content.addView(freewareButton, matchWrapParams(dp(12)));\n\n        firstIsoButton = new Button(this);''','freeware button')
@@ -173,6 +184,101 @@ def patch_hd_artwork_default(root):
     Video.ArtworkMode = 1;
 }'''
     s=replace_once(s,old,new,'mobile HD artwork default')
+    write(p,s)
+
+def patch_android_inno_bridge(root):
+    p=root/'tiberiandawn/CMakeLists.txt'; require(p); s=read(p)
+    s=replace_once(s,
+'''        ${CMAKE_SOURCE_DIR}/platform/android/android_import.cpp
+        ${CMAKE_SOURCE_DIR}/platform/android/android_save_bridge.cpp''',
+'''        ${CMAKE_SOURCE_DIR}/platform/android/android_import.cpp
+        ${CMAKE_SOURCE_DIR}/platform/android/android_inno_bridge.cpp
+        ${CMAKE_SOURCE_DIR}/platform/android/android_save_bridge.cpp''','Android Inno bridge source')
+    marker='''    if(ANDROID_PORT)
+        target_link_libraries(TiberianDawn dl)
+    endif()
+'''
+    anchor='''    target_link_libraries(TiberianDawn commonv ${VANILLA_LIBS} ${STATIC_LIBS})
+'''
+    if marker not in s:
+        if s.count(anchor) != 1:
+            raise SystemExit("Android dl link anchor not found exactly once")
+        s=s.replace(anchor,anchor+marker,1)
+    write(p,s)
+
+def patch_german_runtime(root):
+    p=root/'tiberiandawn/init.cpp'; require(p); s=read(p)
+    old='''        CCDebugString("C&C95 - About to register MOVIES.MIX\\n");
+        if (!MoviesMix)
+            MoviesMix = new MFCD("MOVIES.MIX"); // Never cached.
+'''
+    new='''        const bool android_german_data =
+#if defined(ANDROID_PORT)
+            stricmp(Language_Name("CONQUER"), "CONQUER.GER") == 0
+            && CCFileClass("MOVIESGER.MIX").Is_Available();
+#else
+            false;
+#endif
+        CCDebugString(android_german_data
+            ? "C&C95 - About to register MOVIESGER.MIX\\n"
+            : "C&C95 - About to register MOVIES.MIX\\n");
+        if (!MoviesMix)
+            MoviesMix = new MFCD(android_german_data ? "MOVIESGER.MIX" : "MOVIES.MIX"); // Never cached.
+'''
+    s=replace_once(s,old,new,'German movie mix selection')
+
+    old='''    CCDebugString("C&C95 - About to register SPEECH.MIX\\n");
+    if (CCFileClass("SPEECH.MIX").Is_Available()) {
+        new MFCD("SPEECH.MIX"); // Never cached.
+    }
+    CCDebugString("C&C95 - About to register SOUNDS.MIX\\n");
+    new MFCD("SOUNDS.MIX"); // Cached.
+'''
+    new='''#if defined(ANDROID_PORT)
+    const bool android_german_speech =
+        stricmp(Language_Name("CONQUER"), "CONQUER.GER") == 0
+        && CCFileClass("SPEECGER.MIX").Is_Available();
+    CCDebugString(android_german_speech
+        ? "C&C95 - About to register SPEECGER.MIX\\n"
+        : "C&C95 - About to register SPEECH.MIX\\n");
+    if (CCFileClass(android_german_speech ? "SPEECGER.MIX" : "SPEECH.MIX").Is_Available()) {
+        new MFCD(android_german_speech ? "SPEECGER.MIX" : "SPEECH.MIX");
+    }
+#else
+    CCDebugString("C&C95 - About to register SPEECH.MIX\\n");
+    if (CCFileClass("SPEECH.MIX").Is_Available()) {
+        new MFCD("SPEECH.MIX"); // Never cached.
+    }
+#endif
+    CCDebugString("C&C95 - About to register SOUNDS.MIX\\n");
+    new MFCD("SOUNDS.MIX"); // Cached.
+#if defined(ANDROID_PORT)
+    if (android_german_speech && CCFileClass("TALKGER.MIX").Is_Available()) {
+        CCDebugString("C&C95 - About to register TALKGER.MIX\\n");
+        new MFCD("TALKGER.MIX");
+    }
+#endif
+'''
+    s=replace_once(s,old,new,'German speech mix selection')
+    write(p,s)
+
+    p=root/'tiberiandawn/conquer.cpp'; require(p); s=read(p)
+    old='''        MoviesMix = new MFCD("MOVIES.MIX");
+        GeneralMix = new MFCD("GENERAL.MIX");
+        ScoreMix = new MFCD("SCORES.MIX");
+'''
+    new='''#if defined(ANDROID_PORT)
+        const bool android_german_movies =
+            stricmp(Language_Name("CONQUER"), "CONQUER.GER") == 0
+            && CCFileClass("MOVIESGER.MIX").Is_Available();
+        MoviesMix = new MFCD(android_german_movies ? "MOVIESGER.MIX" : "MOVIES.MIX");
+#else
+        MoviesMix = new MFCD("MOVIES.MIX");
+#endif
+        GeneralMix = new MFCD("GENERAL.MIX");
+        ScoreMix = new MFCD("SCORES.MIX");
+'''
+    s=replace_once(s,old,new,'German movie mix reinit')
     write(p,s)
 
 def patch_game(root):
@@ -337,6 +443,8 @@ def main():
     add_strings(root/'android/app/src/main/res/values/strings.xml',False)
     add_strings(root/'android/app/src/main/res/values-de/strings.xml',True)
     patch_hd_artwork_default(root)
+    patch_android_inno_bridge(root)
+    patch_german_runtime(root)
     patch_game(root)
     print('Tiberian Dawn Android mobile port changes applied.')
 
