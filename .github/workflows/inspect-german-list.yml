@@ -1,0 +1,42 @@
+name: List German C&C Inno contents
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  list:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: List exact German package contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq innoextract
+          python3 - <<'PY'
+          import re, urllib.request, html, hashlib
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36'
+          for fid,out,md5 in [
+            (41773,'/tmp/full.exe','41270fdafc0c177b7c557ccb688a5d67'),
+            (71455,'/tmp/ger.exe','098501debb7e51717ca7cc0d1b30aaf3')]:
+              start=f'https://www.moddb.com/downloads/start/{fid}'
+              h=urllib.request.urlopen(urllib.request.Request(start,headers={'User-Agent':UA}),timeout=30).read().decode('utf-8','replace')
+              m=re.search(r'href=["\']([^"\']*/downloads/mirror/%d/[^"\']+)["\']'%fid,h)
+              u=html.unescape(m.group(1))
+              if u.startswith('/'): u='https://www.moddb.com'+u
+              req=urllib.request.Request(u,headers={'User-Agent':UA,'Referer':start})
+              d=hashlib.md5()
+              with urllib.request.urlopen(req,timeout=60) as src, open(out,'wb') as dst:
+                  while True:
+                      b=src.read(1024*1024)
+                      if not b: break
+                      d.update(b); dst.write(b)
+              if d.hexdigest()!=md5: raise SystemExit(f'hash mismatch {out}')
+          PY
+          echo '=== FULL ALL MIX/LANGUAGE ==='
+          innoextract -l /tmp/full.exe | grep -Ei '(^|/)([^/]*(ger|german)[^/]*|[^/]*\.mix|conquer\.[a-z]{3})$' | head -1000 || true
+          echo '=== VIDEO ALL FILES ==='
+          innoextract -l /tmp/ger.exe | head -1000
