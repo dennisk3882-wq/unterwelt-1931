@@ -1,0 +1,1 @@
+Build trigger for automatic freeware download and installation flow.
