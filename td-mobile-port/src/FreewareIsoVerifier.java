@@ -8,7 +8,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 
-/** Strict verification for the two known public freeware ISO files. */
+/** Integrity checks for the known public game-data packages. */
 public final class FreewareIsoVerifier {
     public enum Result { NOT_KNOWN_FREEWARE, VALID, INVALID_SIZE, INVALID_HASH }
 
@@ -20,23 +20,26 @@ public final class FreewareIsoVerifier {
             return Result.NOT_KNOWN_FREEWARE;
         }
 
-        final long expectedSize;
-        final String expectedMd5;
         if (FreewareCatalog.GDI_FILENAME.equalsIgnoreCase(originalDisplayName)) {
-            expectedSize = FreewareCatalog.GDI_SIZE;
-            expectedMd5 = FreewareCatalog.GDI_MD5;
+            return verifyKnownFile(stagedFile, FreewareCatalog.GDI_SIZE,
+                FreewareCatalog.GDI_MD5);
         } else if (FreewareCatalog.NOD_FILENAME.equalsIgnoreCase(originalDisplayName)) {
-            expectedSize = FreewareCatalog.NOD_SIZE;
-            expectedMd5 = FreewareCatalog.NOD_MD5;
-        } else {
-            return Result.NOT_KNOWN_FREEWARE;
+            return verifyKnownFile(stagedFile, FreewareCatalog.NOD_SIZE,
+                FreewareCatalog.NOD_MD5);
         }
-
-        if (stagedFile.length() != expectedSize) return Result.INVALID_SIZE;
-        return expectedMd5.equals(md5(stagedFile)) ? Result.VALID : Result.INVALID_HASH;
+        return Result.NOT_KNOWN_FREEWARE;
     }
 
-    private static String md5(File file) throws IOException {
+    public static Result verifyKnownFile(File file, long expectedSize,
+                                         String expectedMd5)
+            throws IOException {
+        if (file == null || !file.isFile()) return Result.INVALID_SIZE;
+        if (file.length() != expectedSize) return Result.INVALID_SIZE;
+        return expectedMd5.equalsIgnoreCase(md5(file))
+            ? Result.VALID : Result.INVALID_HASH;
+    }
+
+    public static String md5(File file) throws IOException {
         final MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("MD5");
@@ -48,7 +51,12 @@ public final class FreewareIsoVerifier {
         try (BufferedInputStream input =
                  new BufferedInputStream(new FileInputStream(file))) {
             int count;
-            while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count);
+            while ((count = input.read(buffer)) != -1) {
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new IOException("Verification cancelled");
+                }
+                digest.update(buffer, 0, count);
+            }
         }
 
         StringBuilder result = new StringBuilder(32);
