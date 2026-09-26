@@ -1,0 +1,23 @@
+name: Inspect pinned Android InnoExtract binary
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect v4.0.0 arm64 library
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://github.com/alanwoolley/innoextract-android/releases/download/v4.0.0/App-arm64-v8a-release-signed.apk'
+          curl -L --fail --retry 3 -o /tmp/inno.apk "$url"
+          echo "APK $(sha256sum /tmp/inno.apk)"
+          unzip -l /tmp/inno.apk | grep -E 'lib/arm64-v8a/.*\.so$'
+          unzip -p /tmp/inno.apk lib/arm64-v8a/libinnoextract.so > /tmp/libinnoextract.so
+          echo "SO $(sha256sum /tmp/libinnoextract.so)"
+          file /tmp/libinnoextract.so
+          readelf -Ws /tmp/libinnoextract.so | grep -E 'Java_uk_co_armedpineapple_innoextract_service_ExtractService_native(Prepare|Extract|Check)| main$' || true
