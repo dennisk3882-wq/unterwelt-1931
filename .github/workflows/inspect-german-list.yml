@@ -36,7 +36,7 @@ jobs:
                       d.update(b); dst.write(b)
               if d.hexdigest()!=md5: raise SystemExit(f'hash mismatch {out}')
           PY
-          echo '=== FULL ALL MIX/LANGUAGE ==='
-          innoextract -l /tmp/full.exe | grep -Ei '(^|/)([^/]*(ger|german)[^/]*|[^/]*\.mix|conquer\.[a-z]{3})$' | head -1000 || true
+          echo '=== FULL ALL FILES ==='
+          innoextract -l /tmp/full.exe | head -1200
           echo '=== VIDEO ALL FILES ==='
           innoextract -l /tmp/ger.exe | head -1000
