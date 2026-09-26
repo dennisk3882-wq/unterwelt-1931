@@ -55,6 +55,7 @@ jobs:
           grep -q 'installMobileTouchControls' upstream/android/app/src/main/java/org/tiberiandawn/android/TiberianDawnActivity.java
           grep -q 'mobileDisplayController.onDispatchTouchEvent' upstream/android/app/src/main/java/org/tiberiandawn/android/TiberianDawnActivity.java
           grep -q 'mobile_touch_menu' upstream/android/app/src/main/res/values-de/strings.xml
+          grep -q 'Video.ArtworkMode = 1;' upstream/common/settings.cpp
           grep -q 'installDownloadedGameData' upstream/android/app/src/main/java/org/tiberiandawn/android/GameDataImportActivity.java
           grep -q 'FreewareDownloadClient' upstream/android/app/src/main/java/org/tiberiandawn/android/FreewareDataActivity.java
 
