@@ -80,19 +80,32 @@ def add_strings(p,german):
     <string name="freeware_title">Spieldaten automatisch installieren</string>
     <string name="freeware_explanation">Command &amp; Conquer: Der Tiberiumkonflikt wurde als Freeware veröffentlicht. Die App kann die bekannten GDI- und Nod-ISOs von den öffentlichen ModDB-Downloadseiten automatisch laden, prüfen, installieren und danach wieder löschen.</string>
     <string name="freeware_auto_button">Spieldaten automatisch herunterladen &amp; installieren</string>
-    <string name="freeware_auto_ready">Bereit. Für den Download werden etwa 1,20 GB übertragen.</string>
+    <string name="freeware_auto_german_button">Deutsch komplett automatisch installieren</string>
+    <string name="freeware_auto_english_button">Englisch automatisch installieren</string>
+    <string name="freeware_german_upgrade_title">Deutsche Spieldaten installieren</string>
+    <string name="freeware_german_upgrade_explanation">Die englische Basis ist bereits installiert. Die App lädt jetzt nur noch die geprüften deutschen Sprach-, Einheiten- und Kampagnenvideodaten nach.</string>
+    <string name="freeware_german_upgrade_button">Deutsch jetzt nachinstallieren</string>
+    <string name="freeware_german_upgrade_ready">Bereit. Für Deutsch werden zusätzlich etwa 0,62 GB heruntergeladen.</string>
+    <string name="freeware_auto_ready">Bereit. Wähle Deutsch oder Englisch. Deutsch enthält zusätzlich deutsche Sprache und Kampagnenvideos.</string>
     <string name="freeware_manual_fallback">Falls der automatische Download nicht funktioniert, kannst du die beiden Downloadseiten weiterhin manuell öffnen.</string>
     <string name="freeware_auto_confirm_title">Automatischer Download</string>
-    <string name="freeware_auto_confirm">Es werden etwa %1$s aus dem Internet geladen. Während Download und Installation werden vorübergehend ungefähr %2$s freier Speicher benötigt. Danach löscht die App die ISO-Dateien automatisch.</string>
+    <string name="freeware_auto_confirm">Es werden etwa %1$s aus dem Internet geladen. Während Download und Installation werden vorübergehend ungefähr %2$s freier Speicher benötigt. Danach löscht die App die temporären Installationsdateien automatisch.</string>
+    <string name="freeware_german_confirm_title">Deutsche Fassung installieren</string>
+    <string name="freeware_german_confirm">Für die deutsche Fassung werden etwa %1$s heruntergeladen. Während der Installation werden ungefähr %2$s freier Speicher benötigt. Enthalten sind deutsche Texte, EVA-/Einheitenstimmen und deutsche Kampagnenvideos.</string>
     <string name="freeware_auto_start">Herunterladen</string>
     <string name="freeware_auto_space_error">Nicht genug freier Speicher. Benötigt: ca. %1$s. Verfügbar: %2$s.</string>
     <string name="freeware_auto_preparing">Download wird vorbereitet…</string>
     <string name="freeware_auto_downloading">%1$s wird geladen: %2$s / %3$s</string>
     <string name="freeware_auto_verifying">%1$s wird geprüft…</string>
     <string name="freeware_auto_installing">Spieldaten werden installiert…</string>
+    <string name="freeware_german_extracting">Deutsche Sprach- und Videopakete werden entpackt…</string>
+    <string name="freeware_german_applying">Deutsche Spieldaten werden eingerichtet…</string>
+    <string name="freeware_german_incomplete">Die deutschen Spieldaten wurden nicht vollständig installiert.</string>
     <string name="freeware_auto_verify_error">Die heruntergeladene Datei konnte nicht als bekannte Freeware-ISO bestätigt werden.</string>
     <string name="freeware_auto_complete">Installation abgeschlossen.</string>
-    <string name="freeware_auto_complete_message">GDI- und Nod-Spieldaten wurden geprüft und installiert. Die temporären ISO-Dateien wurden entfernt.</string>
+    <string name="freeware_auto_complete_message">GDI- und Nod-Spieldaten wurden geprüft und installiert. Die temporären Installationsdateien wurden entfernt.</string>
+    <string name="freeware_german_complete">Deutsche Fassung installiert.</string>
+    <string name="freeware_german_complete_message">Deutsch wurde eingerichtet: deutsche Spieltexte, EVA-/Einheitenstimmen und Kampagnenvideos. Das Spiel wird jetzt neu gestartet.</string>
     <string name="freeware_auto_failed">Automatischer Download nicht abgeschlossen.</string>
     <string name="freeware_auto_download_error">Die Spieldaten konnten nicht automatisch heruntergeladen werden. Du kannst es erneut versuchen oder unten die manuellen Downloadseiten öffnen.</string>
     <string name="freeware_download_gdi">GDI-Freeware-ISO manuell öffnen</string>
@@ -123,19 +136,32 @@ def add_strings(p,german):
     <string name="freeware_title">Install game data automatically</string>
     <string name="freeware_explanation">Command &amp; Conquer: Tiberian Dawn was released as freeware. The app can download the known GDI and Nod ISO images from the public ModDB download pages, verify them, install the data, and remove the temporary ISO files afterwards.</string>
     <string name="freeware_auto_button">Download &amp; install game data automatically</string>
-    <string name="freeware_auto_ready">Ready. The download transfers about 1.20 GB.</string>
+    <string name="freeware_auto_german_button">Install complete German version automatically</string>
+    <string name="freeware_auto_english_button">Install English automatically</string>
+    <string name="freeware_german_upgrade_title">Install German game data</string>
+    <string name="freeware_german_upgrade_explanation">The English baseline is already installed. The app now downloads only the verified German text, speech, unit voices and campaign video resources.</string>
+    <string name="freeware_german_upgrade_button">Install German data now</string>
+    <string name="freeware_german_upgrade_ready">Ready. German adds about 0.62 GB of downloads.</string>
+    <string name="freeware_auto_ready">Ready. Choose German or English. German additionally installs German speech and campaign videos.</string>
     <string name="freeware_manual_fallback">If automatic download stops working, the two public download pages remain available below as a manual fallback.</string>
     <string name="freeware_auto_confirm_title">Automatic download</string>
-    <string name="freeware_auto_confirm">About %1$s will be downloaded. Download and installation temporarily require roughly %2$s of free storage. The app removes the ISO files after installation.</string>
+    <string name="freeware_auto_confirm">About %1$s will be downloaded. Download and installation temporarily require roughly %2$s of free storage. Temporary installer files are removed afterwards.</string>
+    <string name="freeware_german_confirm_title">Install German version</string>
+    <string name="freeware_german_confirm">The German version downloads about %1$s and temporarily needs roughly %2$s of free storage. It includes German game text, EVA/unit speech and German campaign videos.</string>
     <string name="freeware_auto_start">Download</string>
     <string name="freeware_auto_space_error">Not enough free storage. Required: about %1$s. Available: %2$s.</string>
     <string name="freeware_auto_preparing">Preparing download…</string>
     <string name="freeware_auto_downloading">Downloading %1$s: %2$s / %3$s</string>
     <string name="freeware_auto_verifying">Verifying %1$s…</string>
     <string name="freeware_auto_installing">Installing game data…</string>
+    <string name="freeware_german_extracting">Extracting German language and video packages…</string>
+    <string name="freeware_german_applying">Applying German game data…</string>
+    <string name="freeware_german_incomplete">German game data was not installed completely.</string>
     <string name="freeware_auto_verify_error">The downloaded file could not be verified as a known freeware ISO.</string>
     <string name="freeware_auto_complete">Installation complete.</string>
-    <string name="freeware_auto_complete_message">The GDI and Nod game data was verified and installed. Temporary ISO files were removed.</string>
+    <string name="freeware_auto_complete_message">The GDI and Nod game data was verified and installed. Temporary installer files were removed.</string>
+    <string name="freeware_german_complete">German version installed.</string>
+    <string name="freeware_german_complete_message">German is installed: game text, EVA/unit speech and campaign videos. The game will now restart.</string>
     <string name="freeware_auto_failed">Automatic download did not complete.</string>
     <string name="freeware_auto_download_error">The game data could not be downloaded automatically. Try again or use the manual download pages below.</string>
     <string name="freeware_download_gdi">Open GDI freeware ISO manually</string>
@@ -394,6 +420,14 @@ def patch_game(root):
         new AlertDialog.Builder(this)
             .setTitle(localizedString(R.string.mobile_language_title))
             .setSingleChoiceItems(items, LanguagePreferences.get(this), (dialog, which) -> {
+                if (which == LanguagePreferences.GERMAN
+                        && !GermanPackageInstaller.isInstalled(this)) {
+                    dialog.dismiss();
+                    Intent installer = new Intent(this, FreewareDataActivity.class);
+                    installer.putExtra(FreewareDataActivity.EXTRA_GERMAN_ONLY, true);
+                    startActivity(installer);
+                    return;
+                }
                 LanguagePreferences.set(this, which);
                 try {
                     nativeConfigureLanguage(LanguagePreferences.get(this),
