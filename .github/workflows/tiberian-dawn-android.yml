@@ -123,8 +123,22 @@ jobs:
           set -euo pipefail
           apk=upstream/android/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk
           test -s "$apk"
-          curl -fsSL 'https://android.googlesource.com/platform/build/+/android-14.0.0_r1/target/product/security/testkey.pk8?format=TEXT' | base64 -d > /tmp/td-testkey.pk8
-          curl -fsSL 'https://android.googlesource.com/platform/build/+/android-14.0.0_r1/target/product/security/testkey.x509.pem?format=TEXT' | base64 -d > /tmp/td-testkey.x509.pem
+          if ! curl -fsSL --retry 6 --retry-all-errors --retry-delay 2 \
+            'https://android.googlesource.com/platform/build/+/android-14.0.0_r1/target/product/security/testkey.pk8?format=TEXT' \
+            | base64 -d > /tmp/td-testkey.pk8; then
+            curl -fsSL --retry 6 --retry-all-errors \
+              'https://raw.githubusercontent.com/aosp-mirror/platform_build/android-14.0.0_r1/target/product/security/testkey.pk8' \
+              -o /tmp/td-testkey.pk8
+          fi
+          if ! curl -fsSL --retry 6 --retry-all-errors --retry-delay 2 \
+            'https://android.googlesource.com/platform/build/+/android-14.0.0_r1/target/product/security/testkey.x509.pem?format=TEXT' \
+            | base64 -d > /tmp/td-testkey.x509.pem; then
+            curl -fsSL --retry 6 --retry-all-errors \
+              'https://raw.githubusercontent.com/aosp-mirror/platform_build/android-14.0.0_r1/target/product/security/testkey.x509.pem' \
+              -o /tmp/td-testkey.x509.pem
+          fi
+          test -s /tmp/td-testkey.pk8
+          test -s /tmp/td-testkey.x509.pem
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
             --key /tmp/td-testkey.pk8 \
             --cert /tmp/td-testkey.x509.pem \
