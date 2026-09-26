@@ -1,0 +1,39 @@
+name: Inspect German core files
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect exact German core filenames
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq innoextract
+          python3 - <<'PY'
+          import re, urllib.request, html, hashlib
+          fid=41773; expected='41270fdafc0c177b7c557ccb688a5d67'
+          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36'
+          start=f'https://www.moddb.com/downloads/start/{fid}'
+          h=urllib.request.urlopen(urllib.request.Request(start,headers={'User-Agent':ua}),timeout=30).read().decode('utf-8','replace')
+          u=html.unescape(re.search(r'href=["\']([^"\']*/downloads/mirror/%d/[^"\']+)["\']'%fid,h).group(1))
+          if u.startswith('/'): u='https://www.moddb.com'+u
+          d=hashlib.md5()
+          with urllib.request.urlopen(urllib.request.Request(u,headers={'User-Agent':ua,'Referer':start}),timeout=60) as src, open('/tmp/full.exe','wb') as dst:
+              while True:
+                  b=src.read(1024*1024)
+                  if not b: break
+                  d.update(b); dst.write(b)
+          assert d.hexdigest()==expected, d.hexdigest()
+          PY
+          echo '=== MATCHING FILES ==='
+          innoextract -l /tmp/full.exe | grep -iE 'conquer|german|ger\.|ger/|ger_|speec|talk|\.mix|\.eng|\.ger|language' | head -600 || true
