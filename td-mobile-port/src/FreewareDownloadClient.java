@@ -168,6 +168,9 @@ public final class FreewareDownloadClient {
             long lastPublished = -1;
             int count;
             while ((count = input.read(buffer)) != -1) {
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new IOException("Download cancelled");
+                }
                 output.write(buffer, 0, count);
                 downloaded += count;
                 if (downloaded > expectedSize) {
