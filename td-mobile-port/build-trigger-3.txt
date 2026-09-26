@@ -1,0 +1,1 @@
+Third isolated build trigger using explicit sdkmanager path.
