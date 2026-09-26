@@ -60,3 +60,21 @@ jobs:
           strings -a -n 6 /tmp/full.exe | grep -Ei -m 120 'conquer\.(ger|eng)|speecger|talkger|tempiger|deseiger|wintiger|cclocal|movies\.mix|lang_ger|\.mix' || true
           echo '=== VIDEO ASCII NAMES ==='
           strings -a -n 6 /tmp/ger.exe | grep -Ei -m 120 'movies\.mix|\.vqa|gdi|nod|german|ger' || true
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq innoextract
+          echo '=== FULL INNO FILES ==='
+          innoextract -l /tmp/full.exe | grep -Ei 'conquer\.(ger|eng)|speecger|talkger|tempiger|deseiger|wintiger|cclocal|general\.mix|movies\.mix|scores\.mix|sounds\.mix|speech\.mix|temperat\.mix|desert\.mix|winter\.mix|\.mix | head -500 || true
+          echo '=== VIDEO INNO FILES ==='
+          innoextract -l /tmp/ger.exe | grep -Ei 'movies\.mix|\.vqa|gdi|nod|german|ger|\.mix | head -500 || true
+          rm -rf /tmp/full-out /tmp/video-out
+          mkdir -p /tmp/full-out /tmp/video-out
+          innoextract -d /tmp/full-out /tmp/full.exe >/tmp/full-extract.log
+          innoextract -d /tmp/video-out /tmp/ger.exe >/tmp/video-extract.log
+          echo '=== EXTRACTED FULL RELEVANT ==='
+          find /tmp/full-out -type f -printf '%s %P\n' | grep -Ei 'conquer\.(ger|eng)|speecger|talkger|tempiger|deseiger|wintiger|cclocal|general\.mix|movies\.mix|scores\.mix|sounds\.mix|speech\.mix|temperat\.mix|desert\.mix|winter\.mix|\.mix | sort | head -500 || true
+          echo '=== EXTRACTED VIDEO RELEVANT ==='
+          find /tmp/video-out -type f -printf '%s %P\n' | grep -Ei 'movies\.mix|\.vqa|gdi|nod|german|ger|\.mix | sort | head -500 || true
+          echo '=== HASHES FULL GERMAN CORE ==='
+          find /tmp/full-out -type f \( -iname 'CONQUER.GER' -o -iname 'SPEECGER.MIX' -o -iname 'TALKGER.MIX' -o -iname 'TEMPIGER.MIX' -o -iname 'DESEIGER.MIX' -o -iname 'WINTIGER.MIX' \) -print0 | xargs -0 -r sha256sum
+          echo '=== HASHES VIDEO MIXES ==='
+          find /tmp/video-out -type f -iname '*.MIX' -print0 | xargs -0 -r sha256sum
