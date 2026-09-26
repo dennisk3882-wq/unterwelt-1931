@@ -1,0 +1,1 @@
+Build trigger for stable development signing of compact UI, zoom and HD build.
