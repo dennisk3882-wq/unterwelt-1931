@@ -1,0 +1,64 @@
+name: Inspect German C&C packages
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve and inspect German community packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re, urllib.request, html
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36'
+          for fid,name in [(41773,'full'),(71455,'ger_video')]:
+              req=urllib.request.Request(f'https://www.moddb.com/downloads/start/{fid}',headers={'User-Agent':UA})
+              data=urllib.request.urlopen(req,timeout=30).read().decode('utf-8','replace')
+              m=re.search(r'href=["\']([^"\']*/downloads/mirror/%d/[^"\']+)["\']'%fid,data)
+              if not m: raise SystemExit(f'no mirror for {fid}')
+              url=html.unescape(m.group(1))
+              if url.startswith('/'): url='https://www.moddb.com'+url
+              req=urllib.request.Request(url,headers={'User-Agent':UA,'Referer':f'https://www.moddb.com/downloads/start/{fid}'})
+              r=urllib.request.urlopen(req,timeout=30)
+              print(name+'='+r.geturl())
+          PY
+          full=$(python3 - <<'PY'
+          import re, urllib.request, html
+          fid=41773; UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36'
+          h=urllib.request.urlopen(urllib.request.Request(f'https://www.moddb.com/downloads/start/{fid}',headers={'User-Agent':UA}),timeout=30).read().decode('utf-8','replace')
+          u=html.unescape(re.search(r'href=["\']([^"\']*/downloads/mirror/%d/[^"\']+)["\']'%fid,h).group(1))
+          if u.startswith('/'): u='https://www.moddb.com'+u
+          print(urllib.request.urlopen(urllib.request.Request(u,headers={'User-Agent':UA,'Referer':f'https://www.moddb.com/downloads/start/{fid}'}),timeout=30).geturl())
+          PY
+          )
+          video=$(python3 - <<'PY'
+          import re, urllib.request, html
+          fid=71455; UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36'
+          h=urllib.request.urlopen(urllib.request.Request(f'https://www.moddb.com/downloads/start/{fid}',headers={'User-Agent':UA}),timeout=30).read().decode('utf-8','replace')
+          u=html.unescape(re.search(r'href=["\']([^"\']*/downloads/mirror/%d/[^"\']+)["\']'%fid,h).group(1))
+          if u.startswith('/'): u='https://www.moddb.com'+u
+          print(urllib.request.urlopen(urllib.request.Request(u,headers={'User-Agent':UA,'Referer':f'https://www.moddb.com/downloads/start/{fid}'}),timeout=30).geturl())
+          PY
+          )
+          curl -L --fail --retry 2 -A 'Mozilla/5.0' -o /tmp/full.exe "$full"
+          curl -L --fail --retry 2 -A 'Mozilla/5.0' -o /tmp/ger.exe "$video"
+          echo "FULL MD5 $(md5sum /tmp/full.exe)"
+          echo "VIDEO MD5 $(md5sum /tmp/ger.exe)"
+          file /tmp/full.exe /tmp/ger.exe
+          echo '=== FULL relevant files ==='
+          7z l -slt /tmp/full.exe | grep -Ei '^(Path = |Size = ).*(CONQUER\.GER|SPEECGER\.MIX|TALKGER\.MIX|LANG_GER|CCLOCAL\.MIX|UPDATEC\.MIX|DESEIGER\.MIX|TEMPIGER\.MIX|WINTIGER\.MIX)' || true
+          echo '=== VIDEO relevant files ==='
+          7z l -slt /tmp/ger.exe | grep -Ei '^(Path = |Size = ).*(MOVIES\.MIX|\.VQA|GER)' | head -200 || true
+          echo '=== FULL archive summary ==='
+          7z l /tmp/full.exe | tail -30
+          echo '=== VIDEO archive summary ==='
+          7z l /tmp/ger.exe | tail -30
