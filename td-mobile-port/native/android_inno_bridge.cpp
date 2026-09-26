@@ -57,7 +57,6 @@ Java_org_tiberiandawn_android_GermanPackageInstaller_nativeExtractInno(
     std::vector<std::string> args;
     args.emplace_back("innoextract");
     args.emplace_back("--extract");
-    args.emplace_back("--silent");
     args.emplace_back("--output-dir");
     args.emplace_back(output);
     args.emplace_back(installer);
