@@ -24,7 +24,7 @@ def insert_before_once(s, anchor, insertion, marker, label):
 def copy_sources(root):
     dst=root/'android/app/src/main/java/org/tiberiandawn/android'
     dst.mkdir(parents=True,exist_ok=True)
-    for name in ['FreewareCatalog.java','FreewareDataActivity.java','FreewareIsoVerifier.java','MobileTouchDock.java','MobileTouchGuide.java']:
+    for name in ['FreewareCatalog.java','FreewareDataActivity.java','FreewareDownloadClient.java','FreewareIsoVerifier.java','MobileTouchDock.java','MobileTouchGuide.java']:
         shutil.copy2(SRC/name,dst/name)
 
 def patch_import(root):
@@ -52,9 +52,73 @@ def add_strings(p,german):
     require(p); s=read(p)
     if 'name="import_no_discs"' in s: return
     if german:
-        add='''\n    <string name="import_no_discs">Ich habe keine Original-CDs</string>\n    <string name="freeware_title">Kostenlose Spieldaten beziehen</string>\n    <string name="freeware_explanation">Command &amp; Conquer: Der Tiberiumkonflikt wurde als Freeware veröffentlicht. Lade die GDI- und Nod-ISO von Command &amp; Conquer Gold über die öffentlichen Downloadseiten herunter. Kehre danach hierher zurück und wähle beide Dateien im Importer aus. Die Android-App selbst bündelt oder spiegelt die Spieldaten nicht.</string>\n    <string name="freeware_download_gdi">GDI-Freeware-ISO öffnen</string>\n    <string name="freeware_download_nod">Nod-Freeware-ISO öffnen</string>\n    <string name="freeware_expected_files">Erwartete Dateien:\\n%1$s\\n%2$s</string>\n    <string name="freeware_back_to_import">Zurück zum ISO-Import</string>\n    <string name="freeware_open_error_title">Seite konnte nicht geöffnet werden</string>\n    <string name="freeware_open_error">Es ist kein Browser verfügbar, um die Freeware-Downloadseite zu öffnen.</string>\n    <string name="import_error_freeware_size">Die heruntergeladene Freeware-ISO %1$s hat eine unerwartete Größe. Lösche sie und lade sie vor dem Import erneut herunter.</string>\n    <string name="import_error_freeware_hash">Die heruntergeladene Freeware-ISO %1$s hat die Integritätsprüfung nicht bestanden. Lösche sie und lade sie vor dem Import erneut herunter.</string>\n    <string name="mobile_touch_commands">Befehle</string>\n    <string name="mobile_touch_more">Mehr</string>\n    <string name="mobile_touch_help_title">Touch-Steuerung</string>\n    <string name="mobile_touch_help_text">Tippe eine Einheit an, um sie auszuwählen. Tippe auf den Boden zum Bewegen oder auf einen Gegner zum Angreifen. Ziehe mit einem Finger, um einen Auswahlrahmen aufzuziehen. Halte einen Finger gedrückt für die Sekundär-/Rechtsklick-Aktion. Ziehe mit zwei Fingern, um die Karte zu verschieben; ein kurzer Zwei-Finger-Tipp löst ebenfalls die Sekundäraktion aus. PAN in der unteren Leiste schaltet vorübergehend Ein-Finger-Ziehen auf Kartenbewegung um. Unter Befehle findest du Gruppen und taktische Aktionen.</string>\n    <string name="mobile_touch_help_close">Spielen</string>\n'''
+        add='''\n    <string name="import_no_discs">Ich habe keine Original-CDs</string>
+    <string name="freeware_title">Spieldaten automatisch installieren</string>
+    <string name="freeware_explanation">Command &amp; Conquer: Der Tiberiumkonflikt wurde als Freeware veröffentlicht. Die App kann die bekannten GDI- und Nod-ISOs von den öffentlichen ModDB-Downloadseiten automatisch laden, prüfen, installieren und danach wieder löschen.</string>
+    <string name="freeware_auto_button">Spieldaten automatisch herunterladen &amp; installieren</string>
+    <string name="freeware_auto_ready">Bereit. Für den Download werden etwa 1,20 GB übertragen.</string>
+    <string name="freeware_manual_fallback">Falls der automatische Download nicht funktioniert, kannst du die beiden Downloadseiten weiterhin manuell öffnen.</string>
+    <string name="freeware_auto_confirm_title">Automatischer Download</string>
+    <string name="freeware_auto_confirm">Es werden etwa %1$s aus dem Internet geladen. Während Download und Installation werden vorübergehend ungefähr %2$s freier Speicher benötigt. Danach löscht die App die ISO-Dateien automatisch.</string>
+    <string name="freeware_auto_start">Herunterladen</string>
+    <string name="freeware_auto_space_error">Nicht genug freier Speicher. Benötigt: ca. %1$s. Verfügbar: %2$s.</string>
+    <string name="freeware_auto_preparing">Download wird vorbereitet…</string>
+    <string name="freeware_auto_downloading">%1$s wird geladen: %2$s / %3$s</string>
+    <string name="freeware_auto_verifying">%1$s wird geprüft…</string>
+    <string name="freeware_auto_installing">Spieldaten werden installiert…</string>
+    <string name="freeware_auto_verify_error">Die heruntergeladene Datei konnte nicht als bekannte Freeware-ISO bestätigt werden.</string>
+    <string name="freeware_auto_complete">Installation abgeschlossen.</string>
+    <string name="freeware_auto_complete_message">GDI- und Nod-Spieldaten wurden geprüft und installiert. Die temporären ISO-Dateien wurden entfernt.</string>
+    <string name="freeware_auto_failed">Automatischer Download nicht abgeschlossen.</string>
+    <string name="freeware_auto_download_error">Die Spieldaten konnten nicht automatisch heruntergeladen werden. Du kannst es erneut versuchen oder unten die manuellen Downloadseiten öffnen.</string>
+    <string name="freeware_download_gdi">GDI-Freeware-ISO manuell öffnen</string>
+    <string name="freeware_download_nod">Nod-Freeware-ISO manuell öffnen</string>
+    <string name="freeware_expected_files">Erwartete Dateien:\\n%1$s\\n%2$s</string>
+    <string name="freeware_back_to_import">Zurück zum ISO-Import</string>
+    <string name="freeware_open_error_title">Seite konnte nicht geöffnet werden</string>
+    <string name="freeware_open_error">Es ist kein Browser verfügbar, um die Freeware-Downloadseite zu öffnen.</string>
+    <string name="import_error_freeware_size">Die heruntergeladene Freeware-ISO %1$s hat eine unerwartete Größe. Sie wurde verworfen und muss erneut geladen werden.</string>
+    <string name="import_error_freeware_hash">Die heruntergeladene Freeware-ISO %1$s hat die Integritätsprüfung nicht bestanden. Sie wurde verworfen und muss erneut geladen werden.</string>
+    <string name="mobile_touch_commands">Befehle</string>
+    <string name="mobile_touch_more">Mehr</string>
+    <string name="mobile_touch_help_title">Touch-Steuerung</string>
+    <string name="mobile_touch_help_text">Tippe eine Einheit an, um sie auszuwählen. Tippe auf den Boden zum Bewegen oder auf einen Gegner zum Angreifen. Ziehe mit einem Finger, um einen Auswahlrahmen aufzuziehen. Halte einen Finger gedrückt für die Sekundär-/Rechtsklick-Aktion. Ziehe mit zwei Fingern, um die Karte zu verschieben; ein kurzer Zwei-Finger-Tipp löst ebenfalls die Sekundäraktion aus. PAN in der unteren Leiste schaltet vorübergehend Ein-Finger-Ziehen auf Kartenbewegung um. Unter Befehle findest du Gruppen und taktische Aktionen.</string>
+    <string name="mobile_touch_help_close">Spielen</string>
+'''
     else:
-        add='''\n    <string name="import_no_discs">I do not have the original discs</string>\n    <string name="freeware_title">Get the freeware game data</string>\n    <string name="freeware_explanation">Command &amp; Conquer: Tiberian Dawn was released as freeware. Download the GDI and Nod C&amp;C Gold ISO images from the public distribution pages, then return here and select both files in the importer. The Android app does not bundle or re-upload the game data.</string>\n    <string name="freeware_download_gdi">Open GDI freeware ISO page</string>\n    <string name="freeware_download_nod">Open Nod freeware ISO page</string>\n    <string name="freeware_expected_files">Expected files:\\n%1$s\\n%2$s</string>\n    <string name="freeware_back_to_import">Back to ISO import</string>\n    <string name="freeware_open_error_title">Page could not be opened</string>\n    <string name="freeware_open_error">No browser was available to open the freeware download page.</string>\n    <string name="import_error_freeware_size">The downloaded freeware ISO %1$s has an unexpected size. Delete it and download it again before importing.</string>\n    <string name="import_error_freeware_hash">The downloaded freeware ISO %1$s failed its integrity check. Delete it and download it again before importing.</string>\n    <string name="mobile_touch_commands">Commands</string>\n    <string name="mobile_touch_more">More</string>\n    <string name="mobile_touch_help_title">Touch controls</string>\n    <string name="mobile_touch_help_text">Tap a unit to select it. Tap terrain to move or tap an enemy to attack. Drag one finger to draw a selection box. Hold one finger for the secondary/right-click action. Drag with two fingers to pan the map; a quick two-finger tap also performs the secondary action. PAN in the bottom dock temporarily turns one-finger dragging into map movement. Use Commands for groups and tactical actions.</string>\n    <string name="mobile_touch_help_close">Play</string>\n'''
+        add='''\n    <string name="import_no_discs">I do not have the original discs</string>
+    <string name="freeware_title">Install game data automatically</string>
+    <string name="freeware_explanation">Command &amp; Conquer: Tiberian Dawn was released as freeware. The app can download the known GDI and Nod ISO images from the public ModDB download pages, verify them, install the data, and remove the temporary ISO files afterwards.</string>
+    <string name="freeware_auto_button">Download &amp; install game data automatically</string>
+    <string name="freeware_auto_ready">Ready. The download transfers about 1.20 GB.</string>
+    <string name="freeware_manual_fallback">If automatic download stops working, the two public download pages remain available below as a manual fallback.</string>
+    <string name="freeware_auto_confirm_title">Automatic download</string>
+    <string name="freeware_auto_confirm">About %1$s will be downloaded. Download and installation temporarily require roughly %2$s of free storage. The app removes the ISO files after installation.</string>
+    <string name="freeware_auto_start">Download</string>
+    <string name="freeware_auto_space_error">Not enough free storage. Required: about %1$s. Available: %2$s.</string>
+    <string name="freeware_auto_preparing">Preparing download…</string>
+    <string name="freeware_auto_downloading">Downloading %1$s: %2$s / %3$s</string>
+    <string name="freeware_auto_verifying">Verifying %1$s…</string>
+    <string name="freeware_auto_installing">Installing game data…</string>
+    <string name="freeware_auto_verify_error">The downloaded file could not be verified as a known freeware ISO.</string>
+    <string name="freeware_auto_complete">Installation complete.</string>
+    <string name="freeware_auto_complete_message">The GDI and Nod game data was verified and installed. Temporary ISO files were removed.</string>
+    <string name="freeware_auto_failed">Automatic download did not complete.</string>
+    <string name="freeware_auto_download_error">The game data could not be downloaded automatically. Try again or use the manual download pages below.</string>
+    <string name="freeware_download_gdi">Open GDI freeware ISO manually</string>
+    <string name="freeware_download_nod">Open Nod freeware ISO manually</string>
+    <string name="freeware_expected_files">Expected files:\\n%1$s\\n%2$s</string>
+    <string name="freeware_back_to_import">Back to ISO import</string>
+    <string name="freeware_open_error_title">Page could not be opened</string>
+    <string name="freeware_open_error">No browser was available to open the freeware download page.</string>
+    <string name="import_error_freeware_size">The downloaded freeware ISO %1$s has an unexpected size. It was discarded and must be downloaded again.</string>
+    <string name="import_error_freeware_hash">The downloaded freeware ISO %1$s failed its integrity check. It was discarded and must be downloaded again.</string>
+    <string name="mobile_touch_commands">Commands</string>
+    <string name="mobile_touch_more">More</string>
+    <string name="mobile_touch_help_title">Touch controls</string>
+    <string name="mobile_touch_help_text">Tap a unit to select it. Tap terrain to move or tap an enemy to attack. Drag one finger to draw a selection box. Hold one finger for the secondary/right-click action. Drag with two fingers to pan the map; a quick two-finger tap also performs the secondary action. PAN in the bottom dock temporarily turns one-finger dragging into map movement. Use Commands for groups and tactical actions.</string>
+    <string name="mobile_touch_help_close">Play</string>
+'''
     write(p,s.replace('</resources>',add+'</resources>',1))
 
 def patch_game(root):
