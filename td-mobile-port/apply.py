@@ -24,7 +24,7 @@ def insert_before_once(s, anchor, insertion, marker, label):
 def copy_sources(root):
     dst=root/'android/app/src/main/java/org/tiberiandawn/android'
     dst.mkdir(parents=True,exist_ok=True)
-    for name in ['FreewareCatalog.java','FreewareDataActivity.java','FreewareDownloadClient.java','FreewareIsoVerifier.java','MobileTouchDock.java','MobileTouchGuide.java']:
+    for name in ['FreewareCatalog.java','FreewareDataActivity.java','FreewareDownloadClient.java','FreewareIsoVerifier.java','MobileTouchDock.java','MobileTouchGuide.java','MobileDisplayController.java']:
         shutil.copy2(SRC/name,dst/name)
 
 def patch_import(root):
@@ -94,8 +94,17 @@ def add_strings(p,german):
     <string name="import_error_freeware_hash">Die heruntergeladene Freeware-ISO %1$s hat die Integritätsprüfung nicht bestanden. Sie wurde verworfen und muss erneut geladen werden.</string>
     <string name="mobile_touch_commands">Befehle</string>
     <string name="mobile_touch_more">Mehr</string>
+    <string name="mobile_touch_menu">Spielsteuerung öffnen</string>
+    <string name="mobile_touch_zoom">Zoom</string>
+    <string name="mobile_language_title">Sprache</string>
+    <string name="mobile_language_system">Systemsprache</string>
+    <string name="mobile_language_german">Deutsch</string>
+    <string name="mobile_language_english">Englisch</string>
+    <string name="mobile_language_note">Menüs und unterstützte Spieltexte werden sofort umgestellt. Sprache und Videos folgen den installierten Spieldaten.</string>
+    <string name="mobile_display_title">Darstellung &amp; Zoom</string>
+    <string name="mobile_display_note">Die App nutzt die native Android-Ausgabe und die vorhandenen scharfen bzw. modernen Ersatzgrafiken des Ports. Zoom vergrößert die Spielfläche bis 200 %; ein Pinch mit zwei Fingern funktioniert ebenfalls.</string>
     <string name="mobile_touch_help_title">Touch-Steuerung</string>
-    <string name="mobile_touch_help_text">Tippe eine Einheit an, um sie auszuwählen. Tippe auf den Boden zum Bewegen oder auf einen Gegner zum Angreifen. Ziehe mit einem Finger, um einen Auswahlrahmen aufzuziehen. Halte einen Finger gedrückt für die Sekundär-/Rechtsklick-Aktion. Ziehe mit zwei Fingern, um die Karte zu verschieben; ein kurzer Zwei-Finger-Tipp löst ebenfalls die Sekundäraktion aus. PAN in der unteren Leiste schaltet vorübergehend Ein-Finger-Ziehen auf Kartenbewegung um. Unter Befehle findest du Gruppen und taktische Aktionen.</string>
+    <string name="mobile_touch_help_text">Tippe eine Einheit an, um sie auszuwählen. Tippe auf den Boden zum Bewegen oder auf einen Gegner zum Angreifen. Ziehe mit einem Finger, um einen Auswahlrahmen aufzuziehen. Halte einen Finger gedrückt für die Sekundär-/Rechtsklick-Aktion. Ziehe mit zwei Fingern parallel, um die Karte zu verschieben. Verändere den Abstand der beiden Finger deutlich, um hinein- oder herauszuzoomen. Das Zahnrad oben rechts öffnet Zurück, PAN, Befehle, Mehr und die Zoom-Steuerung.</string>
     <string name="mobile_touch_help_close">Spielen</string>
 '''
     else:
@@ -128,20 +137,168 @@ def add_strings(p,german):
     <string name="import_error_freeware_hash">The downloaded freeware ISO %1$s failed its integrity check. It was discarded and must be downloaded again.</string>
     <string name="mobile_touch_commands">Commands</string>
     <string name="mobile_touch_more">More</string>
+    <string name="mobile_touch_menu">Open game controls</string>
+    <string name="mobile_touch_zoom">Zoom</string>
+    <string name="mobile_language_title">Language</string>
+    <string name="mobile_language_system">System language</string>
+    <string name="mobile_language_german">German</string>
+    <string name="mobile_language_english">English</string>
+    <string name="mobile_language_note">Menus and supported game text change immediately. Speech and videos follow the installed game data.</string>
+    <string name="mobile_display_title">Display &amp; zoom</string>
+    <string name="mobile_display_note">The app uses the native Android output and the port's available sharp or modern replacement artwork. Zoom enlarges the game surface up to 200%; two-finger pinch works as well.</string>
     <string name="mobile_touch_help_title">Touch controls</string>
-    <string name="mobile_touch_help_text">Tap a unit to select it. Tap terrain to move or tap an enemy to attack. Drag one finger to draw a selection box. Hold one finger for the secondary/right-click action. Drag with two fingers to pan the map; a quick two-finger tap also performs the secondary action. PAN in the bottom dock temporarily turns one-finger dragging into map movement. Use Commands for groups and tactical actions.</string>
+    <string name="mobile_touch_help_text">Tap a unit to select it. Tap terrain to move or tap an enemy to attack. Drag one finger to draw a selection box. Hold one finger for the secondary/right-click action. Drag two fingers together to pan the map. Change the distance between both fingers clearly to zoom in or out. The gear in the upper-right opens Back, PAN, Commands, More and zoom controls.</string>
     <string name="mobile_touch_help_close">Play</string>
 '''
     write(p,s.replace('</resources>',add+'</resources>',1))
 
 def patch_game(root):
     p=root/'android/app/src/main/java/org/tiberiandawn/android/TiberianDawnActivity.java'; require(p); s=read(p)
-    s=replace_once(s,'    private Button tacticalButton;\n    private boolean handPanMode;','    private Button tacticalButton;\n    private MobileTouchDock mobileTouchDock;\n    private boolean handPanMode;','dock field')
+    s=replace_once(s,'    private Button tacticalButton;\n    private boolean handPanMode;','    private Button tacticalButton;\n    private MobileTouchDock mobileTouchDock;\n    private MobileDisplayController mobileDisplayController;\n    private boolean handPanMode;','dock field')
+    s=replace_once(s,
+'''    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        // Horizon can deliver the same controller ACTION_SCROLL through the
+        // touch dispatcher when the ray crosses an ActivityPanel.
+        if (consumeSpatialWindowAdjustment(event)) return true;
+        return super.dispatchTouchEvent(event);
+    }''',
+'''    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        // Horizon can deliver the same controller ACTION_SCROLL through the
+        // touch dispatcher when the ray crosses an ActivityPanel.
+        if (consumeSpatialWindowAdjustment(event)) return true;
+        if (!spatialPanel && mobileDisplayController != null
+                && mobileDisplayController.onDispatchTouchEvent(event)) {
+            return true;
+        }
+        return super.dispatchTouchEvent(event);
+    }''','mobile pinch zoom routing')
     s=replace_once(s,
 '''            installQuestControls();\n            SDLInputDiagnostics.logMarker("activity-onCreate mode="''',
 '''            installQuestControls();\n            if (!spatialPanel) {\n                getWindow().getDecorView().post(() -> MobileTouchGuide.showOnce(this,\n                    localizedString(R.string.mobile_touch_help_title),\n                    localizedString(R.string.mobile_touch_help_text),\n                    localizedString(R.string.mobile_touch_help_close)));\n            }\n            SDLInputDiagnostics.logMarker("activity-onCreate mode="''','first-run guide')
     s=replace_once(s,'    private void installQuestControls() {\n        if (spatialPanel) {','    private void installQuestControls() {\n        if (!spatialPanel) {\n            installMobileTouchControls();\n            return;\n        }\n        if (spatialPanel) {','mobile routing')
-    methods='''    private MobileTouchDock.Labels mobileTouchLabels() {\n        return new MobileTouchDock.Labels(\n            localizedString(R.string.quest_back_label),\n            localizedString(R.string.quest_pan_label),\n            localizedString(R.string.quest_pan_label_active),\n            localizedString(R.string.mobile_touch_commands),\n            localizedString(R.string.mobile_touch_more));\n    }\n\n    private void installMobileTouchControls() {\n        if (!(mLayout instanceof RelativeLayout)) {\n            Log.w(TAG, "SDL layout does not support mobile touch dock");\n            return;\n        }\n        final RelativeLayout layout = (RelativeLayout) mLayout;\n        mobileTouchDock = new MobileTouchDock(this, layout, mobileTouchLabels(),\n            new MobileTouchDock.Callbacks() {\n                public void onBack() {\n                    SDLInputDiagnostics.logMarker("mobile-back");\n                    SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE);\n                    SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_ESCAPE);\n                }\n                public void onPanChanged(boolean enabled) { setHandPanMode(enabled, true); }\n                public void onCommands() { showTacticalControlsDialog(); }\n                public void onMore() { showMobileMoreDialog(); }\n            });\n        layout.setOnApplyWindowInsetsListener((view, insets) -> {\n            if (mobileTouchDock != null) mobileTouchDock.applyInsets(insets);\n            return insets;\n        });\n        layout.post(() -> {\n            if (mobileTouchDock != null) mobileTouchDock.applyInsets(layout.getRootWindowInsets());\n        });\n    }\n\n    private void showMobileMoreDialog() {\n        final String[] items = {\n            localizedString(R.string.save_transfer_title),\n            localizedString(R.string.mobile_touch_help_title),\n            localizedString(R.string.quest_diagnostics_label)\n        };\n        new AlertDialog.Builder(this)\n            .setTitle(localizedString(R.string.mobile_touch_more))\n            .setItems(items, (dialog, which) -> {\n                if (which == 0) startActivity(new Intent(this, SaveTransferActivity.class));\n                else if (which == 1) MobileTouchGuide.show(this,\n                    localizedString(R.string.mobile_touch_help_title),\n                    localizedString(R.string.mobile_touch_help_text),\n                    localizedString(R.string.mobile_touch_help_close));\n                else if (which == 2) showDiagnosticsDialog();\n            })\n            .setNegativeButton(localizedString(R.string.quest_diagnostics_close), null)\n            .show();\n    }\n\n'''
+    methods='''    private MobileTouchDock.Labels mobileTouchLabels() {
+        return new MobileTouchDock.Labels(
+            localizedString(R.string.quest_back_label),
+            localizedString(R.string.quest_pan_label),
+            localizedString(R.string.quest_pan_label_active),
+            localizedString(R.string.mobile_touch_commands),
+            localizedString(R.string.mobile_touch_more),
+            localizedString(R.string.mobile_touch_menu),
+            localizedString(R.string.mobile_touch_zoom));
+    }
+
+    private void installMobileTouchControls() {
+        if (!(mLayout instanceof RelativeLayout)) {
+            Log.w(TAG, "SDL layout does not support mobile touch dock");
+            return;
+        }
+        final RelativeLayout layout = (RelativeLayout) mLayout;
+
+        mobileDisplayController = new MobileDisplayController(this, mSurface, percent -> {
+            if (mobileTouchDock != null) mobileTouchDock.setZoomPercent(percent);
+        });
+
+        mobileTouchDock = new MobileTouchDock(this, layout, mobileTouchLabels(),
+            new MobileTouchDock.Callbacks() {
+                public void onBack() {
+                    SDLInputDiagnostics.logMarker("mobile-back");
+                    SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE);
+                    SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_ESCAPE);
+                }
+                public void onPanChanged(boolean enabled) { setHandPanMode(enabled, true); }
+                public void onCommands() { showTacticalControlsDialog(); }
+                public void onMore() { showMobileMoreDialog(); }
+                public void onZoomOut() {
+                    if (mobileDisplayController != null) mobileDisplayController.zoomOut();
+                }
+                public void onZoomReset() {
+                    if (mobileDisplayController != null) mobileDisplayController.resetZoom();
+                }
+                public void onZoomIn() {
+                    if (mobileDisplayController != null) mobileDisplayController.zoomIn();
+                }
+            });
+        if (mobileDisplayController != null) {
+            mobileTouchDock.setZoomPercent(mobileDisplayController.getZoomPercent());
+        }
+        layout.setOnApplyWindowInsetsListener((view, insets) -> {
+            if (mobileTouchDock != null) mobileTouchDock.applyInsets(insets);
+            return insets;
+        });
+        layout.post(() -> {
+            if (mobileTouchDock != null) mobileTouchDock.applyInsets(layout.getRootWindowInsets());
+        });
+    }
+
+    private void showMobileMoreDialog() {
+        final String[] items = {
+            localizedString(R.string.save_transfer_title),
+            localizedString(R.string.mobile_touch_help_title),
+            localizedString(R.string.mobile_language_title),
+            localizedString(R.string.mobile_display_title),
+            localizedString(R.string.quest_diagnostics_label)
+        };
+        new AlertDialog.Builder(this)
+            .setTitle(localizedString(R.string.mobile_touch_more))
+            .setItems(items, (dialog, which) -> {
+                if (which == 0) startActivity(new Intent(this, SaveTransferActivity.class));
+                else if (which == 1) MobileTouchGuide.show(this,
+                    localizedString(R.string.mobile_touch_help_title),
+                    localizedString(R.string.mobile_touch_help_text),
+                    localizedString(R.string.mobile_touch_help_close));
+                else if (which == 2) showMobileLanguageDialog();
+                else if (which == 3) showMobileDisplayDialog();
+                else if (which == 4) showDiagnosticsDialog();
+            })
+            .setNegativeButton(localizedString(R.string.quest_diagnostics_close), null)
+            .show();
+    }
+
+    private void showMobileLanguageDialog() {
+        final String[] items = {
+            localizedString(R.string.mobile_language_system),
+            localizedString(R.string.mobile_language_german),
+            localizedString(R.string.mobile_language_english)
+        };
+        new AlertDialog.Builder(this)
+            .setTitle(localizedString(R.string.mobile_language_title))
+            .setSingleChoiceItems(items, LanguagePreferences.get(this), (dialog, which) -> {
+                LanguagePreferences.set(this, which);
+                try {
+                    nativeConfigureLanguage(LanguagePreferences.get(this),
+                        LanguagePreferences.systemLanguageTag());
+                    languageNativeReady = true;
+                } catch (UnsatisfiedLinkError error) {
+                    languageNativeReady = false;
+                    Log.w(TAG, "Native language bridge is unavailable during mobile update", error);
+                }
+                updateQuestControlLanguage();
+                Toast.makeText(this, localizedString(R.string.mobile_language_note),
+                    Toast.LENGTH_LONG).show();
+                dialog.dismiss();
+            })
+            .setNegativeButton(localizedString(R.string.quest_diagnostics_close), null)
+            .show();
+    }
+
+    private void showMobileDisplayDialog() {
+        int percent = mobileDisplayController == null
+            ? 100 : mobileDisplayController.getZoomPercent();
+        new AlertDialog.Builder(this)
+            .setTitle(localizedString(R.string.mobile_display_title))
+            .setMessage(localizedString(R.string.mobile_display_note)
+                + "\\n\\n" + localizedString(R.string.mobile_touch_zoom)
+                + ": " + percent + "%")
+            .setNeutralButton("100%", (dialog, which) -> {
+                if (mobileDisplayController != null) mobileDisplayController.resetZoom();
+            })
+            .setNegativeButton(localizedString(R.string.quest_diagnostics_close), null)
+            .show();
+    }
+
+'''
     s=insert_before_once(s,'    private void updateQuestControlInsets(WindowInsets insets) {',methods,'private void installMobileTouchControls()','mobile methods')
     s=replace_once(s,'    private void setHandPanMode(boolean enabled, boolean announce) {\n        handPanMode = enabled;','    private void setHandPanMode(boolean enabled, boolean announce) {\n        handPanMode = enabled;\n        if (mobileTouchDock != null) mobileTouchDock.setPanActive(handPanMode);','PAN sync')
     s=replace_once(s,'    private void updateQuestControlLanguage() {\n        if (backButton != null) {','    private void updateQuestControlLanguage() {\n        if (mobileTouchDock != null) mobileTouchDock.updateLabels(mobileTouchLabels());\n        if (backButton != null) {','language')
