@@ -304,7 +304,11 @@ def patch_german_runtime(root):
         GeneralMix = new MFCD("GENERAL.MIX");
         ScoreMix = new MFCD("SCORES.MIX");
 '''
-    s=replace_once(s,old,new,'German movie mix reinit')
+    if new not in s:
+        count=s.count(old)
+        if count != 2:
+            raise SystemExit(f"German movie reinit anchor expected twice, found {count}")
+        s=s.replace(old,new)
     write(p,s)
 
 def patch_game(root):
