@@ -29,6 +29,19 @@ def copy_sources(root):
 
 def patch_import(root):
     p=root/'android/app/src/main/java/org/tiberiandawn/android/GameDataImportActivity.java'; require(p); s=read(p)
+    wrapper='''    static String installDownloadedGameData(File firstIso, File secondIso, File productDirectory)
+            throws UnsatisfiedLinkError {
+        ensureNativeLibrariesLoaded();
+        return nativeInstallGameData(
+            firstIso.getAbsolutePath(),
+            secondIso.getAbsolutePath(),
+            productDirectory.getAbsolutePath());
+    }
+
+'''
+    s=insert_before_once(s,
+'''    @Override
+    protected void attachBaseContext(Context newBase) {''',wrapper,'installDownloadedGameData(File firstIso','downloaded-data native wrapper')
     s=replace_once(s,
 '''        content.addView(languageButton, matchWrapParams(dp(12)));\n\n        firstIsoButton = new Button(this);''',
 '''        content.addView(languageButton, matchWrapParams(dp(12)));\n\n        Button freewareButton = new Button(this);\n        freewareButton.setText(R.string.import_no_discs);\n        freewareButton.setAllCaps(false);\n        freewareButton.setOnClickListener(view ->\n            startActivity(new Intent(this, FreewareDataActivity.class)));\n        content.addView(freewareButton, matchWrapParams(dp(12)));\n\n        firstIsoButton = new Button(this);''','freeware button')
