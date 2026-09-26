@@ -102,7 +102,7 @@ def add_strings(p,german):
     <string name="mobile_language_english">Englisch</string>
     <string name="mobile_language_note">Menüs und unterstützte Spieltexte werden sofort umgestellt. Sprache und Videos folgen den installierten Spieldaten.</string>
     <string name="mobile_display_title">Darstellung &amp; Zoom</string>
-    <string name="mobile_display_note">Die App nutzt die native Android-Ausgabe und die vorhandenen scharfen bzw. modernen Ersatzgrafiken des Ports. Zoom vergrößert die Spielfläche bis 200 %; ein Pinch mit zwei Fingern funktioniert ebenfalls.</string>
+    <string name="mobile_display_note">HD-Grafik ist für die vorhandenen 4x-Ersatzgrafiken aktiviert; nicht ersetzte Einheiten, Gebäude und Terrain bleiben original. Zoom vergrößert die Spielfläche bis 200 %; ein Pinch mit zwei Fingern funktioniert ebenfalls.</string>
     <string name="mobile_touch_help_title">Touch-Steuerung</string>
     <string name="mobile_touch_help_text">Tippe eine Einheit an, um sie auszuwählen. Tippe auf den Boden zum Bewegen oder auf einen Gegner zum Angreifen. Ziehe mit einem Finger, um einen Auswahlrahmen aufzuziehen. Halte einen Finger gedrückt für die Sekundär-/Rechtsklick-Aktion. Ziehe mit zwei Fingern parallel, um die Karte zu verschieben. Verändere den Abstand der beiden Finger deutlich, um hinein- oder herauszuzoomen. Das Zahnrad oben rechts öffnet Zurück, PAN, Befehle, Mehr und die Zoom-Steuerung.</string>
     <string name="mobile_touch_help_close">Spielen</string>
@@ -145,12 +145,35 @@ def add_strings(p,german):
     <string name="mobile_language_english">English</string>
     <string name="mobile_language_note">Menus and supported game text change immediately. Speech and videos follow the installed game data.</string>
     <string name="mobile_display_title">Display &amp; zoom</string>
-    <string name="mobile_display_note">The app uses the native Android output and the available sharp or modern replacement artwork. Zoom enlarges the game surface up to 200%; two-finger pinch works as well.</string>
+    <string name="mobile_display_note">HD artwork is enabled for the bundled 4x replacement assets; units, buildings and terrain without replacements stay original. Zoom enlarges the game surface up to 200%; two-finger pinch works as well.</string>
     <string name="mobile_touch_help_title">Touch controls</string>
     <string name="mobile_touch_help_text">Tap a unit to select it. Tap terrain to move or tap an enemy to attack. Drag one finger to draw a selection box. Hold one finger for the secondary/right-click action. Drag two fingers together to pan the map. Change the distance between both fingers clearly to zoom in or out. The gear in the upper-right opens Back, PAN, Commands, More and zoom controls.</string>
     <string name="mobile_touch_help_close">Play</string>
 '''
     write(p,s.replace('</resources>',add+'</resources>',1))
+
+def patch_hd_artwork_default(root):
+    p=root/'common/settings.cpp'; require(p); s=read(p)
+    old='''void SettingsClass::Apply_Android_Startup_Defaults()
+{
+    // A Quest process always opens with the crisp indexed presentation and
+    // original artwork. The visual options dialog can still change these
+    // fields after startup; the normal save path retains the user's choice
+    // for inspection/migration, but the next process deliberately resets the
+    // two startup modes again.
+    Video.PresentationMode = 0;
+    Video.ArtworkMode = 0;
+}'''
+    new='''void SettingsClass::Apply_Android_Startup_Defaults()
+{
+    // The touch-first mobile build keeps the crisp indexed presentation but
+    // enables the bundled 4x ModernArt replacements where they exist.
+    // Unsupported sprites/terrain continue to use the original artwork.
+    Video.PresentationMode = 0;
+    Video.ArtworkMode = 1;
+}'''
+    s=replace_once(s,old,new,'mobile HD artwork default')
+    write(p,s)
 
 def patch_game(root):
     p=root/'android/app/src/main/java/org/tiberiandawn/android/TiberianDawnActivity.java'; require(p); s=read(p)
@@ -313,6 +336,7 @@ def main():
     patch_manifest(root/'android/app/src/questSpatial/AndroidManifest.xml',True)
     add_strings(root/'android/app/src/main/res/values/strings.xml',False)
     add_strings(root/'android/app/src/main/res/values-de/strings.xml',True)
+    patch_hd_artwork_default(root)
     patch_game(root)
     print('Tiberian Dawn Android mobile port changes applied.')
 
