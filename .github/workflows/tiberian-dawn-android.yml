@@ -31,6 +31,7 @@ jobs:
           python3 -m py_compile td-mobile-port/apply.py
           test -s td-mobile-port/src/FreewareCatalog.java
           test -s td-mobile-port/src/FreewareDataActivity.java
+          test -s td-mobile-port/src/FreewareDownloadClient.java
           test -s td-mobile-port/src/FreewareIsoVerifier.java
           test -s td-mobile-port/src/MobileTouchDock.java
           test -s td-mobile-port/src/MobileTouchGuide.java
@@ -51,6 +52,8 @@ jobs:
           grep -q 'mobile_touch_help_title' upstream/android/app/src/main/res/values-de/strings.xml
           grep -q 'FreewareDataActivity' upstream/android/app/src/mobile/AndroidManifest.xml
           grep -q 'installMobileTouchControls' upstream/android/app/src/main/java/org/tiberiandawn/android/TiberianDawnActivity.java
+          grep -q 'installDownloadedGameData' upstream/android/app/src/main/java/org/tiberiandawn/android/GameDataImportActivity.java
+          grep -q 'FreewareDownloadClient' upstream/android/app/src/main/java/org/tiberiandawn/android/FreewareDataActivity.java
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -59,6 +62,17 @@ jobs:
           java-version: "17"
           cache: gradle
           cache-dependency-path: upstream/android/**/*.gradle*
+
+      - name: Test freeware mirror resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/td-java-test
+          javac -d /tmp/td-java-test \
+            td-mobile-port/src/FreewareCatalog.java \
+            td-mobile-port/src/FreewareDownloadClient.java \
+            td-mobile-port/tests/FreewareDownloadClientTest.java
+          java -cp /tmp/td-java-test org.tiberiandawn.android.FreewareDownloadClientTest
 
       - name: Install Android build toolchain
         shell: bash
