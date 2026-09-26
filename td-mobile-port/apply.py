@@ -145,7 +145,7 @@ def add_strings(p,german):
     <string name="mobile_language_english">English</string>
     <string name="mobile_language_note">Menus and supported game text change immediately. Speech and videos follow the installed game data.</string>
     <string name="mobile_display_title">Display &amp; zoom</string>
-    <string name="mobile_display_note">The app uses the native Android output and the port's available sharp or modern replacement artwork. Zoom enlarges the game surface up to 200%; two-finger pinch works as well.</string>
+    <string name="mobile_display_note">The app uses the native Android output and the available sharp or modern replacement artwork. Zoom enlarges the game surface up to 200%; two-finger pinch works as well.</string>
     <string name="mobile_touch_help_title">Touch controls</string>
     <string name="mobile_touch_help_text">Tap a unit to select it. Tap terrain to move or tap an enemy to attack. Drag one finger to draw a selection box. Hold one finger for the secondary/right-click action. Drag two fingers together to pan the map. Change the distance between both fingers clearly to zoom in or out. The gear in the upper-right opens Back, PAN, Commands, More and zoom controls.</string>
     <string name="mobile_touch_help_close">Play</string>
