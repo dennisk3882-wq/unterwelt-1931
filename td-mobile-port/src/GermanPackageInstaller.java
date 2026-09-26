@@ -24,6 +24,19 @@ public final class GermanPackageInstaller {
 
     private GermanPackageInstaller() {}
 
+    public static boolean isInstalled(Context context) {
+        if (context == null) return false;
+        File game = new File(new File(context.getFilesDir(), "TiberianDawn"), "vanillatd");
+        File marker = new File(game, "GERMAN_DATA.txt");
+        File speech = new File(game, "SPEECGER.MIX");
+        File talk = new File(game, "TALKGER.MIX");
+        File movies = new File(game, "MOVIESGER.MIX");
+        return marker.isFile()
+            && speech.isFile() && speech.length() > 0
+            && talk.isFile() && talk.length() > 0
+            && movies.isFile() && movies.length() > 100_000_000L;
+    }
+
     private static native String nativeExtractInno(String installerPath,
                                                     String outputDirectory);
 
