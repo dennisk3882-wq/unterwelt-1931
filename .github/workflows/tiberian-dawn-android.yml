@@ -103,6 +103,23 @@ jobs:
           cmake_version=$(cmake --version | sed -n '1s/.* //p')
           ./gradlew --no-daemon -PandroidCmakeVersion="$cmake_version" :app:testMobileDebugUnitTest :app:assembleMobileDebug
 
+      - name: Apply stable development signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=upstream/android/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk
+          test -s "$apk"
+          # Public AOSP test key: intentionally insecure and used ONLY so our
+          # iterative sideloaded development builds keep a stable signer.
+          # A production/release build must use a private release key instead.
+          curl -fsSL 'https://android.googlesource.com/platform/build/+/android-14.0.0_r1/target/product/security/testkey.pk8?format=TEXT' | base64 -d > /tmp/td-testkey.pk8
+          curl -fsSL 'https://android.googlesource.com/platform/build/+/android-14.0.0_r1/target/product/security/testkey.x509.pem?format=TEXT' | base64 -d > /tmp/td-testkey.x509.pem
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+            --key /tmp/td-testkey.pk8 \
+            --cert /tmp/td-testkey.x509.pem \
+            --out "$apk.stable" "$apk"
+          mv "$apk.stable" "$apk"
+
       - name: Verify APK
         shell: bash
         run: |
