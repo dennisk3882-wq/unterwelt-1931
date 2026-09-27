@@ -38,7 +38,7 @@ def insert_before_once(text: str, anchor: str, insertion: str, marker: str, labe
 def copy_sources(root: Path) -> None:
     dst = root / "app/src/main/java/com/winlator"
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java"]:
+    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java"]:
         require(SRC / name)
         shutil.copy2(SRC / name, dst / name)
 
@@ -47,7 +47,7 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("applicationId 'com.winlator'", f"applicationId '{APP_ID}'")
-    s = s.replace('versionName "11.2"', 'versionName "0.1.0-ra2"')
+    s = s.replace('versionName "11.2"', 'versionName "0.2.0-ra2"')
     write(p, s)
 
 def patch_package_paths(root: Path) -> None:
@@ -357,6 +357,7 @@ def validate(root: Path) -> None:
         "launcher": root / "app/src/main/java/com/winlator/RA2LauncherActivity.java",
         "dock": root / "app/src/main/java/com/winlator/RA2TouchDock.java",
         "zoom": root / "app/src/main/java/com/winlator/RA2DisplayController.java",
+        "iso": root / "app/src/main/java/com/winlator/Iso9660Extractor.java",
     }
     for label, path in checks.items():
         require(path)
