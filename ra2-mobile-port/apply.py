@@ -382,7 +382,7 @@ def patch_xserver(root: Path) -> None:
         getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
             .putInt("last_exit_code", status)
             .apply();
-        appendRa2Log(liveLog, "launcherExit=" + status + "\n");
+        appendRa2Log(liveLog, "launcherExit=" + status + "\\n");
 
         Executors.newSingleThreadExecutor().execute(() -> {
             boolean sawGameChild = false;
@@ -394,7 +394,7 @@ def patch_xserver(root: Path) -> None:
                 if (alive) sawGameChild = true;
 
                 if ((snapshots++ % 4) == 0) {
-                    appendRa2Log(liveLog, "processes=" + ra2ProcessSnapshot() + "\n");
+                    appendRa2Log(liveLog, "processes=" + ra2ProcessSnapshot() + "\\n");
                 }
 
                 if (sawGameChild && !alive) break;
@@ -410,11 +410,11 @@ def patch_xserver(root: Path) -> None:
 
             long elapsed = Math.max(0L, System.currentTimeMillis() - startedAt);
             StringBuilder output = new StringBuilder();
-            output.append("stage=launcher-terminated\n");
-            output.append("exit=").append(status).append("\n");
-            output.append("elapsedMs=").append(elapsed).append("\n");
-            output.append("sawGameChild=").append(sawGameChild).append("\n");
-            output.append("processes=").append(ra2ProcessSnapshot()).append("\n");
+            output.append("stage=launcher-terminated\\n");
+            output.append("exit=").append(status).append("\\n");
+            output.append("elapsedMs=").append(elapsed).append("\\n");
+            output.append("sawGameChild=").append(sawGameChild).append("\\n");
+            output.append("processes=").append(ra2ProcessSnapshot()).append("\\n");
             synchronized (debug) {
                 output.append(debug);
             }
@@ -424,13 +424,13 @@ def patch_xserver(root: Path) -> None:
             if (parent != null && !parent.isDirectory()) parent.mkdirs();
             FileUtils.writeString(logFile, output.toString());
             appendRa2Log(liveLog,
-                "stage=launcher-terminated\nexit=" + status +
-                "\nelapsedMs=" + elapsed +
-                "\nsawGameChild=" + sawGameChild + "\n");
+                "stage=launcher-terminated\\nexit=" + status +
+                "\\nelapsedMs=" + elapsed +
+                "\\nsawGameChild=" + sawGameChild + "\\n");
 
             String clue = "";
             synchronized (debug) {
-                String[] lines = debug.toString().split("\n");
+                String[] lines = debug.toString().split("\\n");
                 for (int i = lines.length - 1; i >= 0; i--) {
                     String line = lines[i].trim();
                     String lower = line.toLowerCase();
@@ -515,10 +515,10 @@ def patch_xserver(root: Path) -> None:
 
         File liveLog = new File(rootFS.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
         appendRa2Log(liveLog,
-            "stage=runtime-wrapper-ready\n" +
-            "systemDdraw=" + systemDdraw.isFile() + ":" + systemDdraw.length() + "\n" +
-            "localDdraw=" + localDdraw.isFile() + ":" + localDdraw.length() + "\n" +
-            "cncIni=" + globalIni.isFile() + "\n");
+            "stage=runtime-wrapper-ready\\n" +
+            "systemDdraw=" + systemDdraw.isFile() + ":" + systemDdraw.length() + "\\n" +
+            "localDdraw=" + localDdraw.isFile() + ":" + localDdraw.length() + "\\n" +
+            "cncIni=" + globalIni.isFile() + "\\n");
     }
 
 '''
