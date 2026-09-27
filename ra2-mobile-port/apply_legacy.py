@@ -712,8 +712,6 @@ def patch_xserver(root: Path) -> None:
         "legacy watchdog start"
     )
 
-    s = insert_before_once(
-        s,
     write(p, s)
 
 def patch_winhandler_compat(root: Path) -> None:
