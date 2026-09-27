@@ -739,7 +739,7 @@ def patch_xserver(root: Path) -> None:
             File launchBatch = new File(rootFS.getRootDir(),
                 RootFS.WINEPREFIX + "/drive_c/RA2Mobile/launch-ra2.bat");
             if (launchBatch.isFile()) {
-                return "C:\\windows\\system32\\cmd.exe /c C:\\RA2Mobile\\launch-ra2.bat";
+                return "C:\\\\windows\\\\system32\\\\cmd.exe /c C:\\\\RA2Mobile\\\\launch-ra2.bat";
             }
         }
 
