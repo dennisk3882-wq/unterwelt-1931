@@ -694,6 +694,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             flattenKnownMix(gameDir(), languageMix, "langmd.mix");
             game = findIgnoreCase(gameDir(), "gamemd.exe", 2);
 
+            installSafeDiscDriverFromYuri();
             storeMedia(true);
             writeWestwoodRegistry(true);
             tuneCncDdraw();
@@ -867,6 +868,32 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         }
     }
 
+    private void installSafeDiscDriverFromYuri() {
+        if (container == null) return;
+
+        File secdrv = findIgnoreCase(gameDir(), "secdrv.sys", 5);
+        if (secdrv == null || !secdrv.isFile()) return;
+
+        File driveC = new File(container.getRootDir(), ".wine/drive_c");
+        File system32Drivers = new File(driveC, "windows/system32/drivers");
+        File syswow64Drivers = new File(driveC, "windows/syswow64/drivers");
+        system32Drivers.mkdirs();
+        syswow64Drivers.mkdirs();
+
+        FileUtils.copy(secdrv, new File(system32Drivers, "secdrv.sys"));
+        FileUtils.copy(secdrv, new File(syswow64Drivers, "secdrv.sys"));
+
+        File systemReg = new File(container.getRootDir(), ".wine/system.reg");
+        try (WineRegistryEditor registry = new WineRegistryEditor(systemReg)) {
+            String key = "System\\CurrentControlSet\\Services\\Secdrv";
+            registry.setStringValue(key, "ImagePath", "C:\\windows\\system32\\drivers\\secdrv.sys");
+            registry.setDwordValue(key, "Type", 1);
+            registry.setDwordValue(key, "Start", 3);
+            registry.setDwordValue(key, "ErrorControl", 1);
+        }
+        catch (Exception ignored) {}
+    }
+
     private void writeWestwoodRegistry(boolean yuri) {
         File systemReg = new File(container.getRootDir(), ".wine/system.reg");
         try (WineRegistryEditor registry = new WineRegistryEditor(systemReg)) {
@@ -906,10 +933,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             }
         }
 
-        File systemDdraw = new File(container.getRootDir(), ".wine/drive_c/windows/syswow64/ddraw.dll");
-        if (systemDdraw.isFile()) {
-            FileUtils.copy(systemDdraw, new File(gameDir(), "ddraw.dll"));
-        }
+        // Do not copy ddraw.dll here. At this point Winlator may still expose the
+        // builtin Wine DLL. The runtime copies the real CNC-DDraw wrapper after
+        // extractDXWrapperFiles() has completed.
+        FileUtils.delete(new File(gameDir(), "ddraw.dll"));
 
         File ra2Ini = new File(gameDir(), "RA2.INI");
         if (!ra2Ini.isFile()) {
@@ -1064,11 +1091,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             : diagnosticValue(diag, "sawGameChild=");
         String clue = prefs.getString(KEY_LAST_DIAG_CLUE, "");
         if (clue.isEmpty()) clue = diagnosticClue(diag);
-        prefs.edit()
-            .remove(KEY_LAST_EXIT_CODE)
-            .remove(KEY_LAST_SAW_CHILD)
-            .remove(KEY_LAST_DIAG_CLUE)
-            .apply();
+        // Keep the last detailed diagnostics for the Diagnose-Center.
 
         StringBuilder message = new StringBuilder();
         if (isGerman()) {
@@ -1148,8 +1171,12 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             .putString(yuri ? KEY_YURI_EXE : KEY_RA2_EXE, exe.getAbsolutePath())
             .putString(KEY_LAST_GAME_LAUNCH, yuri ? "Yuri’s Rache" : "Alarmstufe Rot 2")
             .putLong(KEY_LAST_GAME_LAUNCH_AT, System.currentTimeMillis())
+            .remove(KEY_LAST_EXIT_CODE)
+            .remove(KEY_LAST_SAW_CHILD)
+            .remove(KEY_LAST_DIAG_CLUE)
             .apply();
 
+        writeLaunchSeed(exe, yuri);
         activateMedia(yuri);
         writeWestwoodRegistry(yuri);
         tuneCncDdraw();
@@ -1162,6 +1189,28 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         intent.putExtra("ra2_game_launch", true);
         intent.putExtra("ra2_language", isGerman() ? "de" : "en");
         startActivity(intent);
+    }
+
+    private void writeLaunchSeed(File exe, boolean yuri) {
+        if (container == null) return;
+        File log = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/last-start.log");
+        File parent = log.getParentFile();
+        if (parent != null && !parent.isDirectory()) parent.mkdirs();
+
+        File secdrv32 = new File(container.getRootDir(), ".wine/drive_c/windows/system32/drivers/secdrv.sys");
+        File secdrv64 = new File(container.getRootDir(), ".wine/drive_c/windows/syswow64/drivers/secdrv.sys");
+        File globalDdraw = new File(container.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
+
+        StringBuilder seed = new StringBuilder();
+        seed.append("stage=launch-requested\n");
+        seed.append("title=").append(yuri ? "Yuri's Revenge" : "Red Alert 2").append("\n");
+        seed.append("exe=").append(exe.getAbsolutePath()).append("\n");
+        seed.append("exeSize=").append(exe.length()).append("\n");
+        seed.append("secdrvSystem32=").append(secdrv32.isFile()).append("\n");
+        seed.append("secdrvSyswow64=").append(secdrv64.isFile()).append("\n");
+        seed.append("cncDdrawConfig=").append(globalDdraw.isFile()).append("\n");
+        seed.append("timestamp=").append(System.currentTimeMillis()).append("\n");
+        FileUtils.writeString(log, seed.toString());
     }
 
     private void scanInstalledGames(boolean report) {
