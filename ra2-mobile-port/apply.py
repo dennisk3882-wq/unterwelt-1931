@@ -47,8 +47,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("applicationId 'com.winlator'", f"applicationId '{APP_ID}'")
-    s = s.replace("versionCode 33", "versionCode 210")
-    s = s.replace('versionName "11.2"', 'versionName "0.10.0-ra2"')
+    s = s.replace("versionCode 33", "versionCode 211")
+    s = s.replace('versionName "11.2"', 'versionName "0.11.0-ra2"')
     write(p, s)
 
 def patch_package_paths(root: Path) -> None:
@@ -350,7 +350,7 @@ def patch_xserver(root: Path) -> None:
         if (getIntent().getBooleanExtra("ra2_game_launch", false)) {
             final long ra2StartedAt = System.currentTimeMillis();
             final StringBuilder ra2Debug = new StringBuilder();
-            final File ra2LiveLog = new File(rootFS.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
+            final File ra2LiveLog = new File(rootFS.getRootDir(), RootFS.WINEPREFIX+"/drive_c/RA2Mobile/ra2-live.log");
             File ra2LogParent = ra2LiveLog.getParentFile();
             if (ra2LogParent != null && !ra2LogParent.isDirectory()) ra2LogParent.mkdirs();
             FileUtils.writeString(ra2LiveLog,
@@ -419,7 +419,7 @@ def patch_xserver(root: Path) -> None:
                 output.append(debug);
             }
 
-            File logFile = new File(rootFS.getRootDir(), ".wine/drive_c/RA2Mobile/last-start.log");
+            File logFile = new File(rootFS.getRootDir(), RootFS.WINEPREFIX+"/drive_c/RA2Mobile/last-start.log");
             File parent = logFile.getParentFile();
             if (parent != null && !parent.isDirectory()) parent.mkdirs();
             FileUtils.writeString(logFile, output.toString());
@@ -506,19 +506,68 @@ def patch_xserver(root: Path) -> None:
         File gameDir = new File(FileUtils.getDirname(execPath));
         if (!gameDir.isDirectory()) return;
 
-        File systemDdraw = new File(rootFS.getRootDir(), ".wine/drive_c/windows/syswow64/ddraw.dll");
+        File winePrefix = new File(rootFS.getRootDir(), RootFS.WINEPREFIX);
+        File systemDdraw = new File(winePrefix, "drive_c/windows/syswow64/ddraw.dll");
         File localDdraw = new File(gameDir, "ddraw.dll");
         if (systemDdraw.isFile()) FileUtils.copy(systemDdraw, localDdraw);
 
-        File globalIni = new File(rootFS.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
-        if (globalIni.isFile()) FileUtils.copy(globalIni, new File(gameDir, "ddraw.ini"));
+        File globalIni = new File(winePrefix, "drive_c/ProgramData/cnc-ddraw/ddraw.ini");
+        if (globalIni.isFile()) {
+            String cfg = FileUtils.readString(globalIni);
+            if (cfg != null && !cfg.isEmpty()) {
+                cfg = setRa2CncValue(cfg, "renderer", "opengl");
+                cfg = setRa2CncValue(cfg, "windowed", "false");
+                cfg = setRa2CncValue(cfg, "fullscreen", "true");
+                cfg = setRa2CncValue(cfg, "nonexclusive", "true");
+                cfg = setRa2CncValue(cfg, "singlecpu", "true");
+                cfg = setRa2CncValue(cfg, "maxfps", "60");
+                cfg = setRa2CncValue(cfg, "adjmouse", "true");
+                cfg = setRa2CncValue(cfg, "maintas", "true");
+                FileUtils.writeString(globalIni, cfg);
+                FileUtils.copy(globalIni, new File(gameDir, "ddraw.ini"));
+            }
+        }
 
-        File liveLog = new File(rootFS.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
+        File userReg = new File(winePrefix, "user.reg");
+        try (com.winlator.core.WineRegistryEditor registry = new com.winlator.core.WineRegistryEditor(userReg)) {
+            registry.setStringValue("Software\\\\Wine\\\\DllOverrides", "ddraw", "native,builtin");
+        }
+        catch (Exception ignored) {}
+
+        File liveLog = new File(winePrefix, "drive_c/RA2Mobile/ra2-live.log");
         appendRa2Log(liveLog,
             "stage=runtime-wrapper-ready\\n" +
+            "winePrefix=" + winePrefix.getAbsolutePath() + "\\n" +
+            "execPath=" + execPath + "\\n" +
+            "gameDir=" + gameDir.getAbsolutePath() + "\\n" +
             "systemDdraw=" + systemDdraw.isFile() + ":" + systemDdraw.length() + "\\n" +
             "localDdraw=" + localDdraw.isFile() + ":" + localDdraw.length() + "\\n" +
-            "cncIni=" + globalIni.isFile() + "\\n");
+            "cncIni=" + globalIni.isFile() + ":" + globalIni.length() + "\\n");
+    }
+
+    private String setRa2CncValue(String cfg, String key, String value) {
+        String[] lines = cfg.split("\\\\n", -1);
+        StringBuilder out = new StringBuilder();
+        boolean replaced = false;
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (!replaced && !trimmed.startsWith(";") && !trimmed.startsWith("#")) {
+                int eq = trimmed.indexOf('=');
+                if (eq > 0 && trimmed.substring(0, eq).trim().equalsIgnoreCase(key)) {
+                    out.append(key).append("=").append(value);
+                    replaced = true;
+                }
+                else {
+                    out.append(line);
+                }
+            }
+            else {
+                out.append(line);
+            }
+            out.append("\\n");
+        }
+        if (!replaced) out.append(key).append("=").append(value).append("\\n");
+        return out.toString();
     }
 
 '''
