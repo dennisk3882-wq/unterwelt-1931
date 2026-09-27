@@ -47,8 +47,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("applicationId 'com.winlator'", f"applicationId '{APP_ID}'")
-    s = s.replace("versionCode 33", "versionCode 205")
-    s = s.replace('versionName "11.2"', 'versionName "0.5.0-ra2"')
+    s = s.replace("versionCode 33", "versionCode 206")
+    s = s.replace('versionName "11.2"', 'versionName "0.6.0-ra2"')
     write(p, s)
 
 def patch_package_paths(root: Path) -> None:
@@ -330,6 +330,102 @@ def patch_xserver(root: Path) -> None:
         dispatch,
         "ra2DisplayController.onDispatchTouchEvent",
         "pinch dispatcher"
+    )
+
+
+    s = replace_once(
+        s,
+        '''        guestProgramLauncherComponent.setEnvVars(envVars);
+        guestProgramLauncherComponent.setTerminationCallback((status) -> exit());
+        environment.addComponent(guestProgramLauncherComponent);
+''',
+        '''        guestProgramLauncherComponent.setEnvVars(envVars);
+        if (getIntent().getBooleanExtra("ra2_game_launch", false)) {
+            final long ra2StartedAt = System.currentTimeMillis();
+            final StringBuilder ra2Debug = new StringBuilder();
+            envVars.put("WINEDEBUG", "+seh,+process");
+            ProcessHelper.addDebugCallback((line) -> {
+                synchronized (ra2Debug) {
+                    if (ra2Debug.length() > 32000) ra2Debug.delete(0, Math.min(8000, ra2Debug.length()));
+                    ra2Debug.append(line).append("\\n");
+                }
+            });
+            guestProgramLauncherComponent.setTerminationCallback((status) ->
+                finishRa2GameLaunch(status, ra2StartedAt, ra2Debug));
+        }
+        else {
+            guestProgramLauncherComponent.setTerminationCallback((status) -> exit());
+        }
+        environment.addComponent(guestProgramLauncherComponent);
+''',
+        "RA2 detached game lifetime"
+    )
+
+    ra2_helpers = '''    private void finishRa2GameLaunch(int status, long startedAt, StringBuilder debug) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            boolean sawGameChild = false;
+            long noChildDeadline = System.currentTimeMillis() + 12000L;
+
+            while (true) {
+                boolean alive = isRa2GuestProcessAlive();
+                if (alive) sawGameChild = true;
+
+                if (sawGameChild && !alive) break;
+                if (!sawGameChild && System.currentTimeMillis() >= noChildDeadline) break;
+
+                try {
+                    Thread.sleep(500L);
+                }
+                catch (InterruptedException ignored) {
+                    break;
+                }
+            }
+
+            long elapsed = Math.max(0L, System.currentTimeMillis() - startedAt);
+            StringBuilder output = new StringBuilder();
+            output.append("exit=").append(status).append("\\n");
+            output.append("elapsedMs=").append(elapsed).append("\\n");
+            output.append("sawGameChild=").append(sawGameChild).append("\\n");
+            synchronized (debug) {
+                output.append(debug);
+            }
+
+            File logFile = new File(rootFS.getRootDir(), ".wine/drive_c/RA2Mobile/last-start.log");
+            File parent = logFile.getParentFile();
+            if (parent != null && !parent.isDirectory()) parent.mkdirs();
+            FileUtils.writeString(logFile, output.toString());
+            ProcessHelper.removeAllDebugCallbacks();
+
+            runOnUiThread(this::exit);
+        });
+    }
+
+    private boolean isRa2GuestProcessAlive() {
+        for (ProcessHelper.PStat process : ProcessHelper.getChildProcesses()) {
+            if (process.state == ProcessHelper.PState.DEAD ||
+                process.state == ProcessHelper.PState.ZOMBIE ||
+                process.state == ProcessHelper.PState.STOPPED) {
+                continue;
+            }
+
+            String name = ((process.name == null ? "" : process.name) + " " +
+                (process.shortName == null ? "" : process.shortName)).toLowerCase();
+            if (name.contains("game.exe") || name.contains("gamemd.exe") ||
+                name.contains("ra2.exe") || name.contains("ra2md.exe") ||
+                name.contains("yuri.exe")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+'''
+    s = insert_before_once(
+        s,
+        "    private String getWineStartCommand() {\\n",
+        ra2_helpers,
+        "finishRa2GameLaunch(int status",
+        "RA2 lifetime helpers"
     )
 
     old = '''        if (shortcut != null) {
