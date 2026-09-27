@@ -42,6 +42,26 @@ jobs:
           test -s upstream/app/src/main/assets/imagefs.txz
           test "$(stat -c%s upstream/app/src/main/assets/imagefs.txz)" -gt 100000000
 
+          rm -rf /tmp/winlator-libs upstream/app/src/main/jniLibs
+          mkdir -p /tmp/winlator-libs upstream/app/src/main/jniLibs/arm64-v8a
+          unzip -q /tmp/winlator-7.1.apk 'lib/arm64-v8a/*.so' -d /tmp/winlator-libs
+          cp /tmp/winlator-libs/lib/arm64-v8a/*.so upstream/app/src/main/jniLibs/arm64-v8a/
+          test -n "$(find upstream/app/src/main/jniLibs/arm64-v8a -name '*.so' -print -quit)"
+
+      - name: Restore Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://raw.githubusercontent.com/brunodev85/winlator-app/3981d86efa4f333b2a34a7da8b6521476cd8c8b9'
+          curl -fL "$BASE/build.gradle" -o upstream/build.gradle
+          curl -fL "$BASE/settings.gradle" -o upstream/settings.gradle
+          curl -fL "$BASE/gradle.properties" -o upstream/gradle.properties
+          mkdir -p upstream/gradle/wrapper
+          curl -fL "$BASE/gradle/wrapper/gradle-wrapper.properties" -o upstream/gradle/wrapper/gradle-wrapper.properties
+          curl -fL "$BASE/gradle/wrapper/gradle-wrapper.jar" -o upstream/gradle/wrapper/gradle-wrapper.jar
+          curl -fL "$BASE/gradlew" -o upstream/gradlew
+          chmod +x upstream/gradlew
+
       - name: Apply RA2 Android changes
         shell: bash
         run: |
