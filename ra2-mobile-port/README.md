@@ -42,3 +42,5 @@ GitHub Actions führt .github/workflows/ra2-yuri-android.yml aus und erzeugt das
 ra2-yuri-android-debug/app-debug.apk
 
 Der normale main-Branch und der vorhandene Tiberian-Dawn-Android-Build bleiben unverändert.
+
+Build-Version: 0.7
