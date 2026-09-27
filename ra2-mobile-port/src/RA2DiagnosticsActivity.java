@@ -193,6 +193,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 checkYuriFiles();
                 checkRegistry();
                 checkWineServices();
+                checkRpcPreflight();
                 checkCncDdraw();
                 checkSafeDisc();
                 checkExecutableFormat(false);
@@ -619,6 +620,56 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 "Start=" + actual + " • erwartet=" + expected,
                 "Der aktuelle Build setzt diesen Dienst vor dem Spielstart automatisch korrekt.");
         }
+    }
+
+    private void checkRpcPreflight() {
+        if (container == null) return;
+        File file = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/rpcss-preflight.txt");
+        if (!file.isFile()) {
+            add(Level.INFO, "RPC-Preflight", "Noch kein aktiver RpcSs-Starttest vorhanden",
+                file.getAbsolutePath(),
+                "Der nächste Spielstart führt automatisch sc.exe start/query RpcSs aus.");
+            return;
+        }
+
+        String text = FileUtils.readString(file);
+        String lower = text == null ? "" : text.toLowerCase(Locale.ENGLISH);
+        boolean running = lower.contains("running") || lower.contains("state") && lower.contains("4");
+        boolean failed = lower.contains("failed") || lower.contains("error") ||
+            lower.contains("1060") || lower.contains("1058") || lower.contains("1053");
+
+        if (running && !failed) {
+            add(Level.PASS, "RPC-Preflight", "RpcSs vor GAME.EXE gestartet",
+                compactLines(text, 8),
+                "");
+        }
+        else if (failed) {
+            add(Level.FAIL, "RPC-Preflight", "RpcSs konnte vor GAME.EXE nicht sauber gestartet werden",
+                compactLines(text, 10),
+                "Das ist jetzt wichtiger als Grafik oder fehlende optionale RA2-Dateien.");
+        }
+        else {
+            add(Level.WARN, "RPC-Preflight", "RpcSs-Status nicht eindeutig",
+                compactLines(text, 10),
+                "Nächsten Start erneut prüfen; die App protokolliert den Dienststatus direkt vor GAME.EXE.");
+        }
+    }
+
+    private String compactLines(String text, int maxLines) {
+        if (text == null || text.trim().isEmpty()) return "<leer>";
+        StringBuilder out = new StringBuilder();
+        int count = 0;
+        for (String raw : text.split("\\n")) {
+            String line = raw.trim();
+            if (line.isEmpty()) continue;
+            if (count++ >= maxLines) {
+                out.append(" …");
+                break;
+            }
+            if (out.length() > 0) out.append(" | ");
+            out.append(line);
+        }
+        return out.toString();
     }
 
     private void checkCncDdraw() {
@@ -1077,6 +1128,14 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         boolean wow64 = log.contains("experimental wow64 mode");
         boolean nsi = log.contains("nsi:poll_events") && log.contains("errno 13");
         boolean noGame = prefs.contains("last_saw_child") && !prefs.getBoolean("last_saw_child", false);
+
+        File rpcPreflight = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/rpcss-preflight.txt");
+        String rpcPreflightText = rpcPreflight.isFile() ? FileUtils.readString(rpcPreflight) : "";
+        String rpcPreflightLower = rpcPreflightText == null ? "" : rpcPreflightText.toLowerCase(Locale.ENGLISH);
+        boolean rpcPreflightFailed = rpcPreflightLower.contains("failed") || rpcPreflightLower.contains("error") ||
+            rpcPreflightLower.contains("1053") || rpcPreflightLower.contains("1058") || rpcPreflightLower.contains("1060");
+        boolean rpcPreflightRunning = rpcPreflightLower.contains("running") ||
+            (rpcPreflightLower.contains("state") && rpcPreflightLower.contains("4"));
         boolean secdrvGood = new File(container.getRootDir(),
             ".wine/drive_c/windows/system32/drivers/secdrv.sys").isFile();
 
@@ -1089,7 +1148,19 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         boolean graphicsGood = "opengl".equalsIgnoreCase(activeConfigValue(cfg, "renderer")) &&
             "true".equalsIgnoreCase(activeConfigValue(cfg, "singlecpu"));
 
-        if (rpc) {
+        if (rpcPreflightFailed) {
+            primaryDiagnosis = "RpcSs lässt sich direkt vor GAME.EXE nicht starten.";
+            add(Level.FAIL, "Intelligente Ursachenanalyse", "Priorität 1 – RpcSs-Starttest fehlgeschlagen",
+                compactLines(rpcPreflightText, 8),
+                "Wine-Service/WoW64-Laufzeit ist der primäre Kandidat; Spiel- und Grafikdateien sind aktuell nachrangig.");
+        }
+        else if (rpc && rpcPreflightRunning) {
+            primaryDiagnosis = "RpcSs läuft im Preflight, aber RPC bricht danach trotzdem weg.";
+            add(Level.FAIL, "Intelligente Ursachenanalyse", "Priorität 1 – RPC fällt trotz laufendem RpcSs aus",
+                "sc.exe meldet RpcSs als laufend, das Wine-Log enthält aber RPC_S_SERVER_UNAVAILABLE.",
+                "Dann liegt der Verdacht stärker auf dem 32-Bit-WoW64/RPC-Pfad als auf der Registry-Konfiguration.");
+        }
+        else if (rpc) {
             if (servicesGood) {
                 primaryDiagnosis = "RpcSs/RPC war beim letzten Start nicht verfügbar; Auto-Start und WoW64-RPC-Pfad werden jetzt gezielt geprüft.";
                 add(Level.WARN, "Intelligente Ursachenanalyse", "Priorität 1 – RPC/RpcSs",
