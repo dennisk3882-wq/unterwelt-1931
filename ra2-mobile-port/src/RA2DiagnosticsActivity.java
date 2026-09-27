@@ -24,6 +24,7 @@ import com.winlator.container.Container;
 import com.winlator.container.ContainerManager;
 import com.winlator.core.FileUtils;
 import com.winlator.core.WineRegistryEditor;
+import com.winlator.core.WineUtils;
 import com.winlator.xenvironment.RootFS;
 import com.winlator.xenvironment.RootFSInstaller;
 
@@ -62,7 +63,10 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
     private ProgressBar progress;
     private Button copyButton;
     private Button rescanButton;
+    private Button repairButton;
     private String reportText = "";
+    private String lastLaunchText = "";
+    private String primaryDiagnosis = "";
 
     private enum Level { PASS, WARN, FAIL, INFO }
 
@@ -140,16 +144,22 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.END);
 
+        repairButton = button("Sicher reparieren");
         rescanButton = button("Neu prüfen");
         copyButton = button("Protokoll kopieren");
+        repairButton.setEnabled(false);
         rescanButton.setEnabled(false);
         copyButton.setEnabled(false);
 
+        repairButton.setOnClickListener(v -> performSafeRepair());
         rescanButton.setOnClickListener(v -> runDiagnostics());
         copyButton.setOnClickListener(v -> copyReport());
 
-        actions.addView(rescanButton, new LinearLayout.LayoutParams(dp(150), dp(50)));
-        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(dp(190), dp(50));
+        actions.addView(repairButton, new LinearLayout.LayoutParams(dp(170), dp(50)));
+        LinearLayout.LayoutParams rpFix = new LinearLayout.LayoutParams(dp(145), dp(50));
+        rpFix.leftMargin = dp(8);
+        actions.addView(rescanButton, rpFix);
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(dp(185), dp(50));
         cp.leftMargin = dp(8);
         actions.addView(copyButton, cp);
         page.addView(actions);
@@ -160,11 +170,14 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
     private void runDiagnostics() {
         progress.setVisibility(View.VISIBLE);
         progress.setIndeterminate(true);
+        repairButton.setEnabled(false);
         rescanButton.setEnabled(false);
         copyButton.setEnabled(false);
         resultBox.removeAllViews();
         results.clear();
         suspiciousLogLines.clear();
+        lastLaunchText = "";
+        primaryDiagnosis = "";
         summary.setText("Prüfe Laufzeit, Medien, Installation, Registry, Grafik und Startprotokolle …");
 
         worker.execute(() -> {
@@ -174,6 +187,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 checkIsoSlot("Originalmedien", "Sowjet ISO", KEY_SOVIET, true);
                 checkIsoSlot("Originalmedien", "Yuri ISO", KEY_YURI, false);
                 checkContainerStorage();
+                checkWineDriveMappings();
                 checkArchiveStaging();
                 checkRa2Files();
                 checkYuriFiles();
@@ -181,10 +195,14 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 checkWineServices();
                 checkCncDdraw();
                 checkSafeDisc();
+                checkExecutableFormat(false);
+                checkExecutableFormat(true);
                 checkPeDependencies(false);
                 checkPeDependencies(true);
                 checkVirtualMedia();
                 checkLastLaunch();
+                checkLaunchTimeline();
+                createRootCauseAnalysis();
                 createAssessment();
             }
             catch (Throwable t) {
@@ -834,6 +852,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         if (liveText != null && !liveText.isEmpty()) {
             text += "\n--- LIVE WINE TRACE ---\n" + liveText;
         }
+        lastLaunchText = text;
 
         int exit = prefs.getInt("last_exit_code", Integer.MIN_VALUE);
         boolean hasExit = prefs.contains("last_exit_code");
@@ -899,6 +918,299 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         }
     }
 
+    private void checkWineDriveMappings() {
+        if (container == null) return;
+        File dos = new File(container.getRootDir(), ".wine/dosdevices");
+        if (!dos.isDirectory()) {
+            add(Level.FAIL, "Wine-Laufwerke", "dosdevices fehlt",
+                dos.getAbsolutePath(), "Wine-Prefix reparieren bzw. Container neu initialisieren.");
+            return;
+        }
+
+        checkDosDevice(dos, "c:", true);
+        checkDosDevice(dos, "x:", false);
+        checkDosDevice(dos, "z:", false);
+
+        File driveX = new File(container.getRootDir(), ".wine/drive_x");
+        add(driveX.exists() ? Level.PASS : Level.WARN,
+            "Wine-Laufwerke", "Physisches X:-Ziel",
+            driveX.getAbsolutePath() + (FileUtils.isSymlink(driveX) ? " • Symlink" : ""),
+            driveX.exists() ? "" : "Das aktive CD-Medium vor dem nächsten Start erneut aktivieren.");
+    }
+
+    private void checkDosDevice(File dos, String name, boolean critical) {
+        File link = new File(dos, name);
+        boolean present = link.exists() || FileUtils.isSymlink(link);
+        if (!present) {
+            add(critical ? Level.FAIL : Level.WARN, "Wine-Laufwerke",
+                "Wine " + name.toUpperCase(Locale.ENGLISH) + " nicht gemappt",
+                link.getAbsolutePath(),
+                critical ? "Wine-Prefix prüfen." : "Wird beim Start normalerweise automatisch angelegt.");
+            return;
+        }
+
+        String target = "";
+        try { target = link.getCanonicalPath(); }
+        catch (Exception ignored) {}
+        add(Level.PASS, "Wine-Laufwerke",
+            "Wine " + name.toUpperCase(Locale.ENGLISH) + " gemappt",
+            target.isEmpty() ? link.getAbsolutePath() : target, "");
+    }
+
+    private void checkExecutableFormat(boolean yuri) {
+        if (container == null) return;
+        File exe = findIgnoreCase(gameDir(), yuri ? "gamemd.exe" : "game.exe", 2);
+        String group = yuri ? "Yuri EXE-Format" : "RA2 EXE-Format";
+        if (exe == null) {
+            add(yuri ? Level.WARN : Level.FAIL, group,
+                (yuri ? "GAMEMD.EXE" : "GAME.EXE") + " fehlt", "", "");
+            return;
+        }
+
+        try (RandomAccessFile raf = new RandomAccessFile(exe, "r")) {
+            byte[] mz = new byte[64];
+            raf.readFully(mz);
+            long peOffset = u32(mz, 0x3c);
+            raf.seek(peOffset + 4);
+            byte[] machineBytes = new byte[2];
+            raf.readFully(machineBytes);
+            int machine = u16(machineBytes, 0);
+
+            raf.seek(peOffset + 24);
+            byte[] magicBytes = new byte[2];
+            raf.readFully(magicBytes);
+            int magic = u16(magicBytes, 0);
+
+            String machineName = machine == 0x14c ? "x86 (32-Bit)" :
+                machine == 0x8664 ? "x64 (64-Bit)" : "0x" + Integer.toHexString(machine);
+            String peKind = magic == 0x10b ? "PE32" : magic == 0x20b ? "PE32+" : "0x" + Integer.toHexString(magic);
+
+            Level level = machine == 0x14c && magic == 0x10b ? Level.PASS : Level.WARN;
+            add(level, group, exe.getName() + " Architektur",
+                machineName + " • " + peKind + " • " + humanSize(exe.length()),
+                level == Level.PASS ? "" : "RA2/Yuri erwarten einen klassischen 32-Bit-x86-Pfad.");
+        }
+        catch (Exception e) {
+            add(Level.WARN, group, "PE-Header konnte nicht gelesen werden",
+                String.valueOf(e.getMessage()), "");
+        }
+    }
+
+    private void checkLaunchTimeline() {
+        if (lastLaunchText == null || lastLaunchText.isEmpty()) {
+            add(Level.INFO, "Start-Timeline", "Noch keine Timeline vorhanden",
+                "", "Nach einem Spielstart erneut diagnostizieren.");
+            return;
+        }
+
+        LinkedHashSet<String> stages = new LinkedHashSet<>();
+        List<String> snapshots = new ArrayList<>();
+        for (String line : lastLaunchText.split("\\n")) {
+            if (line.startsWith("stage=")) stages.add(line.substring(6).trim());
+            if (line.startsWith("processes=") && snapshots.size() < 6) {
+                snapshots.add(line.substring("processes=".length()).trim());
+            }
+        }
+
+        add(Level.INFO, "Start-Timeline", "Erreichte Phasen",
+            stages.isEmpty() ? "<keine>" : joinStrings(stages, " → "),
+            "");
+
+        if (!snapshots.isEmpty()) {
+            for (int i = 0; i < snapshots.size(); i++) {
+                add(Level.INFO, "Start-Timeline", "Prozess-Snapshot " + (i + 1),
+                    snapshots.get(i), "");
+            }
+        }
+
+        boolean wineAttached = lastLaunchText.contains("stage=wine-debug-attached");
+        boolean wrapperReady = lastLaunchText.contains("stage=runtime-wrapper-ready");
+        boolean terminated = lastLaunchText.contains("stage=launcher-terminated");
+
+        add(wineAttached ? Level.PASS : Level.WARN, "Start-Timeline",
+            "Wine-Debugger gekoppelt", wineAttached ? "Ja" : "Nein",
+            wineAttached ? "" : "Ohne diesen Punkt scheitert der Start noch vor der eigentlichen Wine-Ausführung.");
+        add(wrapperReady ? Level.PASS : Level.WARN, "Start-Timeline",
+            "Runtime-Wrapper vorbereitet", wrapperReady ? "Ja" : "Nein",
+            wrapperReady ? "" : "CNC-DDraw/Runtime wurde nicht bis zum vorbereiteten Zustand erreicht.");
+        add(terminated ? Level.INFO : Level.WARN, "Start-Timeline",
+            "Launcher-Ende protokolliert", terminated ? "Ja" : "Nein",
+            terminated ? "" : "Ein sehr früher Abbruch kann die Abschlussphase verhindern.");
+    }
+
+    private void createRootCauseAnalysis() {
+        String log = lastLaunchText == null ? "" : lastLaunchText.toLowerCase(Locale.ENGLISH);
+        boolean rpc = log.contains("failed to start rpcss") || log.contains("rpc_s_server_unavailable");
+        boolean wow64 = log.contains("experimental wow64 mode");
+        boolean nsi = log.contains("nsi:poll_events") && log.contains("errno 13");
+        boolean noGame = prefs.contains("last_saw_child") && !prefs.getBoolean("last_saw_child", false);
+        boolean secdrvGood = new File(container.getRootDir(),
+            ".wine/drive_c/windows/system32/drivers/secdrv.sys").isFile();
+
+        boolean servicesGood = container.getStartupSelection() == Container.STARTUP_SELECTION_NORMAL;
+        Integer rpcStart = readServiceStart("RpcSs");
+        servicesGood = servicesGood && rpcStart != null && rpcStart == 3;
+
+        File globalIni = new File(container.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
+        String cfg = globalIni.isFile() ? FileUtils.readString(globalIni) : "";
+        boolean graphicsGood = "opengl".equalsIgnoreCase(activeConfigValue(cfg, "renderer")) &&
+            "true".equalsIgnoreCase(activeConfigValue(cfg, "singlecpu"));
+
+        if (rpc) {
+            if (servicesGood) {
+                primaryDiagnosis = "RpcSs/RPC war beim letzten Start blockiert; die Konfiguration ist jetzt repariert und muss neu getestet werden.";
+                add(Level.WARN, "Intelligente Ursachenanalyse", "Priorität 1 – RPC/RpcSs",
+                    "Der letzte Start enthält RPC_S_SERVER_UNAVAILABLE bzw. Failed to start RpcSs. Der aktuelle Dienststatus ist inzwischen korrekt.",
+                    "Nächster RA2-Start ist der entscheidende Retest. Verschwindet RPC, wird automatisch die nächste Ursache sichtbar.");
+            }
+            else {
+                primaryDiagnosis = "RpcSs ist der aktuelle Startblocker.";
+                add(Level.FAIL, "Intelligente Ursachenanalyse", "Priorität 1 – RPC/RpcSs",
+                    "Log und aktuelle Dienstkonfiguration passen zusammen: RpcSs ist nicht korrekt verfügbar.",
+                    "„Sicher reparieren“ ausführen und erneut starten.");
+            }
+        }
+        else if (noGame) {
+            primaryDiagnosis = "GAME.EXE erreicht die eigentliche Spielphase nicht.";
+            add(Level.FAIL, "Intelligente Ursachenanalyse", "Priorität 1 – sehr früher GAME.EXE-Abbruch",
+                "Kein stabiler GAME.EXE-Unterprozess wurde erkannt.",
+                "Die darunter priorisierten Runtime-Hinweise sind jetzt wichtiger als Installationsdateien.");
+        }
+        else {
+            primaryDiagnosis = "Kein eindeutiger Primärfehler im letzten Startlog.";
+            add(Level.INFO, "Intelligente Ursachenanalyse", "Keine eindeutige Einzelursache",
+                "Statische Installation und letzter Start liefern keinen dominanten Fehler.",
+                "Weitere Start-Timeline und Wine-Signaturen vergleichen.");
+        }
+
+        if (wow64) {
+            add(Level.WARN, "Intelligente Ursachenanalyse", "Priorität 2 – experimenteller WoW64-Pfad",
+                "Wine meldet ausdrücklich „experimental wow64 mode“ für GAME.EXE.",
+                rpc
+                    ? "Erst nach dem RPC-Retest bewerten. Wenn RPC verschwindet und GAME.EXE weiter sofort endet, ist dies der nächste Kandidat."
+                    : "Bei weiterem Frühabbruch als nächstes den 32-Bit-Wine/WoW64-Pfad untersuchen.");
+        }
+
+        if (secdrvGood) {
+            add(Level.PASS, "Intelligente Ursachenanalyse", "SafeDisc-Treiber vorhanden",
+                "secdrv.sys liegt im Wine-Treiberpfad.",
+                "Ein schlicht fehlender SafeDisc-Treiber ist damit als Ursache deutlich weniger wahrscheinlich.");
+        }
+
+        if (graphicsGood) {
+            add(Level.PASS, "Intelligente Ursachenanalyse", "Grafikpfad konsistent",
+                "renderer=opengl und singlecpu=true sind aktiv.",
+                "CNC-DDraw-Konfiguration ist derzeit kein führender Verdacht.");
+        }
+
+        if (nsi) {
+            add(Level.INFO, "Intelligente Ursachenanalyse", "Sekundärer Netzwerkhinweis",
+                "nsi:poll_events bind failed, errno 13",
+                "Für Kampagne/Skirmish typischerweise nachrangig; nicht als Hauptursache behandeln, solange frühere RPC-/Runtime-Fehler bestehen.");
+        }
+    }
+
+    private Integer readServiceStart(String service) {
+        if (container == null) return null;
+        File reg = new File(container.getRootDir(), ".wine/system.reg");
+        if (!reg.isFile()) return null;
+        try (WineRegistryEditor editor = new WineRegistryEditor(reg)) {
+            String controlSet = editor.getSymlinkValue("System\\CurrentControlSet", "SymbolicLinkValue");
+            if (controlSet == null || controlSet.isEmpty()) controlSet = "System\\CurrentControlSet";
+            return editor.getDwordValue(controlSet + "\\Services\\" + service, "Start");
+        }
+        catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String joinStrings(Iterable<String> values, String separator) {
+        StringBuilder out = new StringBuilder();
+        for (String value : values) {
+            if (out.length() > 0) out.append(separator);
+            out.append(value);
+        }
+        return out.toString();
+    }
+
+    private void performSafeRepair() {
+        if (container == null) return;
+        progress.setVisibility(View.VISIBLE);
+        progress.setIndeterminate(true);
+        repairButton.setEnabled(false);
+        rescanButton.setEnabled(false);
+        copyButton.setEnabled(false);
+        summary.setText("Sichere Reparaturen werden angewendet …");
+
+        worker.execute(() -> {
+            try {
+                container.setStartupSelection(Container.STARTUP_SELECTION_NORMAL);
+                container.saveData();
+                WineUtils.changeServicesStatus(container, Container.STARTUP_SELECTION_NORMAL);
+
+                File systemReg = new File(container.getRootDir(), ".wine/system.reg");
+                if (systemReg.isFile()) {
+                    try (WineRegistryEditor registry = new WineRegistryEditor(systemReg)) {
+                        String controlSet = registry.getSymlinkValue("System\\CurrentControlSet", "SymbolicLinkValue");
+                        if (controlSet == null || controlSet.isEmpty()) controlSet = "System\\CurrentControlSet";
+                        registry.setDwordValue(controlSet + "\\Services\\RpcSs", "Start", 3);
+                        registry.setDwordValue(controlSet + "\\Services\\PlugPlay", "Start", 2);
+                        registry.setDwordValue(controlSet + "\\Services\\Eventlog", "Start", 2);
+                        registry.setDwordValue(controlSet + "\\Services\\NDIS", "Start", 2);
+                        registry.setDwordValue(controlSet + "\\Services\\nsiproxy", "Start", 2);
+                        registry.setDwordValue(controlSet + "\\Services\\MSIServer", "Start", 3);
+                        registry.setDwordValue(controlSet + "\\Services\\FontCache", "Start", 3);
+                    }
+                }
+
+                File userReg = new File(container.getRootDir(), ".wine/user.reg");
+                if (userReg.isFile()) {
+                    try (WineRegistryEditor registry = new WineRegistryEditor(userReg)) {
+                        registry.setStringValue("Software\\Wine\\DllOverrides", "ddraw", "native,builtin");
+                    }
+                }
+
+                File globalIni = new File(container.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
+                if (globalIni.isFile()) {
+                    String cfg = FileUtils.readString(globalIni);
+                    cfg = setIniValue(cfg, "renderer", "opengl");
+                    cfg = setIniValue(cfg, "singlecpu", "true");
+                    cfg = setIniValue(cfg, "windowed", "false");
+                    cfg = setIniValue(cfg, "fullscreen", "true");
+                    cfg = setIniValue(cfg, "nonexclusive", "true");
+                    cfg = setIniValue(cfg, "maxfps", "60");
+                    FileUtils.writeString(globalIni, cfg);
+                }
+            }
+            catch (Exception e) {
+                runOnUiThread(() -> summary.setText("Reparaturfehler: " + e.getMessage()));
+            }
+            runOnUiThread(this::runDiagnostics);
+        });
+    }
+
+    private String setIniValue(String cfg, String key, String value) {
+        if (cfg == null) cfg = "";
+        String[] lines = cfg.split("\\n", -1);
+        StringBuilder out = new StringBuilder();
+        boolean replaced = false;
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (!replaced && !trimmed.startsWith(";") && !trimmed.startsWith("#")) {
+                int eq = trimmed.indexOf('=');
+                if (eq > 0 && trimmed.substring(0, eq).trim().equalsIgnoreCase(key)) {
+                    out.append(key).append("=").append(value);
+                    replaced = true;
+                }
+                else out.append(line);
+            }
+            else out.append(line);
+            out.append("\n");
+        }
+        if (!replaced) out.append(key).append("=").append(value).append("\n");
+        return out.toString();
+    }
+
     private void createAssessment() {
         int fail = 0, warn = 0, pass = 0;
         for (Result r : results) {
@@ -921,6 +1233,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
 
     private void renderResults() {
         progress.setVisibility(View.GONE);
+        repairButton.setEnabled(container != null);
         rescanButton.setEnabled(true);
         copyButton.setEnabled(true);
 
@@ -931,7 +1244,8 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             else if (r.level == Level.PASS) pass++;
         }
 
-        summary.setText("Fertig: " + pass + " OK • " + warn + " Warnungen • " + fail + " Fehler");
+        String baseSummary = "Fertig: " + pass + " OK • " + warn + " Warnungen • " + fail + " Fehler";
+        summary.setText(primaryDiagnosis.isEmpty() ? baseSummary : baseSummary + "\nHauptverdacht: " + primaryDiagnosis);
 
         String lastGroup = "";
         StringBuilder report = new StringBuilder();
@@ -1051,11 +1365,19 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         for (String raw : lines) {
             String line = raw.trim();
             String lower = line.toLowerCase(Locale.ENGLISH);
+            boolean sehRegisterDump =
+                lower.contains("trace:seh:dispatch_exception rip=") ||
+                lower.contains("trace:seh:dispatch_exception rax=") ||
+                lower.contains("trace:seh:dispatch_exception rsi=") ||
+                lower.contains("trace:seh:dispatch_exception r10=") ||
+                lower.contains("trace:seh:dispatch_exception r14=");
+            if (sehRegisterDump) continue;
+
             if (lower.contains("err:") || lower.contains("unhandled") ||
-                lower.contains("exception") || lower.contains("failed") ||
+                lower.contains("dispatch_exception code=") || lower.contains("failed") ||
                 lower.contains("cannot") || lower.contains("missing") ||
                 lower.contains("not found") || lower.contains("import_dll") ||
-                lower.contains("page fault")) {
+                lower.contains("page fault") || lower.contains("experimental wow64")) {
                 if (line.length() > 260) line = line.substring(0, 260);
                 unique.add(line);
             }
@@ -1074,7 +1396,11 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         if (lower.contains("access denied") || lower.contains("permission"))
             return "Dateizugriff bzw. Wine-Pfade prüfen.";
         if (lower.contains("rpcss") || lower.contains("rpc_s_server_unavailable"))
-            return "RpcSs/Windows-Dienste prüfen. RA2 benötigt den normalen Winlator-Dienstmodus.";
+            return "Hohe Relevanz: RPC-Dienst war beim letzten Start nicht verfügbar. Dienstmodus und RpcSs prüfen.";
+        if (lower.contains("experimental wow64"))
+            return "Kompatibilitätshinweis: GAME.EXE läuft im experimentellen WoW64-Pfad. Erst relevant, wenn RPC/Service-Fehler behoben sind.";
+        if (lower.contains("nsi:poll_events") && lower.contains("errno 13"))
+            return "Wahrscheinlich sekundär: Netzwerk-Socket wurde von Android/Wine abgewiesen; für Einzelspieler meist kein primärer Startblocker.";
         if (lower.contains("secdrv") || lower.contains("safedisc"))
             return "SafeDisc-Treiberpfad prüfen; Yuri enthält eine neuere secdrv.sys-Version.";
         if (lower.contains("registry"))
