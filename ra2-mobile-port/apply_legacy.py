@@ -129,8 +129,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 215")
-    s = s.replace('versionName "7.1"', 'versionName "0.15.0-ra2-legacy"')
+    s = s.replace("versionCode 16", "versionCode 216")
+    s = s.replace('versionName "7.1"', 'versionName "0.16.0-ra2-legacy"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -437,6 +437,7 @@ def patch_xserver(root: Path) -> None:
         environment.addComponent(guestProgramLauncherComponent);
 ''',
         '''        guestProgramLauncherComponent.setEnvVars(envVars);
+        final String ra2HelperStage = getIntent().getStringExtra("ra2_helper_stage");
         if (getIntent().getBooleanExtra("ra2_game_launch", false)) {
             final long ra2StartedAt = System.currentTimeMillis();
             final StringBuilder ra2Debug = new StringBuilder();
@@ -458,6 +459,18 @@ def patch_xserver(root: Path) -> None:
             });
             guestProgramLauncherComponent.setTerminationCallback((status) ->
                 finishRa2LegacyLaunch(status, ra2StartedAt, ra2Debug, ra2LiveLog));
+        }
+        else if (ra2HelperStage != null && !ra2HelperStage.isEmpty()) {
+            final File helperLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/helper-last.log");
+            File helperParent = helperLog.getParentFile();
+            if (helperParent != null && !helperParent.isDirectory()) helperParent.mkdirs();
+            FileUtils.writeString(helperLog,
+                "stage=" + ra2HelperStage + "\\nlauncher=started\\n");
+            guestProgramLauncherComponent.setTerminationCallback((status) -> {
+                appendRa2Log(helperLog, "launcherExit=" + status + "\\n");
+                // Do not exit here. winhandler/explorer can terminate before the
+                // 7-Zip child has finished. The helper watchdog owns shutdown.
+            });
         }
         else {
             guestProgramLauncherComponent.setTerminationCallback((status) -> exit());
@@ -527,13 +540,34 @@ def patch_xserver(root: Path) -> None:
         catch (Exception ignored) {}
     }
 
+    private File findLegacyHelperFile(File dir, String name, int depth) {
+        if (dir == null || depth < 0 || !dir.exists()) return null;
+        if (dir.isFile()) return dir.getName().equalsIgnoreCase(name) ? dir : null;
+        File[] children = dir.listFiles();
+        if (children == null) return null;
+        for (File child : children) {
+            if (child.isFile() && child.getName().equalsIgnoreCase(name)) return child;
+        }
+        if (depth == 0) return null;
+        for (File child : children) {
+            if (!child.isDirectory()) continue;
+            File found = findLegacyHelperFile(child, name, depth - 1);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     private long[] helperOutputSizes(String stage) {
         File dir = new File(container.getRootDir(), ".wine/drive_c/Westwood/RA2");
         if ("ra2_cab".equals(stage)) {
-            return new long[]{new File(dir, "ra2.mix").length(), new File(dir, "language.mix").length()};
+            File a = findLegacyHelperFile(dir, "ra2.mix", 6);
+            File b = findLegacyHelperFile(dir, "language.mix", 6);
+            return new long[]{a != null ? a.length() : 0, b != null ? b.length() : 0};
         }
         if ("yuri_cab".equals(stage)) {
-            return new long[]{new File(dir, "ra2md.mix").length(), new File(dir, "langmd.mix").length()};
+            File a = findLegacyHelperFile(dir, "ra2md.mix", 6);
+            File b = findLegacyHelperFile(dir, "langmd.mix", 6);
+            return new long[]{a != null ? a.length() : 0, b != null ? b.length() : 0};
         }
         return new long[]{0, 0};
     }
@@ -577,7 +611,23 @@ def patch_xserver(root: Path) -> None:
                     lastB = sizes[1];
 
                     if (stable >= 4) {
+                        File helperLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/helper-last.log");
+                        appendRa2Log(helperLog,
+                            "result=complete\\nsizeA=" + sizes[0] + "\\nsizeB=" + sizes[1] + "\\n");
                         appendRa2Log(liveLog, "stage=helper-complete\\n");
+                        requestRa2Exit();
+                        return;
+                    }
+
+                    if (System.currentTimeMillis() - started >= 120000L) {
+                        File helperLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/helper-last.log");
+                        appendRa2Log(helperLog,
+                            "result=timeout\\nsizeA=" + sizes[0] + "\\nsizeB=" + sizes[1] + "\\n");
+                        getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
+                            .putString("last_diag_clue",
+                                "7-Zip-Helfer hat die erwarteten MIX-Dateien innerhalb von 120 s nicht erzeugt.")
+                            .apply();
+                        appendRa2Log(liveLog, "stage=helper-timeout\\n");
                         requestRa2Exit();
                         return;
                     }
