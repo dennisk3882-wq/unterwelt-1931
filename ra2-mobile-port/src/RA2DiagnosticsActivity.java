@@ -368,8 +368,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         };
         String[] support = {
             "blowfish.tlb", "drvmgt.dll", "mph.exe", "patchget.dat",
-            "patchw32.dll", "ra2.lcf", "ra2.tlb", "woldatA.key",
-            "nl.cfg", "wolapi.dll", "wolapi.war"
+            "patchw32.dll", "ra2.lcf", "ra2.tlb"
         };
 
         int missingCritical = checkFileSet("RA2 Dateien", dir, critical, true);
@@ -380,13 +379,26 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 critical.length + " Kernbestandteile vorhanden.", "");
         }
         if (missingSupport > 0) {
-            add(Level.WARN, "RA2 Dateien", "Zusatzbestand nicht vollständig",
+            add(Level.WARN, "RA2 Dateien", "Kompatibilitätsbestand nicht vollständig",
                 missingSupport + " unterstützende Originaldatei(en) fehlen.",
-                "RA2 erneut einrichten; der aktuelle Build übernimmt den gesamten INSTALL-Inhalt.");
+                "RA2 erneut einrichten.");
         }
 
-        checkDirectory("RA2 Dateien", new File(dir, "rmcache"), "RMCACHE", false);
-        checkDirectory("RA2 Dateien", new File(dir, "taunts"), "TAUNTS", false);
+        StringBuilder onlineMissing = new StringBuilder();
+        for (String name : new String[]{"woldatA.key", "nl.cfg", "wolapi.dll", "wolapi.war"}) {
+            if (findIgnoreCase(dir, name, 2) == null) {
+                if (onlineMissing.length() > 0) onlineMissing.append(", ");
+                onlineMissing.append(name);
+            }
+        }
+        if (onlineMissing.length() > 0) {
+            add(Level.INFO, "RA2 Dateien", "Alte Westwood-Online-Dateien fehlen",
+                onlineMissing.toString(),
+                "Für Kampagne/Skirmish kein primärer Startblocker; deshalb nur Information.");
+        }
+
+        reportOptionalDirectory(new File(dir, "rmcache"), "RMCACHE");
+        reportOptionalDirectory(new File(dir, "taunts"), "TAUNTS");
     }
 
     private void checkYuriFiles() {
@@ -435,6 +447,18 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             }
         }
         return missing;
+    }
+
+    private void reportOptionalDirectory(File dir, String label) {
+        if (!dir.isDirectory()) {
+            add(Level.INFO, "RA2 Dateien", label + " fehlt",
+                dir.getAbsolutePath(),
+                "Optional; kein primärer Grund für den aktuellen Startabbruch.");
+            return;
+        }
+        long[] stats = directoryStats(dir, 5);
+        add(Level.PASS, "RA2 Dateien", label + " vorhanden",
+            stats[0] + " Dateien • " + humanSize(stats[1]), "");
     }
 
     private void checkDirectory(String group, File dir, String label, boolean critical) {
