@@ -3,7 +3,6 @@
 
 #include <mutex>
 #include <string>
-#include <vector>
 
 namespace {
 std::mutex g_inno_mutex;
@@ -44,37 +43,31 @@ Java_org_tiberiandawn_android_GermanPackageInstaller_nativeExtractInno(
     }
 
     dlerror();
-    using InnoMain = int (*)(int, char**);
-    InnoMain inno_main = reinterpret_cast<InnoMain>(dlsym(library, "main"));
+    using NativeDoExtract = jint (*)(JNIEnv*, jobject, jstring, jstring);
+    NativeDoExtract native_extract = reinterpret_cast<NativeDoExtract>(
+        dlsym(library,
+            "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativeDoExtract"));
     const char* symbol_error = dlerror();
-    if (!inno_main || symbol_error) {
-        std::string message = "German package extractor entry point is unavailable";
+    if (!native_extract || symbol_error) {
+        std::string message =
+            "Compatible German package extractor entry point is unavailable";
         if (symbol_error) message += std::string(": ") + symbol_error;
         dlclose(library);
         return Error(env, message);
     }
 
-    std::vector<std::string> args;
-    args.emplace_back("innoextract");
-    args.emplace_back("--extract");
-    args.emplace_back("--output-dir");
-    args.emplace_back(output);
-    args.emplace_back(installer);
-
-    std::vector<char*> argv;
-    argv.reserve(args.size() + 1);
-    for (std::string& arg : args) argv.push_back(&arg[0]);
-    argv.push_back(nullptr);
-
-    int result = -1;
-    try {
-        result = inno_main(static_cast<int>(args.size()), argv.data());
-    } catch (...) {
-        dlclose(library);
-        return Error(env, "German package extractor terminated unexpectedly");
-    }
+    // innoextract-android v3.2 exposes a path-based JNI extraction function.
+    // Call that directly instead of its CLI main().  v4 switched to scoped-
+    // storage file descriptors and returns code 2 when used with our private
+    // app paths, which is the failure seen on real Android devices.
+    const jint result = native_extract(
+        env, nullptr, installer_path, output_directory);
 
     dlclose(library);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return Error(env, "German package extractor raised an Android exception");
+    }
     if (result != 0) {
         return Error(env, "German package extractor failed with code "
             + std::to_string(result));
