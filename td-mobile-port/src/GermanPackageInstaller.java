@@ -37,8 +37,12 @@ public final class GermanPackageInstaller {
             && movies.isFile() && movies.length() > 100_000_000L;
     }
 
+    private static final InnoExtractCompatService INNO_SERVICE =
+        new InnoExtractCompatService();
+
     private static native String nativeExtractInno(String installerPath,
-                                                    String outputDirectory);
+                                                    String outputDirectory,
+                                                    InnoExtractCompatService service);
 
     public static void install(Context context,
                                File coreInstaller,
@@ -149,7 +153,10 @@ public final class GermanPackageInstaller {
         }
         String error;
         try {
-            error = nativeExtractInno(installer.getAbsolutePath(), output.getAbsolutePath());
+            error = nativeExtractInno(
+                installer.getAbsolutePath(),
+                output.getAbsolutePath(),
+                INNO_SERVICE);
         } catch (UnsatisfiedLinkError problem) {
             throw new IOException("German package extractor is unavailable", problem);
         }
