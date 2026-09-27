@@ -785,6 +785,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
         File dst = gameDir();
         copyRequired(root, dst, "MAPSMD03.MIX", "MOVMD03.MIX", "MULTIMD.MIX", "THEMEMD.MIX");
+        copyInstallPayload(install, dst, 4);
         copyRequired(install, dst, "GAMEMD.EXE", "MPHMD.EXE", "RA2MD.EXE", "YURI.EXE");
 
         FileUtils.delete(yuriCabDir());
