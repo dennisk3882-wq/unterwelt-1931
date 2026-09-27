@@ -104,12 +104,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url='https://github.com/alanwoolley/innoextract-android/releases/download/v3.2.0/App-arm64-v8a-release.apk'
+          url='https://github.com/alanwoolley/innoextract-android/releases/download/v4.0.0/App-arm64-v8a-release-signed.apk'
           curl -L --fail --retry 3 -o /tmp/innoextract-android.apk "$url"
-          echo '88c0661f5ab69edba6583f4ee990a492e8d13c6c30e7df4551c294bd1ff59161  /tmp/innoextract-android.apk' | sha256sum -c -
+          echo '4cd98d47e235ab802d9c74b96ed62277acce8718b4125f1e20d2fbcfdeb9e0e3  /tmp/innoextract-android.apk' | sha256sum -c -
           mkdir -p upstream/android/app/src/main/jniLibs/arm64-v8a
           unzip -p /tmp/innoextract-android.apk lib/arm64-v8a/libinnoextract.so > upstream/android/app/src/main/jniLibs/arm64-v8a/libinnoextract.so
-          echo '6fb0de32c58a4b3fa489a98d482142c3358c0c60898b9cee61ce4edba7590f15  upstream/android/app/src/main/jniLibs/arm64-v8a/libinnoextract.so' | sha256sum -c -
+          echo '8acf21f50103e44a3d4d5a163022f4545e6a792eccbc24eee9fbc9732657fd40  upstream/android/app/src/main/jniLibs/arm64-v8a/libinnoextract.so' | sha256sum -c -
           file upstream/android/app/src/main/jniLibs/arm64-v8a/libinnoextract.so
           echo '=== innoextract JNI exports ==='
           nm -D upstream/android/app/src/main/jniLibs/arm64-v8a/libinnoextract.so | grep 'Java_uk_co_armedpineapple_innoextract_service_ExtractService_' || true
