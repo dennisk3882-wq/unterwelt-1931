@@ -31,6 +31,7 @@ import com.winlator.container.ContainerManager;
 import com.winlator.container.GraphicsDrivers;
 import com.winlator.core.FileUtils;
 import com.winlator.core.WineRegistryEditor;
+import com.winlator.core.WineUtils;
 import com.winlator.xenvironment.RootFS;
 import com.winlator.xenvironment.RootFSInstaller;
 
@@ -355,7 +356,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             data.put("audioDriver", Container.DEFAULT_AUDIO_DRIVER);
             data.put("wincomponents", Container.DEFAULT_WINCOMPONENTS);
             data.put("drives", Container.DEFAULT_DRIVES);
-            data.put("startupSelection", Container.STARTUP_SELECTION_ESSENTIAL);
+            data.put("startupSelection", Container.STARTUP_SELECTION_NORMAL);
             data.put("box64Preset", Box64Preset.STABILITY);
             data.put("extraData", new JSONObject());
 
@@ -382,9 +383,35 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         target.setScreenSize("1280x720");
         target.setDXWrapper("wined3d");
         target.setDXWrapperConfig("ddrawWrapper=cnc-ddraw");
+        target.setStartupSelection(Container.STARTUP_SELECTION_NORMAL);
         target.setBox64Preset(Box64Preset.STABILITY);
         target.saveData();
+
+        // RA2/Yuri use OLE/RPC during startup. Winlator's ESSENTIAL mode disables
+        // RpcSs and several related services, which causes RPC_S_SERVER_UNAVAILABLE
+        // before GAME.EXE can reach the actual game window.
+        WineUtils.changeServicesStatus(target, Container.STARTUP_SELECTION_NORMAL);
+        repairRa2Services(target);
         applyWineLocale();
+    }
+
+    private void repairRa2Services(Container target) {
+        File systemReg = new File(target.getRootDir(), ".wine/system.reg");
+        if (!systemReg.isFile()) return;
+
+        try (WineRegistryEditor registry = new WineRegistryEditor(systemReg)) {
+            String controlSet = registry.getSymlinkValue("System\\CurrentControlSet", "SymbolicLinkValue");
+            if (controlSet == null || controlSet.isEmpty()) controlSet = "System\\CurrentControlSet";
+
+            registry.setDwordValue(controlSet + "\\Services\\RpcSs", "Start", 3);
+            registry.setDwordValue(controlSet + "\\Services\\PlugPlay", "Start", 2);
+            registry.setDwordValue(controlSet + "\\Services\\Eventlog", "Start", 2);
+            registry.setDwordValue(controlSet + "\\Services\\NDIS", "Start", 2);
+            registry.setDwordValue(controlSet + "\\Services\\nsiproxy", "Start", 2);
+            registry.setDwordValue(controlSet + "\\Services\\MSIServer", "Start", 3);
+            registry.setDwordValue(controlSet + "\\Services\\FontCache", "Start", 3);
+        }
+        catch (Exception ignored) {}
     }
 
     private void applyWineLocale() {
@@ -1185,6 +1212,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             .remove(KEY_LAST_DIAG_CLUE)
             .apply();
 
+        targetNormalServicesBeforeLaunch();
         writeLaunchSeed(exe, yuri);
         activateMedia(yuri);
         writeWestwoodRegistry(yuri);
@@ -1198,6 +1226,16 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         intent.putExtra("ra2_game_launch", true);
         intent.putExtra("ra2_language", isGerman() ? "de" : "en");
         startActivity(intent);
+    }
+
+    private void targetNormalServicesBeforeLaunch() {
+        if (container == null) return;
+        if (container.getStartupSelection() != Container.STARTUP_SELECTION_NORMAL) {
+            container.setStartupSelection(Container.STARTUP_SELECTION_NORMAL);
+            container.saveData();
+        }
+        WineUtils.changeServicesStatus(container, Container.STARTUP_SELECTION_NORMAL);
+        repairRa2Services(container);
     }
 
     private void writeLaunchSeed(File exe, boolean yuri) {
