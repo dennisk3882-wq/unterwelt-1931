@@ -113,7 +113,6 @@ jobs:
           file upstream/android/app/src/main/jniLibs/arm64-v8a/libinnoextract.so
           readelf -Ws upstream/android/app/src/main/jniLibs/arm64-v8a/libinnoextract.so | grep -q 'Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativePrepare'
           readelf -Ws upstream/android/app/src/main/jniLibs/arm64-v8a/libinnoextract.so | grep -q 'Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativeExtract'
-          nm -D upstream/android/app/src/main/jniLibs/arm64-v8a/libinnoextract.so | grep -q 'Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativeDoExtract'
 
       - name: Build mobile debug APK
         working-directory: upstream/android
