@@ -58,8 +58,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private static final String STAGE_RA2_ALLIED = "ra2_allied";
     private static final String STAGE_RA2_SOVIET = "ra2_soviet";
     private static final String STAGE_RA2_SETUP = "ra2_setup";
+    private static final String STAGE_RA2_CAB = "ra2_cab";
     private static final String STAGE_YURI_EXTRACT = "yuri_extract";
     private static final String STAGE_YURI_SETUP = "yuri_setup";
+    private static final String STAGE_YURI_CAB = "yuri_cab";
 
     private static final int PICK_ALLIED = 4101;
     private static final int PICK_SOVIET = 4102;
@@ -388,8 +390,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
             .setTitle(isGerman() ? "Alarmstufe Rot 2 einrichten" : "Set up Red Alert 2")
             .setMessage(isGerman()
-                ? "Beide Original-CDs werden nacheinander in das virtuelle Laufwerk X: vorbereitet. Danach startet das originale Setup."
-                : "Both original discs will be prepared into virtual drive X:, then the original setup will start.")
+                ? "Beide Original-CDs werden direkt ausgewertet. Die Spieldateien werden ohne das alte Westwood-Setup installiert."
+                : "Both original discs will be read directly. The game files are installed without the old Westwood setup.")
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(isGerman() ? "Starten" : "Start", (d, w) -> {
                 preparePhysicalDriveX();
@@ -413,8 +415,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
             .setTitle(isGerman() ? "Yuri’s Rache einrichten" : "Set up Yuri’s Revenge")
             .setMessage(isGerman()
-                ? "Die Yuri-CD wird vorbereitet und anschließend startet das originale Setup."
-                : "The Yuri disc will be prepared and the original setup will start.")
+                ? "Die Yuri-CD wird direkt ausgewertet und in dieselbe RA2-Installation integriert."
+                : "The Yuri disc will be read directly and merged into the same RA2 installation.")
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(isGerman() ? "Starten" : "Start", (d, w) -> {
                 preparePhysicalDriveX();
@@ -516,52 +518,294 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         FileUtils.delete(stagingIso());
 
         if (STAGE_RA2_ALLIED.equals(stage)) {
-            Uri soviet = savedUri(KEY_SOVIET);
-            if (soviet == null) {
-                stopPipeline("Soviet ISO missing");
-                return;
+            try {
+                setBusy(true, isGerman() ? "Alliierte CD wird in den Spielordner übernommen…" : "Copying Allied disc files into the game folder…");
+                prepareRa2Disc(true);
+                preparePhysicalDriveX();
+
+                Uri soviet = savedUri(KEY_SOVIET);
+                if (soviet == null) {
+                    stopPipeline("Soviet ISO missing");
+                    return;
+                }
+                copyAndExtract(soviet, STAGE_RA2_SOVIET);
             }
-            copyAndExtract(soviet, STAGE_RA2_SOVIET);
+            catch (Exception e) {
+                stopPipeline((isGerman() ? "Dateifehler: " : "File error: ") + e.getMessage());
+            }
             return;
         }
 
         if (STAGE_RA2_SOVIET.equals(stage)) {
-            File setup = findIgnoreCase(driveX(), "setup.exe", 5);
-            if (setup == null) {
-                stopPipeline(isGerman() ? "SETUP.EXE wurde auf den RA2-CDs nicht gefunden." : "SETUP.EXE was not found on the RA2 discs.");
-                return;
+            try {
+                setBusy(true, isGerman() ? "Sowjet-CD wird in den Spielordner übernommen…" : "Copying Soviet disc files into the game folder…");
+                prepareRa2Disc(false);
+
+                File cab = new File(ra2CabDir(), "Game1.CAB");
+                if (!cab.isFile()) {
+                    stopPipeline(isGerman()
+                        ? "Game1.CAB der RA2-CD wurde nicht gefunden."
+                        : "RA2 Game1.CAB was not found.");
+                    return;
+                }
+
+                prefs.edit().putString(KEY_STAGE, STAGE_RA2_CAB).apply();
+                setBusy(false, isGerman()
+                    ? "RA2.MIX und LANGUAGE.MIX werden aus Game1.CAB entpackt…"
+                    : "Extracting RA2.MIX and LANGUAGE.MIX from Game1.CAB…");
+                launchRuntimeDos(
+                    "Z:\\opt\\apps\\7-Zip\\7zG.exe",
+                    "x \"C:\\RA2Mobile\\RA2CAB\\Game1.CAB\" -o\"C:\\Westwood\\RA2\" -y -aoa"
+                );
             }
-            prefs.edit().putString(KEY_STAGE, STAGE_RA2_SETUP).apply();
-            applyWineLocale();
-            launchRuntimeDos(toXDosPath(setup), "");
+            catch (Exception e) {
+                stopPipeline((isGerman() ? "Dateifehler: " : "File error: ") + e.getMessage());
+            }
             return;
         }
 
-        if (STAGE_RA2_SETUP.equals(stage)) {
-            storeMedia(false);
-            prefs.edit().putString(KEY_STAGE, STAGE_NONE).apply();
-            scanInstalledGames(true);
+        if (STAGE_RA2_CAB.equals(stage)) {
+            File game = findIgnoreCase(gameDir(), "game.exe", 2);
+            File ra2Mix = findIgnoreCase(gameDir(), "ra2.mix", 2);
+            File languageMix = findIgnoreCase(gameDir(), "language.mix", 2);
+
+            if (game == null || ra2Mix == null || languageMix == null) {
+                StringBuilder missing = new StringBuilder();
+                if (game == null) missing.append(" GAME.EXE");
+                if (ra2Mix == null) missing.append(" RA2.MIX");
+                if (languageMix == null) missing.append(" LANGUAGE.MIX");
+                stopPipeline((isGerman()
+                    ? "Direktinstallation unvollständig. Es fehlen:"
+                    : "Direct installation incomplete. Missing:") + missing);
+                return;
+            }
+
+            writeWestwoodRegistry(false);
+            prefs.edit()
+                .putString(KEY_RA2_EXE, game.getAbsolutePath())
+                .putString(KEY_STAGE, STAGE_NONE)
+                .apply();
+            FileUtils.delete(ra2CabDir());
+            setBusy(false, isGerman()
+                ? "Alarmstufe Rot 2 wurde direkt aus den Original-CDs installiert."
+                : "Red Alert 2 was installed directly from the original discs.");
+            refreshGameState();
             return;
         }
 
         if (STAGE_YURI_EXTRACT.equals(stage)) {
-            File setup = findIgnoreCase(driveX(), "setup.exe", 5);
-            if (setup == null) {
-                stopPipeline(isGerman() ? "SETUP.EXE wurde auf der Yuri-CD nicht gefunden." : "SETUP.EXE was not found on the Yuri disc.");
-                return;
+            try {
+                setBusy(true, isGerman() ? "Yuri-CD wird in den Spielordner übernommen…" : "Copying Yuri disc files into the game folder…");
+                prepareYuriDisc();
+
+                File cab = new File(yuriCabDir(), "Game1.CAB");
+                if (!cab.isFile()) {
+                    // Some disc layouts document Game6.CAB as the file containing the two main MIX archives.
+                    cab = new File(yuriCabDir(), "Game6.CAB");
+                }
+                if (!cab.isFile()) {
+                    stopPipeline(isGerman()
+                        ? "Kein Yuri-Game*.CAB-Archiv wurde gefunden."
+                        : "No Yuri Game*.CAB archive was found.");
+                    return;
+                }
+
+                String cabName = cab.getName();
+                prefs.edit().putString(KEY_STAGE, STAGE_YURI_CAB).apply();
+                setBusy(false, isGerman()
+                    ? "RA2MD.MIX und LANGMD.MIX werden aus den Yuri-CAB-Dateien entpackt…"
+                    : "Extracting RA2MD.MIX and LANGMD.MIX from the Yuri CAB files…");
+                launchRuntimeDos(
+                    "Z:\\opt\\apps\\7-Zip\\7zG.exe",
+                    "x \"C:\\RA2Mobile\\YURICAB\\" + cabName + "\" -o\"C:\\Westwood\\RA2\" -y -aoa"
+                );
             }
-            prefs.edit().putString(KEY_STAGE, STAGE_YURI_SETUP).apply();
-            applyWineLocale();
-            launchRuntimeDos(toXDosPath(setup), "");
+            catch (Exception e) {
+                stopPipeline((isGerman() ? "Dateifehler: " : "File error: ") + e.getMessage());
+            }
             return;
         }
 
-        if (STAGE_YURI_SETUP.equals(stage)) {
-            storeMedia(true);
-            prefs.edit().putString(KEY_STAGE, STAGE_NONE).apply();
-            scanInstalledGames(true);
+        if (STAGE_YURI_CAB.equals(stage)) {
+            File game = findIgnoreCase(gameDir(), "gamemd.exe", 2);
+            File ra2Mix = findIgnoreCase(gameDir(), "ra2md.mix", 3);
+            File languageMix = findIgnoreCase(gameDir(), "langmd.mix", 3);
+
+            if (game == null || ra2Mix == null || languageMix == null) {
+                StringBuilder missing = new StringBuilder();
+                if (game == null) missing.append(" GAMEMD.EXE");
+                if (ra2Mix == null) missing.append(" RA2MD.MIX");
+                if (languageMix == null) missing.append(" LANGMD.MIX");
+                stopPipeline((isGerman()
+                    ? "Yuri-Direktinstallation unvollständig. Es fehlen:"
+                    : "Yuri direct installation incomplete. Missing:") + missing);
+                return;
+            }
+
+            flattenKnownMix(gameDir(), ra2Mix, "ra2md.mix");
+            flattenKnownMix(gameDir(), languageMix, "langmd.mix");
+            game = findIgnoreCase(gameDir(), "gamemd.exe", 2);
+
+            writeWestwoodRegistry(true);
+            prefs.edit()
+                .putString(KEY_YURI_EXE, game.getAbsolutePath())
+                .putString(KEY_STAGE, STAGE_NONE)
+                .apply();
+            FileUtils.delete(yuriCabDir());
+            setBusy(false, isGerman()
+                ? "Yuri’s Rache wurde direkt aus der Original-CD installiert."
+                : "Yuri’s Revenge was installed directly from the original disc.");
+            refreshGameState();
         }
     }
+
+
+    private File gameDir() {
+        File dir = new File(container.getRootDir(), ".wine/drive_c/Westwood/RA2");
+        if (!dir.isDirectory()) dir.mkdirs();
+        return dir;
+    }
+
+    private File ra2CabDir() {
+        File dir = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/RA2CAB");
+        if (!dir.isDirectory()) dir.mkdirs();
+        return dir;
+    }
+
+    private File yuriCabDir() {
+        File dir = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/YURICAB");
+        if (!dir.isDirectory()) dir.mkdirs();
+        return dir;
+    }
+
+    private void prepareRa2Disc(boolean allied) throws Exception {
+        File root = driveX();
+        File install = findChildIgnoreCase(root, "INSTALL");
+        if (install == null || !install.isDirectory()) {
+            throw new Exception(isGerman() ? "INSTALL-Ordner der RA2-CD fehlt." : "RA2 INSTALL folder is missing.");
+        }
+
+        File dst = gameDir();
+
+        // Files shared by both RA2 CDs.
+        copyOptional(root, dst, "MULTI.MIX", "THEME.MIX", "WDT.MIX");
+
+        if (allied) {
+            copyRequired(root, dst, "MAPS01.MIX", "MOVIES01.MIX");
+        }
+        else {
+            copyRequired(root, dst, "MAPS02.MIX", "MOVIES02.MIX");
+        }
+
+        copyRequired(install, dst,
+            "BINKW32.DLL", "BLOWFISH.DLL", "BLOWFISH.TLB",
+            "GAME.EXE", "MPH.EXE", "RA2.EXE", "RA2.TLB");
+        copyOptionalDirectory(install, dst, "RMCACHE");
+        copyOptionalDirectory(install, dst, "TAUNTS");
+
+        if (allied) {
+            File cab = findChildIgnoreCase(install, "Game1.CAB");
+            if (cab == null || !cab.isFile()) {
+                throw new Exception("Game1.CAB");
+            }
+            FileUtils.delete(ra2CabDir());
+            ra2CabDir().mkdirs();
+            if (!FileUtils.copy(cab, new File(ra2CabDir(), "Game1.CAB"))) {
+                throw new Exception(isGerman() ? "Game1.CAB konnte nicht kopiert werden." : "Could not copy Game1.CAB.");
+            }
+        }
+    }
+
+    private void prepareYuriDisc() throws Exception {
+        File root = driveX();
+        File install = findChildIgnoreCase(root, "INSTALL");
+        if (install == null || !install.isDirectory()) {
+            throw new Exception(isGerman() ? "INSTALL-Ordner der Yuri-CD fehlt." : "Yuri INSTALL folder is missing.");
+        }
+
+        File dst = gameDir();
+        copyRequired(root, dst, "MAPSMD03.MIX", "MOVMD03.MIX", "MULTIMD.MIX", "THEMEMD.MIX");
+        copyRequired(install, dst, "GAMEMD.EXE", "MPHMD.EXE", "RA2MD.EXE", "YURI.EXE");
+
+        FileUtils.delete(yuriCabDir());
+        yuriCabDir().mkdirs();
+
+        File[] files = install.listFiles();
+        if (files == null) throw new Exception("Yuri INSTALL");
+        int copiedCabFiles = 0;
+        for (File file : files) {
+            String upper = file.getName().toUpperCase(Locale.ENGLISH);
+            if (file.isFile() && (upper.matches("GAME\\d+\\.CAB") || upper.matches("GAME\\d+\\.HDR"))) {
+                if (FileUtils.copy(file, new File(yuriCabDir(), file.getName()))) copiedCabFiles++;
+            }
+        }
+        if (copiedCabFiles == 0) {
+            throw new Exception(isGerman() ? "Keine Yuri Game*.CAB-Dateien gefunden." : "No Yuri Game*.CAB files found.");
+        }
+    }
+
+    private void copyRequired(File sourceDir, File destinationDir, String... names) throws Exception {
+        for (String name : names) {
+            File source = findChildIgnoreCase(sourceDir, name);
+            if (source == null || !source.isFile()) {
+                throw new Exception((isGerman() ? "Datei fehlt: " : "Missing file: ") + name);
+            }
+            if (!FileUtils.copy(source, new File(destinationDir, source.getName()))) {
+                throw new Exception((isGerman() ? "Kopieren fehlgeschlagen: " : "Copy failed: ") + name);
+            }
+        }
+    }
+
+    private void copyOptional(File sourceDir, File destinationDir, String... names) {
+        for (String name : names) {
+            File source = findChildIgnoreCase(sourceDir, name);
+            if (source != null && source.isFile()) {
+                FileUtils.copy(source, new File(destinationDir, source.getName()));
+            }
+        }
+    }
+
+    private void copyOptionalDirectory(File sourceDir, File destinationDir, String name) {
+        File source = findChildIgnoreCase(sourceDir, name);
+        if (source != null && source.isDirectory()) {
+            FileUtils.copy(source, new File(destinationDir, source.getName()));
+        }
+    }
+
+    private File findChildIgnoreCase(File dir, String name) {
+        if (dir == null || !dir.isDirectory()) return null;
+        File[] children = dir.listFiles();
+        if (children == null) return null;
+        for (File child : children) {
+            if (child.getName().equalsIgnoreCase(name)) return child;
+        }
+        return null;
+    }
+
+    private void flattenKnownMix(File targetDir, File source, String targetName) {
+        if (source == null || !source.isFile()) return;
+        File target = new File(targetDir, targetName);
+        if (!source.equals(target)) {
+            FileUtils.copy(source, target);
+        }
+    }
+
+    private void writeWestwoodRegistry(boolean yuri) {
+        File systemReg = new File(container.getRootDir(), ".wine/system.reg");
+        try (WineRegistryEditor registry = new WineRegistryEditor(systemReg)) {
+            String root = yuri ? "Software\\Westwood\\Yuri's Revenge" : "Software\\Westwood\\Red Alert 2";
+            registry.setStringValue(root, "Name", yuri ? "Yuri's Revenge" : "Red Alert 2");
+            registry.setStringValue(root, "InstallPath", yuri
+                ? "C:\\Westwood\\RA2\\YURI.EXE"
+                : "C:\\Westwood\\RA2\\RA2.EXE");
+            registry.setStringValue(root, "FolderPath", "C:\\Westwood\\RA2");
+            registry.setStringValue(root, "Serial", "");
+            registry.setDwordValue(root, "SKU", yuri ? 0x2900 : 0x2100);
+            registry.setDwordValue(root, "Version", yuri ? 0x00010000 : 0x00010000);
+        }
+        catch (Exception ignored) {}
+    }
+
 
     private void stopPipeline(String text) {
         prefs.edit()
@@ -625,8 +869,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                     }
                     else {
                         setBusy(false, de
-                            ? "Das Setup wurde geschlossen, aber die Spiel-EXE wurde noch nicht gefunden. Falls die Installation abgebrochen wurde, starte die Einrichtung erneut."
-                            : "Setup closed, but no game executable was found yet. If installation was cancelled, start setup again.");
+                            ? "Die Direktinstallation konnte noch keine Spiel-EXE bestätigen. Starte die Einrichtung erneut; die Statuszeile zeigt dann die fehlende Datei."
+                            : "The direct installation could not confirm a game executable yet. Run setup again; the status line will show the missing file.");
                     }
                 }
             });
