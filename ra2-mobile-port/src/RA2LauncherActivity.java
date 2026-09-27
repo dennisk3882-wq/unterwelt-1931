@@ -15,6 +15,7 @@ import android.provider.OpenableColumns;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -206,10 +207,27 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
         TextView touchInfo = label(13, Color.LTGRAY);
         touchInfo.setTag("touchInfo");
-        touchInfo.setPadding(dp(4), dp(18), dp(4), 0);
+        touchInfo.setPadding(dp(4), dp(18), dp(4), dp(84));
         root.addView(touchInfo, matchWrap(0));
 
-        return scroll;
+        FrameLayout shell = new FrameLayout(this);
+        shell.setBackgroundColor(Color.rgb(8, 12, 14));
+        shell.addView(scroll, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        Button diagnostics = accentButton("🩺 Diagnose");
+        diagnostics.setTag("diagnosticsButton");
+        diagnostics.setOnClickListener(v -> {
+            Intent intent = new Intent(this, RA2DiagnosticsActivity.class);
+            startActivity(intent);
+        });
+
+        FrameLayout.LayoutParams dp = new FrameLayout.LayoutParams(
+            dp(170), dp(54), Gravity.BOTTOM | Gravity.END);
+        dp.setMargins(dp(12), dp(12), dp(18), dp(18));
+        shell.addView(diagnostics, dp);
+
+        return shell;
     }
 
     private void setLanguage(String language) {
@@ -252,6 +270,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                 ? "Touch: Tippen = auswählen/Befehl • Ziehen = Auswahlrahmen • langer Druck oder Zwei-Finger-Tipp = Rechtsklick • Pinch = Zoom • ⚙ oben rechts = Steuerung."
                 : "Touch: tap = select/command • drag = selection box • long press or two-finger tap = right click • pinch = zoom • ⚙ top-right = controls.");
         }
+        Button diagnostics = root.findViewWithTag("diagnosticsButton");
+        if (diagnostics != null) diagnostics.setText(de ? "🩺 Diagnose" : "🩺 Diagnostics");
         refreshGameState();
     }
 
