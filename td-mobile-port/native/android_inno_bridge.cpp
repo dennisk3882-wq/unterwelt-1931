@@ -10,6 +10,12 @@ namespace {
 std::mutex g_inno_mutex;
 jobject g_service = nullptr;
 bool g_prepared = false;
+void* g_library = nullptr;
+
+using PrepareFn = void (*)(JNIEnv*, jobject);
+using ExtractFn = int (*)(JNIEnv*, jobject, jint, jstring);
+PrepareFn g_prepare = nullptr;
+ExtractFn g_extract = nullptr;
 
 std::string FromJava(JNIEnv* env, jstring value)
 {
@@ -35,6 +41,42 @@ bool CheckAndClearJavaException(JNIEnv* env, std::string& message)
     return true;
 }
 
+bool EnsureNativeLibrary(JNIEnv* env, std::string& error)
+{
+    if (g_library && g_prepare && g_extract) return true;
+
+    g_library = dlopen("libinnoextract.so", RTLD_NOW | RTLD_LOCAL);
+    if (!g_library) {
+        const char* detail = dlerror();
+        error = std::string("Could not load German package extractor: ")
+            + (detail ? detail : "unknown dlopen error");
+        return false;
+    }
+
+    dlerror();
+    g_prepare = reinterpret_cast<PrepareFn>(dlsym(
+        g_library,
+        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativePrepare"));
+    const char* prepare_error = dlerror();
+    if (!g_prepare || prepare_error) {
+        error = "German package extractor prepare entry point is unavailable";
+        if (prepare_error) error += std::string(": ") + prepare_error;
+        return false;
+    }
+
+    dlerror();
+    g_extract = reinterpret_cast<ExtractFn>(dlsym(
+        g_library,
+        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativeExtract"));
+    const char* extract_error = dlerror();
+    if (!g_extract || extract_error) {
+        error = "German package extractor entry point is unavailable";
+        if (extract_error) error += std::string(": ") + extract_error;
+        return false;
+    }
+    return true;
+}
+
 jobject EnsureService(JNIEnv* env)
 {
     if (g_service) return g_service;
@@ -42,10 +84,15 @@ jobject EnsureService(JNIEnv* env)
     jclass cls = env->FindClass("org/tiberiandawn/android/InnoExtractCompatService");
     if (!cls) return nullptr;
     jmethodID ctor = env->GetMethodID(cls, "<init>", "()V");
-    if (!ctor) return nullptr;
+    if (!ctor) {
+        env->DeleteLocalRef(cls);
+        return nullptr;
+    }
 
     jobject local = env->NewObject(cls, ctor);
+    env->DeleteLocalRef(cls);
     if (!local) return nullptr;
+
     g_service = env->NewGlobalRef(local);
     env->DeleteLocalRef(local);
     return g_service;
@@ -63,6 +110,30 @@ bool ConfigureOutputRoot(JNIEnv* env, jobject service, jstring output_directory)
     return !env->ExceptionCheck();
 }
 
+bool PrepareOnce(JNIEnv* env, jobject service, std::string& error)
+{
+    if (g_prepared) return true;
+
+    // nativePrepare stores the Java callback object and installs its stdout/
+    // stderr capture. Preserve the game's descriptors around that setup.
+    const int saved_stdout = dup(STDOUT_FILENO);
+    const int saved_stderr = dup(STDERR_FILENO);
+
+    g_prepare(env, service);
+
+    if (saved_stdout >= 0) {
+        dup2(saved_stdout, STDOUT_FILENO);
+        close(saved_stdout);
+    }
+    if (saved_stderr >= 0) {
+        dup2(saved_stderr, STDERR_FILENO);
+        close(saved_stderr);
+    }
+
+    if (CheckAndClearJavaException(env, error)) return false;
+    g_prepared = true;
+    return true;
+}
 } // namespace
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -77,110 +148,40 @@ Java_org_tiberiandawn_android_GermanPackageInstaller_nativeExtractInno(
         return Error(env, "German extractor received an empty path");
     }
 
-    void* library = dlopen("libinnoextract.so", RTLD_NOW | RTLD_LOCAL);
-    if (!library) {
-        const char* detail = dlerror();
-        return Error(env, std::string("Could not load German package extractor: ")
-            + (detail ? detail : "unknown dlopen error"));
-    }
-
-    using PrepareFn = void (*)(JNIEnv*, jobject);
-    using ExtractFn = int (*)(JNIEnv*, jobject, jint, jstring);
-
-    dlerror();
-    PrepareFn prepare = reinterpret_cast<PrepareFn>(dlsym(
-        library,
-        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativePrepare"));
-    const char* prepare_error = dlerror();
-    if (!prepare || prepare_error) {
-        std::string message = "German package extractor prepare entry point is unavailable";
-        if (prepare_error) message += std::string(": ") + prepare_error;
-        dlclose(library);
-        return Error(env, message);
-    }
-
-    dlerror();
-    ExtractFn extract = reinterpret_cast<ExtractFn>(dlsym(
-        library,
-        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativeExtract"));
-    const char* extract_error = dlerror();
-    if (!extract || extract_error) {
-        std::string message = "German package extractor entry point is unavailable";
-        if (extract_error) message += std::string(": ") + extract_error;
-        dlclose(library);
-        return Error(env, message);
-    }
+    std::string error;
+    if (!EnsureNativeLibrary(env, error)) return Error(env, error);
 
     jobject service = EnsureService(env);
     if (!service) {
-        std::string message;
-        CheckAndClearJavaException(env, message);
-        dlclose(library);
-        return Error(env, message.empty()
+        CheckAndClearJavaException(env, error);
+        return Error(env, error.empty()
             ? "German package extractor compatibility service is unavailable"
-            : message);
+            : error);
     }
 
     if (!ConfigureOutputRoot(env, service, output_directory)) {
-        std::string message;
-        CheckAndClearJavaException(env, message);
-        dlclose(library);
-        return Error(env, message.empty()
+        CheckAndClearJavaException(env, error);
+        return Error(env, error.empty()
             ? "German package extractor output directory could not be configured"
-            : message);
+            : error);
     }
 
-    if (!g_prepared) {
-        // The Android innoextract library prepares Java callback state here.
-        // It also redirects stdout/stderr. Preserve and restore our process
-        // descriptors immediately afterwards so the game keeps its own logs.
-        const int saved_stdout = dup(STDOUT_FILENO);
-        const int saved_stderr = dup(STDERR_FILENO);
-
-        prepare(env, service);
-        std::string message;
-        if (CheckAndClearJavaException(env, message)) {
-            if (saved_stdout >= 0) {
-                dup2(saved_stdout, STDOUT_FILENO);
-                close(saved_stdout);
-            }
-            if (saved_stderr >= 0) {
-                dup2(saved_stderr, STDERR_FILENO);
-                close(saved_stderr);
-            }
-            dlclose(library);
-            return Error(env, message);
-        }
-
-        if (saved_stdout >= 0) {
-            dup2(saved_stdout, STDOUT_FILENO);
-            close(saved_stdout);
-        }
-        if (saved_stderr >= 0) {
-            dup2(saved_stderr, STDERR_FILENO);
-            close(saved_stderr);
-        }
-        g_prepared = true;
-    }
+    if (!PrepareOnce(env, service, error)) return Error(env, error);
 
     const int fd = open(installer.c_str(), O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
-        dlclose(library);
         return Error(env, "German package installer could not be opened");
     }
 
-    // Important: the Android fork expects a Linux file descriptor here,
-    // not a filesystem path. Passing the path was the cause of error code 2.
-    const int result = extract(env, service, static_cast<jint>(fd), output_directory);
+    // The Android innoextract fork interprets the positional setup argument as
+    // an already-open Linux file descriptor. Its JNI wrapper supplies exactly
+    // that descriptor to its internal main().
+    const int result = g_extract(
+        env, service, static_cast<jint>(fd), output_directory);
     close(fd);
 
-    std::string java_error;
-    if (CheckAndClearJavaException(env, java_error)) {
-        dlclose(library);
-        return Error(env, java_error);
-    }
+    if (CheckAndClearJavaException(env, error)) return Error(env, error);
 
-    dlclose(library);
     if (result != 0) {
         return Error(env, "German package extractor failed with code "
             + std::to_string(result));
