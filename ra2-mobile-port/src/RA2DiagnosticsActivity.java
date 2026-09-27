@@ -418,9 +418,22 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             "gamemd.exe", "ra2md.exe", "ra2md.mix", "langmd.mix",
             "mapsmd03.mix", "movmd03.mix", "multimd.mix", "thememd.mix"
         };
-        String[] support = {"expandmd01.mix", "xyr.dll", "yuri.exe"};
         int missing = checkFileSet("Yuri Dateien", dir, critical, true);
-        checkFileSet("Yuri Dateien", dir, support, false);
+        checkFileSet("Yuri Dateien", dir, new String[]{"yuri.exe"}, false);
+
+        StringBuilder optional = new StringBuilder();
+        for (String name : new String[]{"expandmd01.mix", "xyr.dll"}) {
+            if (findIgnoreCase(dir, name, 3) == null) {
+                if (optional.length() > 0) optional.append(", ");
+                optional.append(name);
+            }
+        }
+        if (optional.length() > 0) {
+            add(Level.INFO, "Yuri Dateien", "Optionale Patch-/Zusatzdateien nicht vorhanden",
+                optional.toString(),
+                "Kein primärer Startblocker für den direkt aus den Originalmedien installierten Kernbestand.");
+        }
+
         if (missing == 0) {
             add(Level.PASS, "Yuri Dateien", "Yuri-Kernbestand vollständig",
                 critical.length + " Kernbestandteile vorhanden.", "");
@@ -527,13 +540,22 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         }
 
         if (localDll != null) {
-            add(Level.WARN, "Grafik", "Lokale ddraw.dll im Spielordner gefunden",
-                localDll.getAbsolutePath() + " • " + humanSize(localDll.length()),
-                "Eine veraltete lokale DLL kann den Winlator-CNC-DDraw-Wrapper überdecken. Der aktuelle Build ersetzt sie beim Start.");
+            String runtimeHash = runtimeDll.isFile() ? md5(runtimeDll) : "";
+            String localHash = md5(localDll);
+            if (!runtimeHash.isEmpty() && runtimeHash.equalsIgnoreCase(localHash)) {
+                add(Level.PASS, "Grafik", "Lokaler CNC-DDraw-Wrapper synchron",
+                    localDll.getAbsolutePath() + " • " + humanSize(localDll.length()) + " • MD5 " + localHash,
+                    "");
+            }
+            else {
+                add(Level.WARN, "Grafik", "Lokale ddraw.dll weicht von der Winlator-Runtime ab",
+                    localDll.getAbsolutePath() + " • " + humanSize(localDll.length()),
+                    "Spiel erneut starten; der aktuelle Build synchronisiert den Wrapper unmittelbar vor GAME.EXE/GAMEMD.EXE.");
+            }
         }
         else {
-            add(Level.PASS, "Grafik", "Keine veraltete lokale ddraw.dll erkannt",
-                "CNC-DDraw wird aus der Winlator-Laufzeit verwendet.", "");
+            add(Level.INFO, "Grafik", "Noch keine lokale ddraw.dll",
+                "Sie wird beim nächsten Spielstart aus der Winlator-Runtime synchronisiert.", "");
         }
 
         if (!ini.isFile()) {
@@ -745,8 +767,12 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
 
         File log = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/last-start.log");
         File liveLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
-        String text = log.isFile() ? FileUtils.readString(log) : "";
-        if ((text == null || text.isEmpty()) && liveLog.isFile()) text = FileUtils.readString(liveLog);
+        String finalText = log.isFile() ? FileUtils.readString(log) : "";
+        String liveText = liveLog.isFile() ? FileUtils.readString(liveLog) : "";
+        String text = (finalText == null ? "" : finalText);
+        if (liveText != null && !liveText.isEmpty()) {
+            text += "\n--- LIVE WINE TRACE ---\n" + liveText;
+        }
 
         int exit = prefs.getInt("last_exit_code", Integer.MIN_VALUE);
         boolean hasExit = prefs.contains("last_exit_code");
@@ -763,7 +789,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             }
         }
 
-        String stage = value(text, "stage=");
+        String stage = lastValue(text, "stage=");
         if (!stage.isEmpty()) {
             add(Level.INFO, "Letzter Start", "Letzte erreichte Startphase",
                 stage, "");
@@ -1009,6 +1035,15 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             if (line.startsWith(prefix)) return line.substring(prefix.length()).trim();
         }
         return "";
+    }
+
+    private String lastValue(String text, String prefix) {
+        if (text == null || text.isEmpty()) return "";
+        String result = "";
+        for (String line : text.split("\\n")) {
+            if (line.startsWith(prefix)) result = line.substring(prefix.length()).trim();
+        }
+        return result;
     }
 
     private int parseIntValue(String text, String prefix, int fallback) {
