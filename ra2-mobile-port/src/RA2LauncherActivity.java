@@ -1187,6 +1187,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         intent.putExtra("exec_args", args == null ? "" : args);
         int slash = Math.max(dosPath.lastIndexOf('\\'), dosPath.lastIndexOf('/'));
         intent.putExtra("ra2_helper_process", slash >= 0 ? dosPath.substring(slash + 1) : dosPath);
+        intent.putExtra("ra2_helper_stage", prefs.getString(KEY_STAGE, STAGE_NONE));
         intent.putExtra("ra2_mode", true);
         intent.putExtra("ra2_language", isGerman() ? "de" : "en");
         startActivity(intent);
