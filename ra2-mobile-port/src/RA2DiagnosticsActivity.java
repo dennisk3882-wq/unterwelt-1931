@@ -23,6 +23,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.winlator.container.Container;
 import com.winlator.container.ContainerManager;
 import com.winlator.core.FileUtils;
+import com.winlator.core.WineRegistryEditor;
 import com.winlator.xenvironment.RootFS;
 import com.winlator.xenvironment.RootFSInstaller;
 
@@ -177,6 +178,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 checkRa2Files();
                 checkYuriFiles();
                 checkRegistry();
+                checkWineServices();
                 checkCncDdraw();
                 checkSafeDisc();
                 checkPeDependencies(false);
@@ -518,6 +520,65 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         else {
             add(Level.FAIL, "Registry", label + " fehlt",
                 token, "Einrichtung erneut ausführen; Registry wird dabei neu geschrieben.");
+        }
+    }
+
+    private void checkWineServices() {
+        if (container == null) return;
+
+        add(container.getStartupSelection() == Container.STARTUP_SELECTION_NORMAL ? Level.PASS : Level.FAIL,
+            "Windows-Dienste",
+            "Winlator-Dienstmodus",
+            container.getStartupSelection() == Container.STARTUP_SELECTION_NORMAL
+                ? "Normal – alle benötigten Dienste"
+                : "Nicht Normal (Wert " + container.getStartupSelection() + ")",
+            container.getStartupSelection() == Container.STARTUP_SELECTION_NORMAL
+                ? ""
+                : "RA2 benötigt insbesondere RpcSs. Der aktuelle Build stellt den Container automatisch auf Normal.");
+
+        File reg = new File(container.getRootDir(), ".wine/system.reg");
+        if (!reg.isFile()) {
+            add(Level.FAIL, "Windows-Dienste", "system.reg fehlt", reg.getAbsolutePath(), "Container neu erstellen.");
+            return;
+        }
+
+        try (WineRegistryEditor editor = new WineRegistryEditor(reg)) {
+            String controlSet = editor.getSymlinkValue("System\\CurrentControlSet", "SymbolicLinkValue");
+            if (controlSet == null || controlSet.isEmpty()) controlSet = "System\\CurrentControlSet";
+
+            checkServiceStart(editor, controlSet, "RpcSs", 3, true);
+            checkServiceStart(editor, controlSet, "PlugPlay", 2, true);
+            checkServiceStart(editor, controlSet, "Eventlog", 2, true);
+            checkServiceStart(editor, controlSet, "NDIS", 2, true);
+            checkServiceStart(editor, controlSet, "nsiproxy", 2, true);
+            checkServiceStart(editor, controlSet, "MSIServer", 3, false);
+            checkServiceStart(editor, controlSet, "FontCache", 3, false);
+        }
+        catch (Exception e) {
+            add(Level.WARN, "Windows-Dienste", "Dienst-Registry konnte nicht gelesen werden",
+                String.valueOf(e.getMessage()), "Nach erneutem App-Start noch einmal prüfen.");
+        }
+    }
+
+    private void checkServiceStart(WineRegistryEditor editor, String controlSet,
+                                   String service, int expected, boolean critical) {
+        Integer actual = editor.getDwordValue(controlSet + "\\Services\\" + service, "Start");
+        if (actual == null) {
+            add(critical ? Level.FAIL : Level.WARN, "Windows-Dienste",
+                service + " nicht registriert",
+                "", "Der aktuelle Build repariert die Dienstkonfiguration vor dem Spielstart.");
+            return;
+        }
+
+        if (actual == expected) {
+            add(Level.PASS, "Windows-Dienste", service + " korrekt",
+                "Start=" + actual, "");
+        }
+        else {
+            add(critical ? Level.FAIL : Level.WARN, "Windows-Dienste",
+                service + " falsch konfiguriert",
+                "Start=" + actual + " • erwartet=" + expected,
+                "Der aktuelle Build setzt diesen Dienst vor dem Spielstart automatisch korrekt.");
         }
     }
 
@@ -1012,6 +1073,8 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             return "CNC-DDraw-Konfiguration und ddraw.dll prüfen.";
         if (lower.contains("access denied") || lower.contains("permission"))
             return "Dateizugriff bzw. Wine-Pfade prüfen.";
+        if (lower.contains("rpcss") || lower.contains("rpc_s_server_unavailable"))
+            return "RpcSs/Windows-Dienste prüfen. RA2 benötigt den normalen Winlator-Dienstmodus.";
         if (lower.contains("secdrv") || lower.contains("safedisc"))
             return "SafeDisc-Treiberpfad prüfen; Yuri enthält eine neuere secdrv.sys-Version.";
         if (lower.contains("registry"))
