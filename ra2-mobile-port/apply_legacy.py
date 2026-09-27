@@ -119,8 +119,24 @@ def patch_build_gradle(root: Path) -> None:
     p = root / "app/build.gradle"
     require(p)
     s = read(p)
+    s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
     s = s.replace("versionCode 16", "versionCode 215")
     s = s.replace('versionName "7.1"', 'versionName "0.15.0-ra2-legacy"')
+    s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
+    s = s.replace("""    ndkVersion '22.1.7171670'
+
+    externalNativeBuild {
+        cmake {
+            version '3.22.1'
+            path 'src/main/cpp/CMakeLists.txt'
+        }
+    }
+""", """    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+""")
     write(p, s)
 
 def patch_manifest(root: Path) -> None:
