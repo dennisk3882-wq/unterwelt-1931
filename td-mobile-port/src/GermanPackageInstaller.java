@@ -10,8 +10,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-import uk.co.armedpineapple.innoextract.service.ExtractService;
-
 /**
  * Applies the verified German C&C95 community resources on top of a valid
  * baseline Tiberian Dawn installation.
@@ -39,7 +37,10 @@ public final class GermanPackageInstaller {
             && movies.isFile() && movies.length() > 100_000_000L;
     }
 
-public static void install(Context context,
+    private static native String nativeExtractInno(String installerPath,
+                                                    String outputDirectory);
+
+    public static void install(Context context,
                                File coreInstaller,
                                File videoInstaller,
                                Progress progress)
@@ -50,6 +51,8 @@ public static void install(Context context,
         if (!AndroidGameData.isInstalled(context)) {
             throw new IOException("Baseline game data is not installed");
         }
+
+        GameDataImportActivity.ensureNativeLibrariesForDataTools();
 
         File extractRoot = new File(context.getCacheDir(), "german-data-extract");
         deleteTree(extractRoot);
@@ -144,14 +147,14 @@ public static void install(Context context,
         if (installer == null || !installer.isFile()) {
             throw new IOException("German installer package is missing");
         }
-        final int result;
+        String error;
         try {
-            result = new ExtractService().extract(installer, output);
+            error = nativeExtractInno(installer.getAbsolutePath(), output.getAbsolutePath());
         } catch (UnsatisfiedLinkError problem) {
             throw new IOException("German package extractor is unavailable", problem);
         }
-        if (result != 0) {
-            throw new IOException("German package extractor failed with code " + result);
+        if (error != null && !error.trim().isEmpty()) {
+            throw new IOException(error.trim());
         }
     }
 
