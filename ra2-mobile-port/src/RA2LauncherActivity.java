@@ -225,8 +225,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         yuriIsoButton.setText(slotText(KEY_YURI, de ? "Yuri’s Rache auswählen" : "Select Yuri’s Revenge"));
 
         storageHint.setText(de
-            ? "Die ISO wird nur während der Einrichtung temporär in den App-Bereich kopiert. Die entpackten CD-Daten bleiben als virtuelles Laufwerk X: erhalten, damit Originalvideos und CD-Abfragen funktionieren."
-            : "The ISO is copied to private app storage only while it is being prepared. Extracted disc data remains as virtual drive X: for original movies and disc checks.");
+            ? "Die ISO wird während der Einrichtung temporär in den App-Bereich kopiert und direkt von Android gelesen. Die CD-Daten bleiben als virtuelles Laufwerk X: erhalten, damit Originalvideos und CD-Abfragen funktionieren."
+            : "The ISO is copied temporarily into private app storage and read directly by Android. Disc data remains as virtual drive X: for original movies and disc checks.");
 
         installRa2Button.setText(de ? "Alarmstufe Rot 2 einrichten" : "Set up Red Alert 2");
         installYuriButton.setText(de ? "Yuri’s Rache einrichten" : "Set up Yuri’s Revenge");
@@ -433,7 +433,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
     private void copyAndExtract(Uri source, String stage) {
         File staging = stagingIso();
-        setBusy(true, isGerman() ? "ISO wird vorbereitet…" : "Preparing ISO…");
+        setBusy(true, isGerman() ? "ISO wird in den App-Speicher kopiert…" : "Copying ISO into app storage…");
         ioExecutor.execute(() -> {
             try {
                 long sourceSize = querySize(source);
@@ -443,6 +443,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                         ? "Nicht genug freier Speicher für die temporäre ISO-Kopie."
                         : "Not enough free space for the temporary ISO copy.");
                 }
+
                 File parent = staging.getParentFile();
                 if (!parent.isDirectory()) parent.mkdirs();
                 FileUtils.delete(staging);
@@ -459,24 +460,49 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                         copied += read;
                         long finalCopied = copied;
                         if (sourceSize > 0) {
-                            runOnUiThread(() -> progress.setProgress((int)Math.min(1000, finalCopied * 1000L / sourceSize)));
+                            runOnUiThread(() ->
+                                progress.setProgress((int)Math.min(400, finalCopied * 400L / sourceSize)));
                         }
                     }
                     out.flush();
                 }
 
+                runOnUiThread(() ->
+                    status.setText(isGerman()
+                        ? "CD-Daten werden direkt unter Android vorbereitet…"
+                        : "Preparing disc files directly on Android…"));
+
+                final String[] lastShownName = {""};
+                Iso9660Extractor.extract(staging, driveX(), (done, imageBytes, currentName) -> {
+                    int extractionProgress = imageBytes > 0
+                        ? (int)Math.min(600, done * 600L / imageBytes)
+                        : 0;
+                    if (!currentName.equals(lastShownName[0])) {
+                        lastShownName[0] = currentName;
+                        runOnUiThread(() -> {
+                            progress.setProgress(400 + extractionProgress);
+                            status.setText((isGerman() ? "Entpacke: " : "Extracting: ") + currentName);
+                        });
+                    }
+                    else {
+                        runOnUiThread(() -> progress.setProgress(400 + extractionProgress));
+                    }
+                });
+
+                FileUtils.delete(staging);
+
                 runOnUiThread(() -> {
                     prefs.edit().putString(KEY_STAGE, stage).apply();
-                    setBusy(false, isGerman() ? "CD wird in X: vorbereitet…" : "Preparing disc in X:…");
-                    String args = "x \"C:\\RA2Mobile\\staging.iso\" -o\"X:\\\" -y -aoa";
-                    launchRuntimeDos("Z:\\opt\\apps\\7-Zip\\7zG.exe", args);
+                    progress.setProgress(1000);
+                    status.setText(isGerman() ? "CD vorbereitet." : "Disc prepared.");
+                    continuePipeline(stage);
                 });
             }
             catch (Exception e) {
                 FileUtils.delete(staging);
                 runOnUiThread(() -> {
                     prefs.edit().putString(KEY_STAGE, STAGE_NONE).apply();
-                    setBusy(false, (isGerman() ? "Fehler: " : "Error: ") + e.getMessage());
+                    setBusy(false, (isGerman() ? "ISO-Fehler: " : "ISO error: ") + e.getMessage());
                 });
             }
         });
