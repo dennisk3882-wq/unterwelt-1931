@@ -8,14 +8,8 @@
 
 namespace {
 std::mutex g_inno_mutex;
-jobject g_service = nullptr;
+void* g_inno_library = nullptr;
 bool g_prepared = false;
-void* g_library = nullptr;
-
-using PrepareFn = void (*)(JNIEnv*, jobject);
-using ExtractFn = int (*)(JNIEnv*, jobject, jint, jstring);
-PrepareFn g_prepare = nullptr;
-ExtractFn g_extract = nullptr;
 
 std::string FromJava(JNIEnv* env, jstring value)
 {
@@ -32,156 +26,118 @@ jstring Error(JNIEnv* env, const std::string& message)
     return env->NewStringUTF(message.c_str());
 }
 
-bool CheckAndClearJavaException(JNIEnv* env, std::string& message)
+bool EnsureLibrary(JNIEnv* env, std::string& error)
 {
-    if (!env->ExceptionCheck()) return false;
-    env->ExceptionDescribe();
-    env->ExceptionClear();
-    message = "German package extractor Java compatibility layer failed";
-    return true;
-}
+    if (g_inno_library) return true;
 
-bool EnsureNativeLibrary(JNIEnv* env, std::string& error)
-{
-    if (g_library && g_prepare && g_extract) return true;
-
-    g_library = dlopen("libinnoextract.so", RTLD_NOW | RTLD_LOCAL);
-    if (!g_library) {
+    g_inno_library = dlopen("libinnoextract.so", RTLD_NOW | RTLD_LOCAL);
+    if (!g_inno_library) {
         const char* detail = dlerror();
         error = std::string("Could not load German package extractor: ")
             + (detail ? detail : "unknown dlopen error");
         return false;
     }
-
-    dlerror();
-    g_prepare = reinterpret_cast<PrepareFn>(dlsym(
-        g_library,
-        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativePrepare"));
-    const char* prepare_error = dlerror();
-    if (!g_prepare || prepare_error) {
-        error = "German package extractor prepare entry point is unavailable";
-        if (prepare_error) error += std::string(": ") + prepare_error;
-        return false;
-    }
-
-    dlerror();
-    g_extract = reinterpret_cast<ExtractFn>(dlsym(
-        g_library,
-        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativeExtract"));
-    const char* extract_error = dlerror();
-    if (!g_extract || extract_error) {
-        error = "German package extractor entry point is unavailable";
-        if (extract_error) error += std::string(": ") + extract_error;
-        return false;
-    }
     return true;
 }
-
-jobject EnsureService(JNIEnv* env)
-{
-    if (g_service) return g_service;
-
-    jclass cls = env->FindClass("org/tiberiandawn/android/InnoExtractCompatService");
-    if (!cls) return nullptr;
-    jmethodID ctor = env->GetMethodID(cls, "<init>", "()V");
-    if (!ctor) {
-        env->DeleteLocalRef(cls);
-        return nullptr;
-    }
-
-    jobject local = env->NewObject(cls, ctor);
-    env->DeleteLocalRef(cls);
-    if (!local) return nullptr;
-
-    g_service = env->NewGlobalRef(local);
-    env->DeleteLocalRef(local);
-    return g_service;
 }
-
-bool ConfigureOutputRoot(JNIEnv* env, jobject service, jstring output_directory)
-{
-    jclass cls = env->GetObjectClass(service);
-    if (!cls) return false;
-    jmethodID method = env->GetMethodID(cls, "setOutputRoot", "(Ljava/lang/String;)V");
-    env->DeleteLocalRef(cls);
-    if (!method) return false;
-
-    env->CallVoidMethod(service, method, output_directory);
-    return !env->ExceptionCheck();
-}
-
-bool PrepareOnce(JNIEnv* env, jobject service, std::string& error)
-{
-    if (g_prepared) return true;
-
-    // nativePrepare stores the Java callback object and installs its stdout/
-    // stderr capture. Preserve the game's descriptors around that setup.
-    const int saved_stdout = dup(STDOUT_FILENO);
-    const int saved_stderr = dup(STDERR_FILENO);
-
-    g_prepare(env, service);
-
-    if (saved_stdout >= 0) {
-        dup2(saved_stdout, STDOUT_FILENO);
-        close(saved_stdout);
-    }
-    if (saved_stderr >= 0) {
-        dup2(saved_stderr, STDERR_FILENO);
-        close(saved_stderr);
-    }
-
-    if (CheckAndClearJavaException(env, error)) return false;
-    g_prepared = true;
-    return true;
-}
-} // namespace
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_org_tiberiandawn_android_GermanPackageInstaller_nativeExtractInno(
-    JNIEnv* env, jclass, jstring installer_path, jstring output_directory)
+    JNIEnv* env, jclass, jstring installer_path, jstring output_directory,
+    jobject compat_service)
 {
     std::lock_guard<std::mutex> guard(g_inno_mutex);
 
     const std::string installer = FromJava(env, installer_path);
     const std::string output = FromJava(env, output_directory);
-    if (installer.empty() || output.empty()) {
-        return Error(env, "German extractor received an empty path");
+    if (installer.empty() || output.empty() || !compat_service) {
+        return Error(env, "German extractor received invalid parameters");
     }
 
-    std::string error;
-    if (!EnsureNativeLibrary(env, error)) return Error(env, error);
-
-    jobject service = EnsureService(env);
-    if (!service) {
-        CheckAndClearJavaException(env, error);
-        return Error(env, error.empty()
-            ? "German package extractor compatibility service is unavailable"
-            : error);
+    std::string load_error;
+    if (!EnsureLibrary(env, load_error)) {
+        return Error(env, load_error);
     }
 
-    if (!ConfigureOutputRoot(env, service, output_directory)) {
-        CheckAndClearJavaException(env, error);
-        return Error(env, error.empty()
-            ? "German package extractor output directory could not be configured"
-            : error);
+    using NativePrepare = void (*)(JNIEnv*, jobject);
+    using NativeExtract = int (*)(JNIEnv*, jobject, jint, jstring);
+
+    dlerror();
+    auto native_prepare = reinterpret_cast<NativePrepare>(dlsym(
+        g_inno_library,
+        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativePrepare"));
+    const char* prepare_error = dlerror();
+    if (!native_prepare || prepare_error) {
+        return Error(env, std::string("German extractor prepare entry point unavailable: ")
+            + (prepare_error ? prepare_error : "unknown symbol error"));
     }
 
-    if (!PrepareOnce(env, service, error)) return Error(env, error);
+    dlerror();
+    auto native_extract = reinterpret_cast<NativeExtract>(dlsym(
+        g_inno_library,
+        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativeExtract"));
+    const char* extract_error = dlerror();
+    if (!native_extract || extract_error) {
+        return Error(env, std::string("German extractor entry point unavailable: ")
+            + (extract_error ? extract_error : "unknown symbol error"));
+    }
 
+    // The Android innoextract port deliberately expects the setup executable
+    // as an already-open Linux file descriptor. Passing a normal pathname
+    // makes its Android loader parse atoi(filename) and results in exit code 2.
     const int fd = open(installer.c_str(), O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
-        return Error(env, "German package installer could not be opened");
+        return Error(env, "Could not open downloaded German installer");
     }
 
-    // The Android innoextract fork interprets the positional setup argument as
-    // an already-open Linux file descriptor. Its JNI wrapper supplies exactly
-    // that descriptor to its internal main().
-    const int result = g_extract(
-        env, service, static_cast<jint>(fd), output_directory);
+    if (!g_prepared) {
+        // nativePrepare stores a global reference to this compatibility object.
+        // GermanPackageInstaller reuses one process-wide service object so the
+        // callbacks remain valid for both the core and video package.
+        native_prepare(env, compat_service);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            close(fd);
+            return Error(env, "German extractor could not initialise Android callbacks");
+        }
+        g_prepared = true;
+    }
+
+    // Configure the Java callback object for this package's private output dir.
+    jclass service_class = env->GetObjectClass(compat_service);
+    if (!service_class) {
+        close(fd);
+        return Error(env, "German extractor callback class unavailable");
+    }
+    jmethodID set_output_root = env->GetMethodID(
+        service_class, "setOutputRoot", "(Ljava/lang/String;)V");
+    if (!set_output_root) {
+        env->DeleteLocalRef(service_class);
+        close(fd);
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        return Error(env, "German extractor output callback unavailable");
+    }
+    env->CallVoidMethod(compat_service, set_output_root, output_directory);
+    env->DeleteLocalRef(service_class);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        close(fd);
+        return Error(env, "German extractor could not configure its output directory");
+    }
+
+    int result = -1;
+    try {
+        result = native_extract(env, compat_service, static_cast<jint>(fd), output_directory);
+    } catch (...) {
+        close(fd);
+        return Error(env, "German package extractor terminated unexpectedly");
+    }
     close(fd);
 
-    if (CheckAndClearJavaException(env, error)) return Error(env, error);
-
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return Error(env, "German package extractor raised an Android exception");
+    }
     if (result != 0) {
         return Error(env, "German package extractor failed with code "
             + std::to_string(result));
