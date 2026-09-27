@@ -809,19 +809,37 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     }
 
     private void tuneCncDdraw() {
-        File ini = new File(container.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
-        if (!ini.isFile()) return;
-        String cfg = FileUtils.readString(ini);
-        if (cfg == null || cfg.isEmpty()) return;
+        File globalIni = new File(container.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
+        if (globalIni.isFile()) {
+            String cfg = FileUtils.readString(globalIni);
+            if (cfg != null && !cfg.isEmpty()) {
+                cfg = replaceConfig(cfg, "renderer", "opengl");
+                cfg = replaceConfig(cfg, "windowed", "false");
+                cfg = replaceConfig(cfg, "fullscreen", "true");
+                cfg = replaceConfig(cfg, "nonexclusive", "true");
+                cfg = replaceConfig(cfg, "singlecpu", "true");
+                cfg = replaceConfig(cfg, "maxfps", "60");
+                cfg = replaceConfig(cfg, "adjmouse", "true");
+                cfg = replaceConfig(cfg, "maintas", "true");
+                FileUtils.writeString(globalIni, cfg);
+                FileUtils.copy(globalIni, new File(gameDir(), "ddraw.ini"));
+            }
+        }
 
-        cfg = replaceConfig(cfg, "renderer", "opengl");
-        cfg = replaceConfig(cfg, "windowed", "true");
-        cfg = replaceConfig(cfg, "fullscreen", "false");
-        cfg = replaceConfig(cfg, "nonexclusive", "true");
-        cfg = replaceConfig(cfg, "singlecpu", "true");
-        cfg = replaceConfig(cfg, "maxfps", "60");
-        cfg = replaceConfig(cfg, "adjmouse", "true");
-        FileUtils.writeString(ini, cfg);
+        File systemDdraw = new File(container.getRootDir(), ".wine/drive_c/windows/syswow64/ddraw.dll");
+        if (systemDdraw.isFile()) {
+            FileUtils.copy(systemDdraw, new File(gameDir(), "ddraw.dll"));
+        }
+
+        File ra2Ini = new File(gameDir(), "RA2.INI");
+        if (!ra2Ini.isFile()) {
+            FileUtils.writeString(ra2Ini,
+                "[Video]\\n" +
+                "ScreenWidth=1024\\n" +
+                "ScreenHeight=768\\n" +
+                "VideoBackBuffer=no\\n" +
+                "AllowHiResModes=yes\\n");
+        }
     }
 
     private String replaceConfig(String cfg, String key, String value) {
@@ -917,14 +935,51 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         long seconds = Math.max(0L, (System.currentTimeMillis() - started) / 1000L);
         prefs.edit().remove(KEY_LAST_GAME_LAUNCH).remove(KEY_LAST_GAME_LAUNCH_AT).apply();
 
-        if (seconds < 20L) {
-            status.setText(isGerman()
-                ? last + " wurde nach " + seconds + " s beendet. Falls kein Spielbild erschien, ist der Start fehlgeschlagen."
-                : last + " exited after " + seconds + " s. If no game screen appeared, startup failed.");
+        File diagnostic = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/last-start.log");
+        String diag = diagnostic.isFile() ? FileUtils.readString(diagnostic) : "";
+        String exitCode = diagnosticValue(diag, "exit=");
+        String child = diagnosticValue(diag, "sawGameChild=");
+        String clue = diagnosticClue(diag);
+
+        StringBuilder message = new StringBuilder();
+        if (isGerman()) {
+            message.append(last).append(" wurde nach ").append(seconds).append(" s beendet.");
+            if (!exitCode.isEmpty()) message.append(" Exit-Code ").append(exitCode).append(".");
+            if ("false".equalsIgnoreCase(child)) message.append(" Kein laufender GAME.EXE-Unterprozess wurde erkannt.");
+            if (!clue.isEmpty()) message.append(" Diagnose: ").append(clue);
         }
         else {
-            status.setText(isGerman() ? last + " wurde beendet." : last + " exited.");
+            message.append(last).append(" exited after ").append(seconds).append(" s.");
+            if (!exitCode.isEmpty()) message.append(" Exit code ").append(exitCode).append(".");
+            if ("false".equalsIgnoreCase(child)) message.append(" No running GAME.EXE child process was detected.");
+            if (!clue.isEmpty()) message.append(" Diagnostic: ").append(clue);
         }
+        status.setText(message.toString());
+    }
+
+    private String diagnosticValue(String text, String prefix) {
+        if (text == null || text.isEmpty()) return "";
+        String[] lines = text.split("\\n");
+        for (String line : lines) {
+            if (line.startsWith(prefix)) return line.substring(prefix.length()).trim();
+        }
+        return "";
+    }
+
+    private String diagnosticClue(String text) {
+        if (text == null || text.isEmpty()) return "";
+        String[] lines = text.split("\\n");
+        for (int i = lines.length - 1; i >= 0; i--) {
+            String line = lines[i].trim();
+            String lower = line.toLowerCase(Locale.ENGLISH);
+            if (lower.contains("err:") || lower.contains("exception") ||
+                lower.contains("failed") || lower.contains("cannot") ||
+                lower.contains("missing") || lower.contains("not found")) {
+                if (line.length() > 180) line = line.substring(0, 180);
+                return line;
+            }
+        }
+        return "";
     }
 
     private void stopPipeline(String text) {
@@ -975,6 +1030,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         intent.putExtra("container_id", container.id);
         intent.putExtra("exec_path", exe.getAbsolutePath());
         intent.putExtra("ra2_mode", true);
+        intent.putExtra("ra2_game_launch", true);
         intent.putExtra("ra2_language", isGerman() ? "de" : "en");
         startActivity(intent);
     }
