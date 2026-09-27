@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.10-final
+# build-version: 0.10-final2
 
 on:
   push:
