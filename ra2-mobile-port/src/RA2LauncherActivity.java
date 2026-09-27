@@ -983,10 +983,12 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         if (container == null) return;
         ioExecutor.execute(() -> {
             File driveC = new File(container.getRootDir(), ".wine/drive_c");
-            File ra2 = findIgnoreCase(driveC, "ra2.exe", 10);
-            if (ra2 == null) ra2 = findIgnoreCase(driveC, "game.exe", 10);
-            File yuri = findIgnoreCase(driveC, "ra2md.exe", 10);
-            if (yuri == null) yuri = findIgnoreCase(driveC, "gamemd.exe", 10);
+            File ra2Found = findIgnoreCase(driveC, "ra2.exe", 10);
+            if (ra2Found == null) ra2Found = findIgnoreCase(driveC, "game.exe", 10);
+            File yuriFound = findIgnoreCase(driveC, "ra2md.exe", 10);
+            if (yuriFound == null) yuriFound = findIgnoreCase(driveC, "gamemd.exe", 10);
+            final File ra2 = ra2Found;
+            final File yuri = yuriFound;
 
             SharedPreferences.Editor edit = prefs.edit();
             if (ra2 != null) edit.putString(KEY_RA2_EXE, ra2.getAbsolutePath());
