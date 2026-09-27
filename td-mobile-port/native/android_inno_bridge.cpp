@@ -1,5 +1,7 @@
 #include <jni.h>
 #include <dlfcn.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <mutex>
 #include <string>
@@ -7,6 +9,7 @@
 namespace {
 std::mutex g_inno_mutex;
 void* g_inno_library = nullptr;
+bool g_inno_prepared = false;
 
 std::string FromJava(JNIEnv* env, jstring value)
 {
@@ -56,47 +59,56 @@ Java_org_tiberiandawn_android_GermanPackageInstaller_nativeExtractInno(
         return Error(env, load_error);
     }
 
-    // innoextract-android v3.2.0 exposes the same JNI entry points used by
-    // its original ExtractService. Unlike v4, this release accepts normal
-    // filesystem paths, which is exactly what we have in app-private storage.
-    using NativeInit = void (*)(JNIEnv*, jobject);
-    using NativeDoExtract = int (*)(JNIEnv*, jobject, jstring, jstring);
+    // alanwoolley/innoextract-android expects the input installer as an
+    // already-open Linux file descriptor. The numeric fd is passed into
+    // innoextract's Android stream adapter by its JNI nativeExtract method.
+    using NativePrepare = void (*)(JNIEnv*, jobject);
+    using NativeExtract = int (*)(JNIEnv*, jobject, jint, jstring);
 
     dlerror();
-    auto native_init = reinterpret_cast<NativeInit>(dlsym(
+    auto native_prepare = reinterpret_cast<NativePrepare>(dlsym(
         g_inno_library,
-        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativeInit"));
-    const char* init_error = dlerror();
-    if (!native_init || init_error) {
-        return Error(env, std::string("German extractor init entry point unavailable: ")
-            + (init_error ? init_error : "unknown symbol error"));
+        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativePrepare"));
+    const char* prepare_error = dlerror();
+    if (!native_prepare || prepare_error) {
+        return Error(env, std::string("German extractor prepare entry point unavailable: ")
+            + (prepare_error ? prepare_error : "unknown symbol error"));
     }
 
     dlerror();
-    auto native_extract = reinterpret_cast<NativeDoExtract>(dlsym(
+    auto native_extract = reinterpret_cast<NativeExtract>(dlsym(
         g_inno_library,
-        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativeDoExtract"));
+        "Java_uk_co_armedpineapple_innoextract_service_ExtractService_nativeExtract"));
     const char* extract_error = dlerror();
     if (!native_extract || extract_error) {
         return Error(env, std::string("German extractor entry point unavailable: ")
             + (extract_error ? extract_error : "unknown symbol error"));
     }
 
-    // Match the v3.2 ExtractService lifecycle: initialise immediately before
-    // each extraction, then hand the private app paths to nativeDoExtract.
-    native_init(env, compat_service);
-    if (env->ExceptionCheck()) {
-        env->ExceptionClear();
-        return Error(env, "German extractor could not initialise its callbacks");
+    if (!g_inno_prepared) {
+        native_prepare(env, compat_service);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            return Error(env, "German extractor could not initialise its callbacks");
+        }
+        g_inno_prepared = true;
+    }
+
+    int fd = open(installer.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+        return Error(env, "German installer could not be opened");
     }
 
     int result = -1;
     try {
-        result = native_extract(
-            env, compat_service, installer_path, output_directory);
+        result = native_extract(env, compat_service, static_cast<jint>(fd),
+                                output_directory);
     } catch (...) {
+        close(fd);
         return Error(env, "German package extractor terminated unexpectedly");
     }
+
+    close(fd);
 
     if (env->ExceptionCheck()) {
         env->ExceptionClear();
