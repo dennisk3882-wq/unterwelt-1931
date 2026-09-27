@@ -403,7 +403,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             String controlSet = registry.getSymlinkValue("System\\CurrentControlSet", "SymbolicLinkValue");
             if (controlSet == null || controlSet.isEmpty()) controlSet = "System\\CurrentControlSet";
 
-            registry.setDwordValue(controlSet + "\\Services\\RpcSs", "Start", 3);
+            registry.setDwordValue(controlSet + "\\Services\\RpcSs", "Start", 2);
             registry.setDwordValue(controlSet + "\\Services\\PlugPlay", "Start", 2);
             registry.setDwordValue(controlSet + "\\Services\\Eventlog", "Start", 2);
             registry.setDwordValue(controlSet + "\\Services\\NDIS", "Start", 2);
@@ -1185,6 +1185,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         intent.putExtra("container_id", container.id);
         intent.putExtra("exec_dos_path", dosPath);
         intent.putExtra("exec_args", args == null ? "" : args);
+        int slash = Math.max(dosPath.lastIndexOf('\\'), dosPath.lastIndexOf('/'));
+        intent.putExtra("ra2_helper_process", slash >= 0 ? dosPath.substring(slash + 1) : dosPath);
         intent.putExtra("ra2_mode", true);
         intent.putExtra("ra2_language", isGerman() ? "de" : "en");
         startActivity(intent);
