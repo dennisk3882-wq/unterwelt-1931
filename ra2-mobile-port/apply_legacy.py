@@ -88,8 +88,15 @@ def copy_sources_legacy(root: Path) -> None:
                 box86.getAbsolutePath(), "");
         }
         else {
-            add(Level.FAIL, "32-Bit-Laufzeit", "Box86 fehlt",
-                box86.getAbsolutePath(), "32-Bit-x86-Übersetzung fehlt.");
+            boolean gameAttempted = prefs.contains("last_exit_code") ||
+                prefs.getBoolean("last_saw_child", false);
+            add(gameAttempted ? Level.FAIL : Level.INFO,
+                "32-Bit-Laufzeit",
+                gameAttempted ? "Box86 wurde beim Spielstart nicht entpackt" : "Box86 noch nicht entpackt",
+                box86.getAbsolutePath(),
+                gameAttempted
+                    ? "Legacy-Start konnte Box86 nicht bereitstellen."
+                    : "Normal vor dem ersten RA2/Yuri-Spielstart; Winlator entpackt Box86 automatisch beim ersten Legacy-x86-Start.");
         }
     }
 
@@ -163,10 +170,8 @@ def copy_sources_legacy(root: Path) -> None:
             if helper not in text:
                 text = text.replace(marker, helper + marker, 1)
 
-            # Console 7-Zip is more deterministic than the GUI extractor and returns
-            # an exit status when extraction is actually finished.
-            text = text.replace("Z:\\\\opt\\\\apps\\\\7-Zip\\\\7zG.exe",
-                                "Z:\\\\opt\\\\apps\\\\7-Zip\\\\7z.exe")
+            # Keep Winlator 7.1's bundled 7zG.exe. The setup helper itself runs
+            # temporarily in WoW64 mode; the actual RA2/Yuri game returns to Box86/x86.
 
         # Wine 7.1's WineRegistryEditor has no getSymlinkValue(); CurrentControlSet is directly addressable.
         text = text.replace(
@@ -182,8 +187,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 216")
-    s = s.replace('versionName "7.1"', 'versionName "0.16.0-ra2-legacy"')
+    s = s.replace("versionCode 16", "versionCode 217")
+    s = s.replace('versionName "7.1"', 'versionName "0.17.0-ra2-legacy"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
