@@ -115,6 +115,59 @@ def copy_sources_legacy(root: Path) -> None:
                 '"sc.exe meldet RpcSs als laufend, das Wine-Log enthält aber einen RPC-Abbruch (6ba/6be).",'
             )
 
+        if name == "RA2LauncherActivity.java":
+            text = text.replace(
+                """        if (prefs.getBoolean(KEY_RUNTIME_OUTSTANDING, false) && !runtimeStarting) {
+            prefs.edit().putBoolean(KEY_RUNTIME_OUTSTANDING, false).apply();
+            continuePipeline(prefs.getString(KEY_STAGE, STAGE_NONE));
+""",
+                """        if (prefs.getBoolean(KEY_RUNTIME_OUTSTANDING, false) && !runtimeStarting) {
+            prefs.edit().putBoolean(KEY_RUNTIME_OUTSTANDING, false).apply();
+            restoreLegacyGameMode();
+            continuePipeline(prefs.getString(KEY_STAGE, STAGE_NONE));
+""")
+
+            text = text.replace(
+                """    private void launchRuntimeDos(String dosPath, String args) {
+        runtimeStarting = true;
+""",
+                """    private void launchRuntimeDos(String dosPath, String args) {
+        // Winlator 7.1 bundles helper apps such as 7-Zip for the 64-bit Wine path.
+        // Use WoW64 only for setup helpers; RA2/Yuri are switched back to Box86/x86.
+        if (container != null) {
+            container.setWoW64Mode(true);
+            container.saveData();
+        }
+        runtimeStarting = true;
+""")
+
+            text = text.replace(
+                """    private void launchGame(boolean yuri) {
+        if (container == null) return;
+""",
+                """    private void launchGame(boolean yuri) {
+        if (container == null) return;
+        restoreLegacyGameMode();
+""")
+
+            helper = """    private void restoreLegacyGameMode() {
+        if (container == null) return;
+        if (container.isWoW64Mode()) {
+            container.setWoW64Mode(false);
+            container.saveData();
+        }
+    }
+
+"""
+            marker = "    private void launchGame(boolean yuri) {"
+            if helper not in text:
+                text = text.replace(marker, helper + marker, 1)
+
+            # Console 7-Zip is more deterministic than the GUI extractor and returns
+            # an exit status when extraction is actually finished.
+            text = text.replace("Z:\\\\opt\\\\apps\\\\7-Zip\\\\7zG.exe",
+                                "Z:\\\\opt\\\\apps\\\\7-Zip\\\\7z.exe")
+
         # Wine 7.1's WineRegistryEditor has no getSymlinkValue(); CurrentControlSet is directly addressable.
         text = text.replace(
             r'editor.getSymlinkValue("System\\CurrentControlSet", "SymbolicLinkValue")',
@@ -808,7 +861,7 @@ def patch_midi_compat(root: Path) -> None:
 
 def validate(root: Path) -> None:
     expected = {
-        root / "app/src/main/java/com/winlator/RA2LauncherActivity.java": "setWoW64Mode(false)",
+        root / "app/src/main/java/com/winlator/RA2LauncherActivity.java": "restoreLegacyGameMode",
         root / "app/src/main/java/com/winlator/RA2DiagnosticsActivity.java": "Legacy-x86-Modus aktiv",
         root / "app/src/main/java/com/winlator/XServerDisplayActivity.java": "legacy-x86-start",
         root / "app/src/main/java/com/winlator/widget/TouchpadView.java": "setRtsMode",
