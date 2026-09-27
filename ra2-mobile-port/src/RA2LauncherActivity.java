@@ -601,7 +601,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             String[] recommended = {
                 "binkw32.dll", "blowfish.dll", "blowfish.tlb", "drvmgt.dll",
                 "mph.exe", "patchget.dat", "patchw32.dll", "ra2.exe",
-                "ra2.lcf", "ra2.tlb", "woldatA.key"
+                "ra2.lcf", "ra2.tlb"
             };
 
             if (game == null || ra2Mix == null || languageMix == null) {
@@ -631,15 +631,23 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                 .putString(KEY_STAGE, STAGE_NONE)
                 .apply();
             FileUtils.delete(ra2CabDir());
+            File secdrv = new File(container.getRootDir(), ".wine/drive_c/windows/system32/drivers/secdrv.sys");
             if (optionalMissing.length() == 0) {
-                setBusy(false, isGerman()
-                    ? "Alarmstufe Rot 2 vollständig aus den Original-CDs installiert."
-                    : "Red Alert 2 fully installed from the original discs.");
+                if (!secdrv.isFile() && savedUri(KEY_YURI) != null) {
+                    setBusy(false, isGerman()
+                        ? "RA2-Dateien vollständig. Die Original-CD nutzt SafeDisc; richte jetzt Yuri’s Rache ein, damit ein vorhandener neuerer secdrv.sys-Treiber aus deinem Yuri-Medium übernommen werden kann."
+                        : "RA2 files are complete. The original CD uses SafeDisc; set up Yuri’s Revenge next so a newer secdrv.sys driver from your Yuri media can be installed if present.");
+                }
+                else {
+                    setBusy(false, isGerman()
+                        ? "Alarmstufe Rot 2 vollständig aus den Original-CDs installiert."
+                        : "Red Alert 2 fully installed from the original discs.");
+                }
             }
             else {
                 setBusy(false, (isGerman()
-                    ? "RA2 installiert. Zusätzliche Originaldateien fehlen: "
-                    : "RA2 installed. Additional original files missing: ") + optionalMissing);
+                    ? "RA2 installiert. Zusätzliche Kompatibilitätsdateien fehlen: "
+                    : "RA2 installed. Additional compatibility files missing: ") + optionalMissing);
             }
             refreshGameState();
             return;
