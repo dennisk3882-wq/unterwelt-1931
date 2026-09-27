@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: brunodev85/winlator-app
-          ref: 96504ff
+          ref: 96504ff4ef34a9cbad9d03d70d1f420fcb8338ec
           path: upstream
           lfs: true
 
