@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.7
+# build-version: 0.8
 
 on:
   push:
@@ -41,6 +41,8 @@ jobs:
           grep -q 'setRtsMode' upstream/app/src/main/java/com/winlator/widget/TouchpadView.java
           grep -q 'exec_dos_path' upstream/app/src/main/java/com/winlator/XServerDisplayActivity.java
           grep -q 'ddrawWrapper=cnc-ddraw' upstream/app/src/main/java/com/winlator/RA2LauncherActivity.java
+          grep -q 'RA2DiagnosticsActivity' upstream/app/src/main/AndroidManifest.xml
+          test -s upstream/app/src/main/java/com/winlator/RA2DiagnosticsActivity.java
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
