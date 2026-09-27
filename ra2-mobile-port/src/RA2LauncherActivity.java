@@ -53,6 +53,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private static final String KEY_YURI_EXE = "yuri_exe";
     private static final String KEY_STAGE = "pipeline_stage";
     private static final String KEY_RUNTIME_OUTSTANDING = "runtime_outstanding";
+    private static final String KEY_LAST_GAME_LAUNCH = "last_game_launch";
+    private static final String KEY_LAST_GAME_LAUNCH_AT = "last_game_launch_at";
 
     private static final String STAGE_NONE = "";
     private static final String STAGE_RA2_ALLIED = "ra2_allied";
@@ -105,6 +107,9 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         if (prefs.getBoolean(KEY_RUNTIME_OUTSTANDING, false) && !runtimeStarting) {
             prefs.edit().putBoolean(KEY_RUNTIME_OUTSTANDING, false).apply();
             continuePipeline(prefs.getString(KEY_STAGE, STAGE_NONE));
+        }
+        else {
+            reportPreviousGameExit();
         }
         refreshGameState();
     }
@@ -580,9 +585,13 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                 return;
             }
 
+            storeMedia(false);
             writeWestwoodRegistry(false);
+            tuneCncDdraw();
+            File launcher = findIgnoreCase(gameDir(), "ra2.exe", 2);
+            if (launcher == null) launcher = game;
             prefs.edit()
-                .putString(KEY_RA2_EXE, game.getAbsolutePath())
+                .putString(KEY_RA2_EXE, launcher.getAbsolutePath())
                 .putString(KEY_STAGE, STAGE_NONE)
                 .apply();
             FileUtils.delete(ra2CabDir());
@@ -598,15 +607,11 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                 setBusy(true, isGerman() ? "Yuri-CD wird in den Spielordner übernommen…" : "Copying Yuri disc files into the game folder…");
                 prepareYuriDisc();
 
-                File cab = new File(yuriCabDir(), "Game1.CAB");
-                if (!cab.isFile()) {
-                    // Some disc layouts document Game6.CAB as the file containing the two main MIX archives.
-                    cab = new File(yuriCabDir(), "Game6.CAB");
-                }
-                if (!cab.isFile()) {
+                File cab = selectYuriCab();
+                if (cab == null || !cab.isFile()) {
                     stopPipeline(isGerman()
-                        ? "Kein Yuri-Game*.CAB-Archiv wurde gefunden."
-                        : "No Yuri Game*.CAB archive was found.");
+                        ? "Kein CAB-Archiv auf der Yuri-CD gefunden. Erkannte INSTALL-Dateien: " + listInstallFiles(driveX())
+                        : "No CAB archive found on the Yuri disc. Detected INSTALL files: " + listInstallFiles(driveX()));
                     return;
                 }
 
@@ -646,9 +651,13 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             flattenKnownMix(gameDir(), languageMix, "langmd.mix");
             game = findIgnoreCase(gameDir(), "gamemd.exe", 2);
 
+            storeMedia(true);
             writeWestwoodRegistry(true);
+            tuneCncDdraw();
+            File launcher = findIgnoreCase(gameDir(), "ra2md.exe", 2);
+            if (launcher == null) launcher = game;
             prefs.edit()
-                .putString(KEY_YURI_EXE, game.getAbsolutePath())
+                .putString(KEY_YURI_EXE, launcher.getAbsolutePath())
                 .putString(KEY_STAGE, STAGE_NONE)
                 .apply();
             FileUtils.delete(yuriCabDir());
@@ -730,17 +739,11 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         FileUtils.delete(yuriCabDir());
         yuriCabDir().mkdirs();
 
-        File[] files = install.listFiles();
-        if (files == null) throw new Exception("Yuri INSTALL");
-        int copiedCabFiles = 0;
-        for (File file : files) {
-            String upper = file.getName().toUpperCase(Locale.ENGLISH);
-            if (file.isFile() && (upper.matches("GAME\\d+\\.CAB") || upper.matches("GAME\\d+\\.HDR"))) {
-                if (FileUtils.copy(file, new File(yuriCabDir(), file.getName()))) copiedCabFiles++;
-            }
-        }
+        int copiedCabFiles = copyCabArchivesRecursive(install, yuriCabDir(), 3);
         if (copiedCabFiles == 0) {
-            throw new Exception(isGerman() ? "Keine Yuri Game*.CAB-Dateien gefunden." : "No Yuri Game*.CAB files found.");
+            throw new Exception(isGerman()
+                ? "Keine CAB/HDR-Dateien im Yuri-INSTALL-Ordner gefunden. Vorhanden: " + listDirectoryNames(install)
+                : "No CAB/HDR files found in Yuri INSTALL. Present: " + listDirectoryNames(install));
         }
     }
 
@@ -795,17 +798,134 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         try (WineRegistryEditor registry = new WineRegistryEditor(systemReg)) {
             String root = yuri ? "Software\\Westwood\\Yuri's Revenge" : "Software\\Westwood\\Red Alert 2";
             registry.setStringValue(root, "Name", yuri ? "Yuri's Revenge" : "Red Alert 2");
-            registry.setStringValue(root, "InstallPath", yuri
-                ? "C:\\Westwood\\RA2\\YURI.EXE"
-                : "C:\\Westwood\\RA2\\RA2.EXE");
+            registry.setStringValue(root, "InstallPath", "C:\\Westwood\\RA2\\");
             registry.setStringValue(root, "FolderPath", "C:\\Westwood\\RA2");
-            registry.setStringValue(root, "Serial", "");
-            registry.setDwordValue(root, "SKU", yuri ? 0x2900 : 0x2100);
-            registry.setDwordValue(root, "Version", yuri ? 0x00010000 : 0x00010000);
+            registry.setStringValue(root, "Serial", "0");
+            registry.setStringValue(root, "Language", isGerman() ? "German" : "English");
+            registry.setDwordValue(root, "SKU", yuri ? 0x00000901 : 0x00000801);
+            registry.setDwordValue(root, "Version", yuri ? 0x00010001 : 0x00010006);
         }
         catch (Exception ignored) {}
     }
 
+    private void tuneCncDdraw() {
+        File ini = new File(container.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
+        if (!ini.isFile()) return;
+        String cfg = FileUtils.readString(ini);
+        if (cfg == null || cfg.isEmpty()) return;
+
+        cfg = replaceConfig(cfg, "renderer", "opengl");
+        cfg = replaceConfig(cfg, "windowed", "true");
+        cfg = replaceConfig(cfg, "fullscreen", "false");
+        cfg = replaceConfig(cfg, "nonexclusive", "true");
+        cfg = replaceConfig(cfg, "singlecpu", "true");
+        cfg = replaceConfig(cfg, "maxfps", "60");
+        cfg = replaceConfig(cfg, "adjmouse", "true");
+        FileUtils.writeString(ini, cfg);
+    }
+
+    private String replaceConfig(String cfg, String key, String value) {
+        String[] lines = cfg.split("\\n", -1);
+        boolean replaced = false;
+        StringBuilder out = new StringBuilder();
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (!replaced && trimmed.startsWith(key + "=") && !trimmed.startsWith(";")) {
+                out.append(key).append("=").append(value);
+                replaced = true;
+            }
+            else {
+                out.append(line);
+            }
+            out.append("\\n");
+        }
+        if (!replaced) out.append(key).append("=").append(value).append("\\n");
+        return out.toString();
+    }
+
+    private int copyCabArchivesRecursive(File source, File destination, int depth) {
+        if (source == null || depth < 0 || !source.exists()) return 0;
+        int copied = 0;
+        if (source.isFile()) {
+            String upper = source.getName().toUpperCase(Locale.ENGLISH);
+            if (upper.endsWith(".CAB") || upper.endsWith(".HDR")) {
+                File target = new File(destination, source.getName());
+                if (FileUtils.copy(source, target)) copied++;
+            }
+            return copied;
+        }
+
+        File[] children = source.listFiles();
+        if (children == null) return 0;
+        for (File child : children) {
+            if (child.isDirectory() && depth > 0) {
+                copied += copyCabArchivesRecursive(child, destination, depth - 1);
+            }
+            else if (child.isFile()) {
+                String upper = child.getName().toUpperCase(Locale.ENGLISH);
+                if (upper.endsWith(".CAB") || upper.endsWith(".HDR")) {
+                    File target = new File(destination, child.getName());
+                    if (FileUtils.copy(child, target)) copied++;
+                }
+            }
+        }
+        return copied;
+    }
+
+    private File selectYuriCab() {
+        File preferred = findChildIgnoreCase(yuriCabDir(), "Game1.CAB");
+        if (preferred != null && preferred.isFile()) return preferred;
+        preferred = findChildIgnoreCase(yuriCabDir(), "Game6.CAB");
+        if (preferred != null && preferred.isFile()) return preferred;
+
+        File[] files = yuriCabDir().listFiles();
+        if (files == null) return null;
+        File best = null;
+        for (File file : files) {
+            if (!file.isFile() || !file.getName().toUpperCase(Locale.ENGLISH).endsWith(".CAB")) continue;
+            if (best == null || file.getName().compareToIgnoreCase(best.getName()) < 0) best = file;
+        }
+        return best;
+    }
+
+    private String listInstallFiles(File root) {
+        File install = findChildIgnoreCase(root, "INSTALL");
+        return install == null ? "-" : listDirectoryNames(install);
+    }
+
+    private String listDirectoryNames(File dir) {
+        File[] files = dir == null ? null : dir.listFiles();
+        if (files == null || files.length == 0) return "-";
+        StringBuilder names = new StringBuilder();
+        int shown = 0;
+        for (File file : files) {
+            if (shown++ >= 12) {
+                names.append(" …");
+                break;
+            }
+            if (names.length() > 0) names.append(", ");
+            names.append(file.getName());
+        }
+        return names.toString();
+    }
+
+    private void reportPreviousGameExit() {
+        String last = prefs.getString(KEY_LAST_GAME_LAUNCH, "");
+        long started = prefs.getLong(KEY_LAST_GAME_LAUNCH_AT, 0L);
+        if (last.isEmpty() || started <= 0L) return;
+
+        long seconds = Math.max(0L, (System.currentTimeMillis() - started) / 1000L);
+        prefs.edit().remove(KEY_LAST_GAME_LAUNCH).remove(KEY_LAST_GAME_LAUNCH_AT).apply();
+
+        if (seconds < 20L) {
+            status.setText(isGerman()
+                ? last + " wurde nach " + seconds + " s beendet. Falls kein Spielbild erschien, ist der Start fehlgeschlagen."
+                : last + " exited after " + seconds + " s. If no game screen appeared, startup failed.");
+        }
+        else {
+            status.setText(isGerman() ? last + " wurde beendet." : last + " exited.");
+        }
+    }
 
     private void stopPipeline(String text) {
         prefs.edit()
@@ -829,17 +949,28 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
     private void launchGame(boolean yuri) {
         if (container == null) return;
-        String key = yuri ? KEY_YURI_EXE : KEY_RA2_EXE;
-        String path = prefs.getString(key, "");
-        File exe = path.isEmpty() ? null : new File(path);
+
+        File exe = findIgnoreCase(gameDir(), yuri ? "ra2md.exe" : "ra2.exe", 2);
+        if (exe == null) {
+            exe = findIgnoreCase(gameDir(), yuri ? "gamemd.exe" : "game.exe", 2);
+        }
         if (exe == null || !exe.isFile()) {
             scanInstalledGames(false);
             message(isGerman() ? "Installation wird geprüft. Bitte danach erneut starten." : "Checking the installation. Try again in a moment.");
             return;
         }
 
+        prefs.edit()
+            .putString(yuri ? KEY_YURI_EXE : KEY_RA2_EXE, exe.getAbsolutePath())
+            .putString(KEY_LAST_GAME_LAUNCH, yuri ? "Yuri’s Rache" : "Alarmstufe Rot 2")
+            .putLong(KEY_LAST_GAME_LAUNCH_AT, System.currentTimeMillis())
+            .apply();
+
         activateMedia(yuri);
+        writeWestwoodRegistry(yuri);
+        tuneCncDdraw();
         applyWineLocale();
+
         Intent intent = new Intent(this, XServerDisplayActivity.class);
         intent.putExtra("container_id", container.id);
         intent.putExtra("exec_path", exe.getAbsolutePath());
@@ -852,8 +983,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         if (container == null) return;
         ioExecutor.execute(() -> {
             File driveC = new File(container.getRootDir(), ".wine/drive_c");
-            File ra2 = findIgnoreCase(driveC, "game.exe", 10);
-            File yuri = findIgnoreCase(driveC, "gamemd.exe", 10);
+            File ra2 = findIgnoreCase(driveC, "ra2.exe", 10);
+            if (ra2 == null) ra2 = findIgnoreCase(driveC, "game.exe", 10);
+            File yuri = findIgnoreCase(driveC, "ra2md.exe", 10);
+            if (yuri == null) yuri = findIgnoreCase(driveC, "gamemd.exe", 10);
 
             SharedPreferences.Editor edit = prefs.edit();
             if (ra2 != null) edit.putString(KEY_RA2_EXE, ra2.getAbsolutePath());
