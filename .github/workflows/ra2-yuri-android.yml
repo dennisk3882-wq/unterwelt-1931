@@ -1,0 +1,95 @@
+name: Build RA2 Yuri Android
+
+on:
+  push:
+    branches:
+      - ra2-yuri-android
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ra2-yuri-android-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout mobile patch
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned Winlator runtime
+        uses: actions/checkout@v4
+        with:
+          repository: brunodev85/winlator-app
+          ref: 3981d86efa4f333b2a34a7da8b6521476cd8c8b9
+          path: upstream
+
+      - name: Apply RA2 Android changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ra2-mobile-port/apply.py
+          python3 ra2-mobile-port/apply.py upstream
+          grep -q 'de.ahnsen.ra2yuri' upstream/app/build.gradle
+          grep -q 'RA2LauncherActivity' upstream/app/src/main/AndroidManifest.xml
+          grep -q 'setRtsMode' upstream/app/src/main/java/com/winlator/widget/TouchpadView.java
+          grep -q 'exec_dos_path' upstream/app/src/main/java/com/winlator/XServerDisplayActivity.java
+          grep -q 'ddrawWrapper=cnc-ddraw' upstream/app/src/main/java/com/winlator/RA2LauncherActivity.java
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: upstream/**/*.gradle*
+
+      - name: Install Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          ANDROID_HOME="\${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;24.0.8215888" \
+            "cmake;3.22.1"
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > upstream/local.properties
+
+      - name: Build debug APK
+        working-directory: upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=upstream/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$apk"
+          unzip -Z1 "$apk" | grep -q 'lib/arm64-v8a/'
+          sha256sum "$apk" | tee ra2-yuri-mobile.sha256
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ra2-yuri-android-debug
+          path: |
+            upstream/app/build/outputs/apk/debug/app-debug.apk
+            ra2-yuri-mobile.sha256
+          if-no-files-found: error
+          retention-days: 14
