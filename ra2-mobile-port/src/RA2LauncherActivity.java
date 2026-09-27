@@ -55,6 +55,9 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private static final String KEY_RUNTIME_OUTSTANDING = "runtime_outstanding";
     private static final String KEY_LAST_GAME_LAUNCH = "last_game_launch";
     private static final String KEY_LAST_GAME_LAUNCH_AT = "last_game_launch_at";
+    private static final String KEY_LAST_EXIT_CODE = "last_exit_code";
+    private static final String KEY_LAST_SAW_CHILD = "last_saw_child";
+    private static final String KEY_LAST_DIAG_CLUE = "last_diag_clue";
 
     private static final String STAGE_NONE = "";
     private static final String STAGE_RA2_ALLIED = "ra2_allied";
@@ -574,6 +577,12 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             File ra2Mix = findIgnoreCase(gameDir(), "ra2.mix", 2);
             File languageMix = findIgnoreCase(gameDir(), "language.mix", 2);
 
+            String[] recommended = {
+                "binkw32.dll", "blowfish.dll", "blowfish.tlb", "drvmgt.dll",
+                "mph.exe", "patchget.dat", "patchw32.dll", "ra2.exe",
+                "ra2.lcf", "ra2.tlb", "woldatA.key"
+            };
+
             if (game == null || ra2Mix == null || languageMix == null) {
                 StringBuilder missing = new StringBuilder();
                 if (game == null) missing.append(" GAME.EXE");
@@ -585,19 +594,32 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                 return;
             }
 
+            StringBuilder optionalMissing = new StringBuilder();
+            for (String name : recommended) {
+                if (findIgnoreCase(gameDir(), name, 2) == null) {
+                    if (optionalMissing.length() > 0) optionalMissing.append(", ");
+                    optionalMissing.append(name);
+                }
+            }
+
             storeMedia(false);
             writeWestwoodRegistry(false);
             tuneCncDdraw();
-            File launcher = findIgnoreCase(gameDir(), "ra2.exe", 2);
-            if (launcher == null) launcher = game;
             prefs.edit()
-                .putString(KEY_RA2_EXE, launcher.getAbsolutePath())
+                .putString(KEY_RA2_EXE, game.getAbsolutePath())
                 .putString(KEY_STAGE, STAGE_NONE)
                 .apply();
             FileUtils.delete(ra2CabDir());
-            setBusy(false, isGerman()
-                ? "Alarmstufe Rot 2 wurde direkt aus den Original-CDs installiert."
-                : "Red Alert 2 was installed directly from the original discs.");
+            if (optionalMissing.length() == 0) {
+                setBusy(false, isGerman()
+                    ? "Alarmstufe Rot 2 vollständig aus den Original-CDs installiert."
+                    : "Red Alert 2 fully installed from the original discs.");
+            }
+            else {
+                setBusy(false, (isGerman()
+                    ? "RA2 installiert. Zusätzliche Originaldateien fehlen: "
+                    : "RA2 installed. Additional original files missing: ") + optionalMissing);
+            }
             refreshGameState();
             return;
         }
@@ -696,8 +718,14 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
         File dst = gameDir();
 
-        // Files shared by both RA2 CDs.
-        copyOptional(root, dst, "MULTI.MIX", "THEME.MIX", "WDT.MIX");
+        // Preserve the original install payload. This is intentionally broader than
+        // the first implementation because classic RA2 expects several launcher/
+        // patch/security files in addition to GAME.EXE and the MIX archives.
+        copyInstallPayload(install, dst, 4);
+
+        copyOptional(root, dst,
+            "MULTI.MIX", "THEME.MIX", "WDT.MIX",
+            "NL.CFG", "WOLDATA.KEY", "WOLAPI.DLL", "WOLAPI.WAR");
 
         if (allied) {
             copyRequired(root, dst, "MAPS01.MIX", "MOVIES01.MIX");
@@ -706,21 +734,14 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             copyRequired(root, dst, "MAPS02.MIX", "MOVIES02.MIX");
         }
 
-        copyRequired(install, dst,
-            "BINKW32.DLL", "BLOWFISH.DLL", "BLOWFISH.TLB",
-            "GAME.EXE", "MPH.EXE", "RA2.EXE", "RA2.TLB");
-        copyOptionalDirectory(install, dst, "RMCACHE");
-        copyOptionalDirectory(install, dst, "TAUNTS");
-
         if (allied) {
-            File cab = findChildIgnoreCase(install, "Game1.CAB");
-            if (cab == null || !cab.isFile()) {
-                throw new Exception("Game1.CAB");
-            }
             FileUtils.delete(ra2CabDir());
             ra2CabDir().mkdirs();
-            if (!FileUtils.copy(cab, new File(ra2CabDir(), "Game1.CAB"))) {
-                throw new Exception(isGerman() ? "Game1.CAB konnte nicht kopiert werden." : "Could not copy Game1.CAB.");
+            int archives = copyCabArchivesRecursive(install, ra2CabDir(), 4);
+            if (archives == 0) {
+                throw new Exception(isGerman()
+                    ? "Keine RA2-CAB/HDR-Dateien gefunden."
+                    : "No RA2 CAB/HDR files found.");
             }
         }
     }
@@ -744,6 +765,38 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             throw new Exception(isGerman()
                 ? "Keine CAB/HDR-Dateien im Yuri-INSTALL-Ordner gefunden. Vorhanden: " + listDirectoryNames(install)
                 : "No CAB/HDR files found in Yuri INSTALL. Present: " + listDirectoryNames(install));
+        }
+    }
+
+    private void copyInstallPayload(File source, File destination, int depth) throws Exception {
+        if (source == null || depth < 0 || !source.exists()) return;
+
+        if (source.isFile()) {
+            String upper = source.getName().toUpperCase(Locale.ENGLISH);
+            if (upper.endsWith(".CAB") || upper.endsWith(".HDR")) return;
+            if (upper.startsWith("SETUP") && upper.endsWith(".EXE")) return;
+
+            if (!destination.getParentFile().isDirectory()) destination.getParentFile().mkdirs();
+            if (!FileUtils.copy(source, destination)) {
+                throw new Exception((isGerman() ? "Kopieren fehlgeschlagen: " : "Copy failed: ") + source.getName());
+            }
+            return;
+        }
+
+        if (!destination.isDirectory() && !destination.mkdirs()) {
+            throw new Exception((isGerman() ? "Ordner konnte nicht erstellt werden: " : "Could not create folder: ") + destination.getName());
+        }
+
+        File[] children = source.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            File target = new File(destination, child.getName());
+            if (child.isDirectory()) {
+                if (depth > 0) copyInstallPayload(child, target, depth - 1);
+            }
+            else {
+                copyInstallPayload(child, target, depth);
+            }
         }
     }
 
@@ -798,12 +851,18 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         try (WineRegistryEditor registry = new WineRegistryEditor(systemReg)) {
             String root = yuri ? "Software\\Westwood\\Yuri's Revenge" : "Software\\Westwood\\Red Alert 2";
             registry.setStringValue(root, "Name", yuri ? "Yuri's Revenge" : "Red Alert 2");
-            registry.setStringValue(root, "InstallPath", "C:\\Westwood\\RA2\\");
+            registry.setStringValue(root, "InstallPath", yuri
+                ? "C:\\Westwood\\RA2\\GAMEMD.EXE"
+                : "C:\\Westwood\\RA2\\GAME.EXE");
             registry.setStringValue(root, "FolderPath", "C:\\Westwood\\RA2");
             registry.setStringValue(root, "Serial", "0");
             registry.setStringValue(root, "Language", isGerman() ? "German" : "English");
             registry.setDwordValue(root, "SKU", yuri ? 0x00000901 : 0x00000801);
             registry.setDwordValue(root, "Version", yuri ? 0x00010001 : 0x00010006);
+            File wolapi = findIgnoreCase(gameDir(), "wolapi.dll", 2);
+            if (wolapi != null) {
+                registry.setStringValue("Software\\Westwood\\WOLAPI", "InstallPath", "C:\\Westwood\\RA2\\WOLAPI.DLL");
+            }
         }
         catch (Exception ignored) {}
     }
@@ -937,9 +996,19 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
         File diagnostic = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/last-start.log");
         String diag = diagnostic.isFile() ? FileUtils.readString(diagnostic) : "";
-        String exitCode = diagnosticValue(diag, "exit=");
-        String child = diagnosticValue(diag, "sawGameChild=");
-        String clue = diagnosticClue(diag);
+        String exitCode = prefs.contains(KEY_LAST_EXIT_CODE)
+            ? String.valueOf(prefs.getInt(KEY_LAST_EXIT_CODE, -999))
+            : diagnosticValue(diag, "exit=");
+        String child = prefs.contains(KEY_LAST_SAW_CHILD)
+            ? String.valueOf(prefs.getBoolean(KEY_LAST_SAW_CHILD, false))
+            : diagnosticValue(diag, "sawGameChild=");
+        String clue = prefs.getString(KEY_LAST_DIAG_CLUE, "");
+        if (clue.isEmpty()) clue = diagnosticClue(diag);
+        prefs.edit()
+            .remove(KEY_LAST_EXIT_CODE)
+            .remove(KEY_LAST_SAW_CHILD)
+            .remove(KEY_LAST_DIAG_CLUE)
+            .apply();
 
         StringBuilder message = new StringBuilder();
         if (isGerman()) {
@@ -1005,9 +1074,9 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private void launchGame(boolean yuri) {
         if (container == null) return;
 
-        File exe = findIgnoreCase(gameDir(), yuri ? "ra2md.exe" : "ra2.exe", 2);
+        File exe = findIgnoreCase(gameDir(), yuri ? "gamemd.exe" : "game.exe", 2);
         if (exe == null) {
-            exe = findIgnoreCase(gameDir(), yuri ? "gamemd.exe" : "game.exe", 2);
+            exe = findIgnoreCase(gameDir(), yuri ? "ra2md.exe" : "ra2.exe", 2);
         }
         if (exe == null || !exe.isFile()) {
             scanInstalledGames(false);
@@ -1039,10 +1108,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         if (container == null) return;
         ioExecutor.execute(() -> {
             File driveC = new File(container.getRootDir(), ".wine/drive_c");
-            File ra2Found = findIgnoreCase(driveC, "ra2.exe", 10);
-            if (ra2Found == null) ra2Found = findIgnoreCase(driveC, "game.exe", 10);
-            File yuriFound = findIgnoreCase(driveC, "ra2md.exe", 10);
-            if (yuriFound == null) yuriFound = findIgnoreCase(driveC, "gamemd.exe", 10);
+            File ra2Found = findIgnoreCase(driveC, "game.exe", 10);
+            if (ra2Found == null) ra2Found = findIgnoreCase(driveC, "ra2.exe", 10);
+            File yuriFound = findIgnoreCase(driveC, "gamemd.exe", 10);
+            if (yuriFound == null) yuriFound = findIgnoreCase(driveC, "ra2md.exe", 10);
             final File ra2 = ra2Found;
             final File yuri = yuriFound;
 
