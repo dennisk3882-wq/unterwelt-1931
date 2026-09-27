@@ -564,7 +564,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             String controlSet = editor.getSymlinkValue("System\\CurrentControlSet", "SymbolicLinkValue");
             if (controlSet == null || controlSet.isEmpty()) controlSet = "System\\CurrentControlSet";
 
-            checkServiceStart(editor, controlSet, "RpcSs", 3, true);
+            checkServiceStart(editor, controlSet, "RpcSs", 2, true);
             checkServiceStart(editor, controlSet, "PlugPlay", 2, true);
             checkServiceStart(editor, controlSet, "Eventlog", 2, true);
             checkServiceStart(editor, controlSet, "NDIS", 2, true);
@@ -575,6 +575,27 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         catch (Exception e) {
             add(Level.WARN, "Windows-Dienste", "Dienst-Registry konnte nicht gelesen werden",
                 String.valueOf(e.getMessage()), "Nach erneutem App-Start noch einmal prüfen.");
+        }
+
+        File windows = new File(container.getRootDir(), ".wine/drive_c/windows");
+        checkRuntimeBinary("Windows-Dienste", new File(windows, "system32/services.exe"), "services.exe", true);
+        checkRuntimeBinary("Windows-Dienste", new File(windows, "system32/rpcss.exe"), "rpcss.exe (64-Bit/System32)", true);
+        checkRuntimeBinary("Windows-Dienste", new File(windows, "syswow64/rpcss.exe"), "rpcss.exe (32-Bit/SysWOW64)", false);
+        checkRuntimeBinary("WoW64-Laufzeit", new File(windows, "syswow64/ntdll.dll"), "SysWOW64 ntdll.dll", true);
+        checkRuntimeBinary("WoW64-Laufzeit", new File(windows, "syswow64/kernel32.dll"), "SysWOW64 kernel32.dll", true);
+        checkRuntimeBinary("WoW64-Laufzeit", new File(windows, "syswow64/rpcrt4.dll"), "SysWOW64 rpcrt4.dll", true);
+        checkRuntimeBinary("WoW64-Laufzeit", new File(windows, "syswow64/ole32.dll"), "SysWOW64 ole32.dll", true);
+    }
+
+    private void checkRuntimeBinary(String group, File file, String label, boolean critical) {
+        if (!file.isFile() || file.length() == 0) {
+            add(critical ? Level.FAIL : Level.WARN, group, label + " fehlt",
+                file.getAbsolutePath(),
+                critical ? "Wine-Laufzeit/Prefix ist für den 32-Bit-Start unvollständig." : "Kann bei älteren 32-Bit-Programmen relevant sein.");
+        }
+        else {
+            add(Level.PASS, group, label + " vorhanden",
+                humanSize(file.length()), "");
         }
     }
 
@@ -1026,6 +1047,8 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         boolean wineAttached = lastLaunchText.contains("stage=wine-debug-attached");
         boolean wrapperReady = lastLaunchText.contains("stage=runtime-wrapper-ready");
         boolean terminated = lastLaunchText.contains("stage=launcher-terminated");
+        boolean helperDone = lastLaunchText.contains("stage=helper-complete");
+        boolean targetTimeout = lastLaunchText.contains("stage=target-not-seen");
 
         add(wineAttached ? Level.PASS : Level.WARN, "Start-Timeline",
             "Wine-Debugger gekoppelt", wineAttached ? "Ja" : "Nein",
@@ -1035,7 +1058,17 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             wrapperReady ? "" : "CNC-DDraw/Runtime wurde nicht bis zum vorbereiteten Zustand erreicht.");
         add(terminated ? Level.INFO : Level.WARN, "Start-Timeline",
             "Launcher-Ende protokolliert", terminated ? "Ja" : "Nein",
-            terminated ? "" : "Ein sehr früher Abbruch kann die Abschlussphase verhindern.");
+            terminated ? "" : "Fehlt bei manuellem Exit oder wenn Wine im Hintergrund weiterlief.");
+
+        if (helperDone) {
+            add(Level.PASS, "Start-Timeline", "Setup-Helfer automatisch beendet",
+                "7-Zip/Setup-Prozess wurde erkannt und die App ist selbstständig zurückgekehrt.", "");
+        }
+        if (targetTimeout) {
+            add(Level.FAIL, "Start-Timeline", "Spielprozess-Timeout",
+                "Innerhalb des Diagnosefensters wurde kein stabiler GAME.EXE/GAMEMD.EXE-Prozess erkannt.",
+                "Wine-/WoW64-/RPC-Ursache priorisieren; Installationsdateien sind nachrangig.");
+        }
     }
 
     private void createRootCauseAnalysis() {
@@ -1049,7 +1082,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
 
         boolean servicesGood = container.getStartupSelection() == Container.STARTUP_SELECTION_NORMAL;
         Integer rpcStart = readServiceStart("RpcSs");
-        servicesGood = servicesGood && rpcStart != null && rpcStart == 3;
+        servicesGood = servicesGood && rpcStart != null && rpcStart == 2;
 
         File globalIni = new File(container.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
         String cfg = globalIni.isFile() ? FileUtils.readString(globalIni) : "";
@@ -1058,7 +1091,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
 
         if (rpc) {
             if (servicesGood) {
-                primaryDiagnosis = "RpcSs/RPC war beim letzten Start blockiert; die Konfiguration ist jetzt repariert und muss neu getestet werden.";
+                primaryDiagnosis = "RpcSs/RPC war beim letzten Start nicht verfügbar; Auto-Start und WoW64-RPC-Pfad werden jetzt gezielt geprüft.";
                 add(Level.WARN, "Intelligente Ursachenanalyse", "Priorität 1 – RPC/RpcSs",
                     "Der letzte Start enthält RPC_S_SERVER_UNAVAILABLE bzw. Failed to start RpcSs. Der aktuelle Dienststatus ist inzwischen korrekt.",
                     "Nächster RA2-Start ist der entscheidende Retest. Verschwindet RPC, wird automatisch die nächste Ursache sichtbar.");
@@ -1153,7 +1186,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                     try (WineRegistryEditor registry = new WineRegistryEditor(systemReg)) {
                         String controlSet = registry.getSymlinkValue("System\\CurrentControlSet", "SymbolicLinkValue");
                         if (controlSet == null || controlSet.isEmpty()) controlSet = "System\\CurrentControlSet";
-                        registry.setDwordValue(controlSet + "\\Services\\RpcSs", "Start", 3);
+                        registry.setDwordValue(controlSet + "\\Services\\RpcSs", "Start", 2);
                         registry.setDwordValue(controlSet + "\\Services\\PlugPlay", "Start", 2);
                         registry.setDwordValue(controlSet + "\\Services\\Eventlog", "Start", 2);
                         registry.setDwordValue(controlSet + "\\Services\\NDIS", "Start", 2);
