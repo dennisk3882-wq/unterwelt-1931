@@ -27,9 +27,11 @@ import com.winlator.xenvironment.RootFS;
 import com.winlator.xenvironment.RootFSInstaller;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -176,6 +178,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 checkYuriFiles();
                 checkRegistry();
                 checkCncDdraw();
+                checkSafeDisc();
                 checkPeDependencies(false);
                 checkPeDependencies(true);
                 checkVirtualMedia();
@@ -301,9 +304,13 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
 
     private void reportArchiveFolder(String label, File dir, boolean ra2) {
         if (!dir.isDirectory()) {
-            add(Level.WARN, "Archive", label + "-Ordner fehlt",
+            boolean installed = ra2
+                ? findIgnoreCase(gameDir(), "ra2.mix", 2) != null && findIgnoreCase(gameDir(), "language.mix", 2) != null
+                : findIgnoreCase(gameDir(), "gamemd.exe", 2) != null;
+            add(installed ? Level.INFO : Level.WARN, "Archive",
+                installed ? label + "-Arbeitsordner wurde nach erfolgreicher Einrichtung bereinigt" : label + "-Ordner fehlt",
                 dir.getAbsolutePath(),
-                "Der Ordner entsteht während der Einrichtung.");
+                installed ? "" : "Der Ordner entsteht während der Einrichtung.");
             return;
         }
 
@@ -480,32 +487,48 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
     private void checkCncDdraw() {
         if (container == null) return;
         File dir = gameDir();
-        File dll = findIgnoreCase(dir, "ddraw.dll", 2);
-        File ini = findIgnoreCase(dir, "ddraw.ini", 2);
 
-        if (dll == null || dll.length() == 0) {
-            add(Level.FAIL, "Grafik", "CNC-DDraw DLL fehlt",
-                "", "Einrichtung erneut ausführen; ddraw.dll muss neben GAME.EXE liegen.");
+        File runtimeDll = new File(container.getRootDir(), ".wine/drive_c/windows/syswow64/ddraw.dll");
+        File localDll = findIgnoreCase(dir, "ddraw.dll", 1);
+        File ini = new File(container.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
+
+        if (!runtimeDll.isFile() || runtimeDll.length() == 0) {
+            add(Level.FAIL, "Grafik", "Winlator-DDraw-Runtime fehlt",
+                runtimeDll.getAbsolutePath(),
+                "Die Wine-Laufzeit muss CNC-DDraw vor dem Spielstart extrahieren.");
         }
         else {
-            add(Level.PASS, "Grafik", "CNC-DDraw DLL vorhanden",
-                humanSize(dll.length()), "");
+            add(Level.PASS, "Grafik", "Winlator DDraw-Runtime vorhanden",
+                humanSize(runtimeDll.length()), "");
         }
 
-        if (ini == null) {
-            add(Level.FAIL, "Grafik", "ddraw.ini fehlt",
-                "", "Einrichtung erneut ausführen.");
+        if (localDll != null) {
+            add(Level.WARN, "Grafik", "Lokale ddraw.dll im Spielordner gefunden",
+                localDll.getAbsolutePath() + " • " + humanSize(localDll.length()),
+                "Eine veraltete lokale DLL kann den Winlator-CNC-DDraw-Wrapper überdecken. Der aktuelle Build ersetzt sie beim Start.");
+        }
+        else {
+            add(Level.PASS, "Grafik", "Keine veraltete lokale ddraw.dll erkannt",
+                "CNC-DDraw wird aus der Winlator-Laufzeit verwendet.", "");
+        }
+
+        if (!ini.isFile()) {
+            add(Level.FAIL, "Grafik", "CNC-DDraw ddraw.ini fehlt",
+                ini.getAbsolutePath(), "Einrichtung/Laufzeit erneut starten.");
         }
         else {
             String cfg = FileUtils.readString(ini);
-            String lower = cfg == null ? "" : cfg.toLowerCase(Locale.ENGLISH);
-            add(lower.contains("renderer=opengl") ? Level.PASS : Level.WARN,
+            String renderer = activeConfigValue(cfg, "renderer");
+            String singlecpu = activeConfigValue(cfg, "singlecpu");
+
+            add("opengl".equalsIgnoreCase(renderer) ? Level.PASS : Level.WARN,
                 "Grafik", "Renderer-Konfiguration",
-                configValue(cfg, "renderer"),
+                "renderer=" + (renderer.isEmpty() ? "<nicht aktiv gesetzt>" : renderer),
                 "OpenGL ist für diesen Build die bevorzugte Einstellung.");
-            add(lower.contains("singlecpu=true") ? Level.PASS : Level.WARN,
+
+            add("true".equalsIgnoreCase(singlecpu) ? Level.PASS : Level.WARN,
                 "Grafik", "Single-CPU-Kompatibilität",
-                configValue(cfg, "singlecpu"),
+                "singlecpu=" + (singlecpu.isEmpty() ? "<nicht aktiv gesetzt>" : singlecpu),
                 "singlecpu=true setzen.");
         }
 
@@ -517,6 +540,102 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         else {
             add(Level.PASS, "Grafik", "RA2.INI vorhanden",
                 humanSize(ra2Ini.length()), "");
+        }
+    }
+
+    private String activeConfigValue(String cfg, String key) {
+        if (cfg == null) return "";
+        for (String line : cfg.split("\\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith(";") || trimmed.startsWith("#")) continue;
+            int eq = trimmed.indexOf('=');
+            if (eq <= 0) continue;
+            String left = trimmed.substring(0, eq).trim();
+            if (left.equalsIgnoreCase(key)) return trimmed.substring(eq + 1).trim();
+        }
+        return "";
+    }
+
+    private void checkSafeDisc() {
+        if (container == null) return;
+
+        File game = findIgnoreCase(gameDir(), "game.exe", 2);
+        File drvmgt = findIgnoreCase(gameDir(), "drvmgt.dll", 2);
+        File secdrvGame = findIgnoreCase(gameDir(), "secdrv.sys", 5);
+        File secdrv32 = new File(container.getRootDir(), ".wine/drive_c/windows/system32/drivers/secdrv.sys");
+        File secdrv64 = new File(container.getRootDir(), ".wine/drive_c/windows/syswow64/drivers/secdrv.sys");
+
+        boolean indicator = drvmgt != null || (game != null && containsAscii(game, "secdrv"));
+        if (indicator) {
+            add(Level.WARN, "Kopierschutz", "Original-CD/SafeDisc erkannt",
+                "Die CD-Version verwendet den alten SafeDisc-Treiberpfad.",
+                "Das erklärt einen stillen Spielabbruch trotz vollständiger RA2-Dateien wesentlich besser als die fehlenden WOL-Dateien.");
+        }
+        else {
+            add(Level.INFO, "Kopierschutz", "Kein eindeutiger SafeDisc-Indikator erkannt",
+                "", "");
+        }
+
+        File active = secdrv32.isFile() ? secdrv32 : (secdrv64.isFile() ? secdrv64 : secdrvGame);
+        if (active == null || !active.isFile()) {
+            add(indicator ? Level.FAIL : Level.WARN, "Kopierschutz", "secdrv.sys fehlt",
+                "Weder im Wine-Treiberordner noch im Spielordner gefunden.",
+                "Yuri’s Rache einrichten. Der aktuelle Build übernimmt einen vorhandenen neueren Yuri-SafeDisc-Treiber automatisch.");
+            return;
+        }
+
+        String md5 = md5(active);
+        String knownYuri = "f376a1580204e47f37a721e1cbc5582a";
+        Level level = knownYuri.equalsIgnoreCase(md5) ? Level.PASS : Level.WARN;
+        add(level, "Kopierschutz", "secdrv.sys vorhanden",
+            active.getAbsolutePath() + " • " + humanSize(active.length()) + " • MD5 " + md5,
+            level == Level.PASS
+                ? ""
+                : "Treiber vorhanden, aber nicht als der bekannte Yuri-SafeDisc-2.40.010-Treiber erkannt.");
+    }
+
+    private boolean containsAscii(File file, String needle) {
+        if (file == null || !file.isFile()) return false;
+        byte[] target = needle.toLowerCase(Locale.ENGLISH).getBytes(StandardCharsets.US_ASCII);
+        byte[] window = new byte[1024 * 1024];
+        int carry = 0;
+
+        try (FileInputStream in = new FileInputStream(file)) {
+            int read;
+            while ((read = in.read(window, carry, window.length - carry)) > 0) {
+                int total = carry + read;
+                for (int i = 0; i <= total - target.length; i++) {
+                    boolean match = true;
+                    for (int j = 0; j < target.length; j++) {
+                        int b = window[i + j] & 0xff;
+                        if (b >= 'A' && b <= 'Z') b += 32;
+                        if (b != (target[j] & 0xff)) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match) return true;
+                }
+                carry = Math.min(target.length - 1, total);
+                if (carry > 0) System.arraycopy(window, total - carry, window, 0, carry);
+            }
+        }
+        catch (Exception ignored) {}
+        return false;
+    }
+
+    private String md5(File file) {
+        try (FileInputStream in = new FileInputStream(file)) {
+            MessageDigest digest = MessageDigest.getInstance("MD5");
+            byte[] buffer = new byte[256 * 1024];
+            int read;
+            while ((read = in.read(buffer)) > 0) digest.update(buffer, 0, read);
+            StringBuilder out = new StringBuilder();
+            for (byte b : digest.digest()) out.append(String.format(Locale.US, "%02x", b & 0xff));
+            return out.toString();
+        }
+        catch (Exception e) {
+            return "unbekannt";
         }
     }
 
@@ -601,7 +720,9 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         if (container == null) return;
 
         File log = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/last-start.log");
+        File liveLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
         String text = log.isFile() ? FileUtils.readString(log) : "";
+        if ((text == null || text.isEmpty()) && liveLog.isFile()) text = FileUtils.readString(liveLog);
 
         int exit = prefs.getInt("last_exit_code", Integer.MIN_VALUE);
         boolean hasExit = prefs.contains("last_exit_code");
@@ -609,14 +730,8 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         boolean sawChild = prefs.getBoolean("last_saw_child", false);
         String clue = prefs.getString("last_diag_clue", "");
 
-        if (!hasExit && (text == null || text.isEmpty())) {
-            add(Level.INFO, "Letzter Start", "Noch kein detailliertes Startprotokoll",
-                "", "Einmal RA2 starten und danach Diagnose erneut öffnen.");
-            return;
-        }
-
-        if (!hasExit) exit = parseIntValue(text, "exit=", Integer.MIN_VALUE);
-        if (!hasChild) {
+        if (!hasExit && text != null) exit = parseIntValue(text, "exit=", Integer.MIN_VALUE);
+        if (!hasChild && text != null) {
             String childText = value(text, "sawGameChild=");
             if (!childText.isEmpty()) {
                 sawChild = Boolean.parseBoolean(childText);
@@ -624,11 +739,26 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             }
         }
 
+        String stage = value(text, "stage=");
+        if (!stage.isEmpty()) {
+            add(Level.INFO, "Letzter Start", "Letzte erreichte Startphase",
+                stage, "");
+        }
+
+        if (!hasExit && (text == null || text.isEmpty())) {
+            add(Level.WARN, "Letzter Start", "Detailliertes Startprotokoll fehlt",
+                "Der vorherige Build hat den Rücksprung protokolliert, aber das Wine-Detailprotokoll nicht dauerhaft erhalten.",
+                "Der aktuelle Build schreibt das Protokoll bereits während des Starts fortlaufend.");
+            return;
+        }
+
         if (exit != Integer.MIN_VALUE) {
-            add(exit == 0 ? Level.PASS : Level.FAIL, "Letzter Start",
+            add(exit == 0 ? Level.WARN : Level.FAIL, "Letzter Start",
                 "Wine/Launcher Exit-Code",
                 String.valueOf(exit),
-                exit == 0 ? "" : "Fehlerzeilen darunter prüfen.");
+                exit == 0
+                    ? "Exit-Code 0 bei schwarzem Bildschirm kann bei der Original-CD auf SafeDisc-Kompatibilität hindeuten."
+                    : "Fehlerzeilen darunter prüfen.");
         }
 
         if (hasChild) {
@@ -646,15 +776,15 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         collectSuspiciousLines(text);
         int shown = 0;
         for (String line : suspiciousLogLines) {
-            if (shown++ >= 12) break;
+            if (shown++ >= 16) break;
             add(Level.WARN, "Wine-Protokoll", "Verdächtige Wine-Zeile",
                 line, hintForLog(line));
         }
 
-        if (suspiciousLogLines.isEmpty() && log.isFile()) {
-            add(Level.INFO, "Wine-Protokoll", "Keine offensichtliche Fehlerzeile erkannt",
-                humanSize(log.length()) + " Logdaten ausgewertet.",
-                "Wenn der Start trotzdem scheitert, sind Dateistruktur/Registry/Renderer wichtiger.");
+        if (suspiciousLogLines.isEmpty() && (log.isFile() || liveLog.isFile())) {
+            add(Level.INFO, "Wine-Protokoll", "Keine offensichtliche Wine-Fehlerzeile erkannt",
+                humanSize(log.isFile() ? log.length() : liveLog.length()) + " Logdaten ausgewertet.",
+                "Bei Exit-Code 0 und Original-CD ist SafeDisc als Ursache besonders relevant.");
         }
     }
 
@@ -832,6 +962,8 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             return "CNC-DDraw-Konfiguration und ddraw.dll prüfen.";
         if (lower.contains("access denied") || lower.contains("permission"))
             return "Dateizugriff bzw. Wine-Pfade prüfen.";
+        if (lower.contains("secdrv") || lower.contains("safedisc"))
+            return "SafeDisc-Treiberpfad prüfen; Yuri enthält eine neuere secdrv.sys-Version.";
         if (lower.contains("registry"))
             return "Westwood-Registry-Einträge prüfen.";
         return "Diese Zeile ist wahrscheinlich startrelevant.";
