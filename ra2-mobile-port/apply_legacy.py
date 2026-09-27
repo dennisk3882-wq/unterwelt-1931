@@ -115,6 +115,13 @@ def copy_sources_legacy(root: Path) -> None:
                 '"sc.exe meldet RpcSs als laufend, das Wine-Log enthält aber einen RPC-Abbruch (6ba/6be).",'
             )
 
+        # Wine 7.1's WineRegistryEditor has no getSymlinkValue(); CurrentControlSet is directly addressable.
+        text = text.replace(
+            r'editor.getSymlinkValue("System\\CurrentControlSet", "SymbolicLinkValue")',
+            r'"System\\CurrentControlSet"')
+        text = text.replace(
+            r'registry.getSymlinkValue("System\\CurrentControlSet", "SymbolicLinkValue")',
+            r'"System\\CurrentControlSet"')
         write(dst / name, text)
 
 def patch_build_gradle(root: Path) -> None:
@@ -125,8 +132,8 @@ def patch_build_gradle(root: Path) -> None:
     s = s.replace("versionCode 16", "versionCode 215")
     s = s.replace('versionName "7.1"', 'versionName "0.15.0-ra2-legacy"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
-    s = s.replace("    lintOptions {\\n        checkReleaseBuilds false\\n    }\\n",
-                  "    lintOptions {\\n        checkReleaseBuilds false\\n    }\\n\\n    aaptOptions {\\n        noCompress 'txz', 'tzst'\\n    }\\n")
+    s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
+                  "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
     s = s.replace("""    ndkVersion '22.1.7171670'
 
     externalNativeBuild {
@@ -707,16 +714,6 @@ def patch_xserver(root: Path) -> None:
 
     s = insert_before_once(
         s,
-        "    public InputControlsView getInputControlsView() {\\n",
-        '''    public SharedPreferences getPreferences() {
-        return preferences;
-    }
-
-''',
-        "public SharedPreferences getPreferences()",
-        "legacy preferences accessor"
-    )
-
     write(p, s)
 
 def patch_winhandler_compat(root: Path) -> None:
@@ -727,7 +724,7 @@ def patch_winhandler_compat(root: Path) -> None:
     s = s.replace("    private final XServerDisplayActivity activity;", "    final XServerDisplayActivity activity;")
     s = s.replace("    private void addAction(Runnable action) {", "    void addAction(Runnable action) {")
 
-    anchor = "    public void exec(String command) {\\n"
+    anchor = "    public void exec(String command) {\n"
     overload = '''    boolean sendPacket(int port, byte[] data) {
         if (data == null) return false;
         try {
@@ -747,6 +744,18 @@ def patch_winhandler_compat(root: Path) -> None:
         if anchor not in s:
             raise SystemExit("WinHandler send overload anchor missing")
         s = s.replace(anchor, overload + anchor, 1)
+    write(p, s)
+
+def patch_midi_compat(root: Path) -> None:
+    p = root / "app/src/main/java/com/winlator/winhandler/MIDIHandler.java"
+    require(p)
+    s = read(p)
+    if "import androidx.preference.PreferenceManager;" not in s:
+        s = s.replace("import android.os.Looper;\n",
+                      "import android.os.Looper;\n\nimport androidx.preference.PreferenceManager;\n")
+    s = s.replace(
+        'winHandler.activity.getPreferences().getString("midi_input_device", "auto")',
+        'PreferenceManager.getDefaultSharedPreferences(winHandler.activity).getString("midi_input_device", "auto")')
     write(p, s)
 
 def validate(root: Path) -> None:
@@ -776,6 +785,7 @@ def main() -> None:
     patch_touchpad(root)
     patch_xserver(root)
     patch_winhandler_compat(root)
+    patch_midi_compat(root)
     validate(root)
     print("RA2/Yuri legacy x86 Android patch applied successfully.")
 
