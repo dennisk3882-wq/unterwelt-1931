@@ -435,6 +435,27 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
     private void beginRa2Install() {
         if (!readyForInstall()) return;
+
+        // v0.16 recovery path: if both discs were already copied and GAME1.CAB
+        // survived a failed helper run, retry only CAB extraction instead of
+        // making the user re-copy ~1.3 GB of ISO data.
+        File existingCab = selectRa2Cab();
+        File existingGame = findIgnoreCase(gameDir(), "game.exe", 4);
+        File existingRa2Mix = findIgnoreCase(gameDir(), "ra2.mix", 6);
+        File existingLanguageMix = findIgnoreCase(gameDir(), "language.mix", 6);
+        if (existingCab != null && existingCab.isFile() && existingGame != null &&
+                (existingRa2Mix == null || existingLanguageMix == null)) {
+            String cabName = existingCab.getName();
+            prefs.edit().putString(KEY_STAGE, STAGE_RA2_CAB).apply();
+            setBusy(false, isGerman()
+                ? "Vorhandenes GAME1.CAB erkannt. Die fehlenden MIX-Dateien werden direkt erneut entpackt…"
+                : "Existing GAME1.CAB found. Retrying the missing MIX extraction directly…");
+            launchRuntimeDos(
+                "Z:\\opt\\apps\\7-Zip\\7z.exe",
+                "x \"C:\\RA2Mobile\\RA2CAB\\" + cabName + "\" -o\"C:\\Westwood\\RA2\" -y -aoa"
+            );
+            return;
+        }
         Uri allied = savedUri(KEY_ALLIED);
         Uri soviet = savedUri(KEY_SOVIET);
         if (allied == null || soviet == null) {
@@ -610,7 +631,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                     ? "RA2.MIX und LANGUAGE.MIX werden aus " + cabName + " entpackt…"
                     : "Extracting RA2.MIX and LANGUAGE.MIX from " + cabName + "…");
                 launchRuntimeDos(
-                    "Z:\\opt\\apps\\7-Zip\\7zG.exe",
+                    "Z:\\opt\\apps\\7-Zip\\7z.exe",
                     "x \"C:\\RA2Mobile\\RA2CAB\\" + cabName + "\" -o\"C:\\Westwood\\RA2\" -y -aoa"
                 );
             }
@@ -621,9 +642,14 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         }
 
         if (STAGE_RA2_CAB.equals(stage)) {
-            File game = findIgnoreCase(gameDir(), "game.exe", 2);
-            File ra2Mix = findIgnoreCase(gameDir(), "ra2.mix", 2);
-            File languageMix = findIgnoreCase(gameDir(), "language.mix", 2);
+            File game = findIgnoreCase(gameDir(), "game.exe", 4);
+            File ra2Mix = findIgnoreCase(gameDir(), "ra2.mix", 6);
+            File languageMix = findIgnoreCase(gameDir(), "language.mix", 6);
+
+            flattenKnownMix(gameDir(), ra2Mix, "ra2.mix");
+            flattenKnownMix(gameDir(), languageMix, "language.mix");
+            ra2Mix = findIgnoreCase(gameDir(), "ra2.mix", 2);
+            languageMix = findIgnoreCase(gameDir(), "language.mix", 2);
 
             String[] recommended = {
                 "binkw32.dll", "blowfish.dll", "blowfish.tlb", "drvmgt.dll",
@@ -699,7 +725,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                     ? "RA2MD.MIX und LANGMD.MIX werden aus den Yuri-CAB-Dateien entpackt…"
                     : "Extracting RA2MD.MIX and LANGMD.MIX from the Yuri CAB files…");
                 launchRuntimeDos(
-                    "Z:\\opt\\apps\\7-Zip\\7zG.exe",
+                    "Z:\\opt\\apps\\7-Zip\\7z.exe",
                     "x \"C:\\RA2Mobile\\YURICAB\\" + cabName + "\" -o\"C:\\Westwood\\RA2\" -y -aoa"
                 );
             }
@@ -710,9 +736,9 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         }
 
         if (STAGE_YURI_CAB.equals(stage)) {
-            File game = findIgnoreCase(gameDir(), "gamemd.exe", 2);
-            File ra2Mix = findIgnoreCase(gameDir(), "ra2md.mix", 3);
-            File languageMix = findIgnoreCase(gameDir(), "langmd.mix", 3);
+            File game = findIgnoreCase(gameDir(), "gamemd.exe", 4);
+            File ra2Mix = findIgnoreCase(gameDir(), "ra2md.mix", 6);
+            File languageMix = findIgnoreCase(gameDir(), "langmd.mix", 6);
 
             if (game == null || ra2Mix == null || languageMix == null) {
                 StringBuilder missing = new StringBuilder();
