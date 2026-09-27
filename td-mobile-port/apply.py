@@ -24,8 +24,14 @@ def insert_before_once(s, anchor, insertion, marker, label):
 def copy_sources(root):
     dst=root/'android/app/src/main/java/org/tiberiandawn/android'
     dst.mkdir(parents=True,exist_ok=True)
-    for name in ['FreewareCatalog.java','FreewareDataActivity.java','FreewareDownloadClient.java','FreewareIsoVerifier.java','GermanPackageInstaller.java','MobileTouchDock.java','MobileTouchGuide.java','MobileDisplayController.java']:
+    for name in ['FreewareCatalog.java','FreewareDataActivity.java','FreewareDownloadClient.java','FreewareIsoVerifier.java','GermanPackageInstaller.java','InnoExtractCompatService.java','MobileTouchDock.java','MobileTouchGuide.java','MobileDisplayController.java']:
         shutil.copy2(SRC/name,dst/name)
+
+    inno_dst=root/'android/app/src/main/java/uk/co/armedpineapple/innoextract/service'
+    inno_dst.mkdir(parents=True,exist_ok=True)
+    shutil.copy2(SRC/'inno/OutputFile.java', inno_dst/'OutputFile.java')
+    shutil.copy2(SRC/'inno/DirectAccessFile.java', inno_dst/'DirectAccessFile.java')
+
     native_dst=root/'platform/android'
     native_dst.mkdir(parents=True,exist_ok=True)
     shutil.copy2(HERE/'native/android_inno_bridge.cpp', native_dst/'android_inno_bridge.cpp')
