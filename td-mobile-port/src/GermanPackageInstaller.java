@@ -153,6 +153,7 @@ public final class GermanPackageInstaller {
         }
         String error;
         try {
+            INNO_SERVICE.setOutputRoot(output.getAbsolutePath());
             error = nativeExtractInno(
                 installer.getAbsolutePath(),
                 output.getAbsolutePath(),
