@@ -38,7 +38,7 @@ def insert_before_once(text: str, anchor: str, insertion: str, marker: str, labe
 def copy_sources(root: Path) -> None:
     dst = root / "app/src/main/java/com/winlator"
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java"]:
+    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java"]:
         require(SRC / name)
         shutil.copy2(SRC / name, dst / name)
 
@@ -47,8 +47,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("applicationId 'com.winlator'", f"applicationId '{APP_ID}'")
-    s = s.replace("versionCode 33", "versionCode 207")
-    s = s.replace('versionName "11.2"', 'versionName "0.7.0-ra2"')
+    s = s.replace("versionCode 33", "versionCode 208")
+    s = s.replace('versionName "11.2"', 'versionName "0.8.0-ra2"')
     write(p, s)
 
 def patch_package_paths(root: Path) -> None:
@@ -91,6 +91,13 @@ def patch_manifest(root: Path) -> None:
     )
 
     launcher = '''        <activity
+            android:name="com.winlator.RA2DiagnosticsActivity"
+            android:theme="@style/AppThemeFullscreenDark"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|density|navigation" />
+
+        <activity
             android:name="com.winlator.RA2LauncherActivity"
             android:theme="@style/AppThemeFullscreenDark"
             android:exported="true"
@@ -476,6 +483,7 @@ def validate(root: Path) -> None:
         "dock": root / "app/src/main/java/com/winlator/RA2TouchDock.java",
         "zoom": root / "app/src/main/java/com/winlator/RA2DisplayController.java",
         "iso": root / "app/src/main/java/com/winlator/Iso9660Extractor.java",
+        "diagnostics": root / "app/src/main/java/com/winlator/RA2DiagnosticsActivity.java",
     }
     for label, path in checks.items():
         require(path)
