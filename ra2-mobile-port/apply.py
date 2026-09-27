@@ -47,8 +47,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("applicationId 'com.winlator'", f"applicationId '{APP_ID}'")
-    s = s.replace("versionCode 33", "versionCode 206")
-    s = s.replace('versionName "11.2"', 'versionName "0.6.0-ra2"')
+    s = s.replace("versionCode 33", "versionCode 207")
+    s = s.replace('versionName "11.2"', 'versionName "0.7.0-ra2"')
     write(p, s)
 
 def patch_package_paths(root: Path) -> None:
@@ -394,8 +394,29 @@ def patch_xserver(root: Path) -> None:
             File parent = logFile.getParentFile();
             if (parent != null && !parent.isDirectory()) parent.mkdirs();
             FileUtils.writeString(logFile, output.toString());
-            ProcessHelper.removeAllDebugCallbacks();
 
+            String clue = "";
+            synchronized (debug) {
+                String[] lines = debug.toString().split("\\n");
+                for (int i = lines.length - 1; i >= 0; i--) {
+                    String line = lines[i].trim();
+                    String lower = line.toLowerCase();
+                    if (lower.contains("err:") || lower.contains("exception") ||
+                        lower.contains("failed") || lower.contains("cannot") ||
+                        lower.contains("missing") || lower.contains("not found")) {
+                        clue = line.length() > 180 ? line.substring(0, 180) : line;
+                        break;
+                    }
+                }
+            }
+
+            getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
+                .putInt("last_exit_code", status)
+                .putBoolean("last_saw_child", sawGameChild)
+                .putString("last_diag_clue", clue)
+                .apply();
+
+            ProcessHelper.removeAllDebugCallbacks();
             runOnUiThread(this::exit);
         });
     }
