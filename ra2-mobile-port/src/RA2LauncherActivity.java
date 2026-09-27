@@ -569,21 +569,22 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                 setBusy(true, isGerman() ? "Sowjet-CD wird in den Spielordner übernommen…" : "Copying Soviet disc files into the game folder…");
                 prepareRa2Disc(false);
 
-                File cab = new File(ra2CabDir(), "Game1.CAB");
-                if (!cab.isFile()) {
+                File cab = selectRa2Cab();
+                if (cab == null || !cab.isFile()) {
                     stopPipeline(isGerman()
-                        ? "Game1.CAB der RA2-CD wurde nicht gefunden."
-                        : "RA2 Game1.CAB was not found.");
+                        ? "Kein RA2-CAB-Archiv gefunden. Erkannte CAB/HDR-Dateien: " + listArchiveFiles(ra2CabDir())
+                        : "No RA2 CAB archive found. Detected CAB/HDR files: " + listArchiveFiles(ra2CabDir()));
                     return;
                 }
 
+                String cabName = cab.getName();
                 prefs.edit().putString(KEY_STAGE, STAGE_RA2_CAB).apply();
                 setBusy(false, isGerman()
-                    ? "RA2.MIX und LANGUAGE.MIX werden aus Game1.CAB entpackt…"
-                    : "Extracting RA2.MIX and LANGUAGE.MIX from Game1.CAB…");
+                    ? "RA2.MIX und LANGUAGE.MIX werden aus " + cabName + " entpackt…"
+                    : "Extracting RA2.MIX and LANGUAGE.MIX from " + cabName + "…");
                 launchRuntimeDos(
                     "Z:\\opt\\apps\\7-Zip\\7zG.exe",
-                    "x \"C:\\RA2Mobile\\RA2CAB\\Game1.CAB\" -o\"C:\\Westwood\\RA2\" -y -aoa"
+                    "x \"C:\\RA2Mobile\\RA2CAB\\" + cabName + "\" -o\"C:\\Westwood\\RA2\" -y -aoa"
                 );
             }
             catch (Exception e) {
@@ -967,6 +968,45 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             }
         }
         return copied;
+    }
+
+    private File selectRa2Cab() {
+        File preferred = findChildIgnoreCase(ra2CabDir(), "Game1.CAB");
+        if (preferred != null && preferred.isFile()) return preferred;
+
+        File[] files = ra2CabDir().listFiles();
+        if (files == null) return null;
+
+        File largest = null;
+        for (File file : files) {
+            if (!file.isFile()) continue;
+            String upper = file.getName().toUpperCase(Locale.ENGLISH);
+            if (!upper.endsWith(".CAB")) continue;
+
+            if (upper.equals("GAME1.CAB")) return file;
+            if (largest == null || file.length() > largest.length()) largest = file;
+        }
+        return largest;
+    }
+
+    private String listArchiveFiles(File dir) {
+        File[] files = dir == null ? null : dir.listFiles();
+        if (files == null || files.length == 0) return "-";
+
+        StringBuilder out = new StringBuilder();
+        int shown = 0;
+        for (File file : files) {
+            if (!file.isFile()) continue;
+            String upper = file.getName().toUpperCase(Locale.ENGLISH);
+            if (!upper.endsWith(".CAB") && !upper.endsWith(".HDR")) continue;
+            if (shown++ >= 20) {
+                out.append(" …");
+                break;
+            }
+            if (out.length() > 0) out.append(", ");
+            out.append(file.getName()).append(" (").append(file.length() / (1024 * 1024)).append(" MB)");
+        }
+        return out.length() == 0 ? "-" : out.toString();
     }
 
     private File selectYuriCab() {
