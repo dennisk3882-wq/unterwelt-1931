@@ -41,6 +41,8 @@ def copy_sources_legacy(root: Path) -> None:
                                 "WineUtils.changeServicesStatus(target, false);")
             text = text.replace("WineUtils.changeServicesStatus(container, Container.STARTUP_SELECTION_NORMAL);",
                                 "WineUtils.changeServicesStatus(container, false);")
+            text = text.replace('registry.getSymlinkValue("System\\\\CurrentControlSet", "SymbolicLinkValue")',
+                                '"System\\\\CurrentControlSet"')
 
         elif name == "RA2DiagnosticsActivity.java":
             text = text.replace("import com.winlator.xenvironment.RootFS;\n", "import com.winlator.xenvironment.ImageFs;\n")
@@ -123,6 +125,8 @@ def patch_build_gradle(root: Path) -> None:
     s = s.replace("versionCode 16", "versionCode 215")
     s = s.replace('versionName "7.1"', 'versionName "0.15.0-ra2-legacy"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
+    s = s.replace("    lintOptions {\\n        checkReleaseBuilds false\\n    }\\n",
+                  "    lintOptions {\\n        checkReleaseBuilds false\\n    }\\n\\n    aaptOptions {\\n        noCompress 'txz', 'tzst'\\n    }\\n")
     s = s.replace("""    ndkVersion '22.1.7171670'
 
     externalNativeBuild {
@@ -456,7 +460,18 @@ def patch_xserver(root: Path) -> None:
         "legacy RA2 debug callback"
     )
 
-    helpers = '''    private void finishRa2LegacyLaunch(int status, long startedAt, StringBuilder debug, File liveLog) {
+    helpers = '''    private String legacyUnixToDOSPath(String unixPath) {
+        if (unixPath == null || unixPath.isEmpty()) return "";
+        File driveC = new File(container.getRootDir(), ".wine/drive_c");
+        String base = driveC.getAbsolutePath();
+        if (unixPath.startsWith(base)) {
+            String tail = unixPath.substring(base.length()).replace('/', '\\\\');
+            return "C:" + tail;
+        }
+        return "Z:" + unixPath.replace('/', '\\\\');
+    }
+
+    private void finishRa2LegacyLaunch(int status, long startedAt, StringBuilder debug, File liveLog) {
         long elapsed = Math.max(0L, System.currentTimeMillis() - startedAt);
         StringBuilder output = new StringBuilder();
         output.append("stage=legacy-launch-terminated\\n");
@@ -598,7 +613,7 @@ def patch_xserver(root: Path) -> None:
             if (directArgs != null && !directArgs.isEmpty()) args += " " + directArgs;
         }
         else if (directIntent.hasExtra("exec_path")) {
-            String dosPath = WineUtils.unixToDOSPath(directIntent.getStringExtra("exec_path"), container);
+            String dosPath = legacyUnixToDOSPath(directIntent.getStringExtra("exec_path"));
             int slash = dosPath == null ? -1 : dosPath.lastIndexOf('\\\\');
             String directDir = slash >= 0 ? dosPath.substring(0, slash) : "C:\\\\";
             String directFile = slash >= 0 ? dosPath.substring(slash + 1) : dosPath;
@@ -670,7 +685,7 @@ def patch_xserver(root: Path) -> None:
         s,
         "    private void setupXEnvironment() {\n",
         legacy_prepare,
-        "prepareLegacyRa2Files()",
+        "private void prepareLegacyRa2Files()",
         "legacy CNC prepare"
     )
 
@@ -690,6 +705,48 @@ def patch_xserver(root: Path) -> None:
         "legacy watchdog start"
     )
 
+    s = insert_before_once(
+        s,
+        "    public InputControlsView getInputControlsView() {\\n",
+        '''    public SharedPreferences getPreferences() {
+        return preferences;
+    }
+
+''',
+        "public SharedPreferences getPreferences()",
+        "legacy preferences accessor"
+    )
+
+    write(p, s)
+
+def patch_winhandler_compat(root: Path) -> None:
+    p = root / "app/src/main/java/com/winlator/winhandler/WinHandler.java"
+    require(p)
+    s = read(p)
+    s = s.replace("    private boolean initReceived = false;", "    boolean initReceived = false;")
+    s = s.replace("    private final XServerDisplayActivity activity;", "    final XServerDisplayActivity activity;")
+    s = s.replace("    private void addAction(Runnable action) {", "    void addAction(Runnable action) {")
+
+    anchor = "    public void exec(String command) {\\n"
+    overload = '''    boolean sendPacket(int port, byte[] data) {
+        if (data == null) return false;
+        try {
+            DatagramPacket packet = new DatagramPacket(data, data.length);
+            packet.setAddress(localhost);
+            packet.setPort(port);
+            socket.send(packet);
+            return true;
+        }
+        catch (Exception e) {
+            return false;
+        }
+    }
+
+'''
+    if "boolean sendPacket(int port, byte[] data)" not in s:
+        if anchor not in s:
+            raise SystemExit("WinHandler send overload anchor missing")
+        s = s.replace(anchor, overload + anchor, 1)
     write(p, s)
 
 def validate(root: Path) -> None:
@@ -718,6 +775,7 @@ def main() -> None:
     patch_imagefs_installer(root)
     patch_touchpad(root)
     patch_xserver(root)
+    patch_winhandler_compat(root)
     validate(root)
     print("RA2/Yuri legacy x86 Android patch applied successfully.")
 
