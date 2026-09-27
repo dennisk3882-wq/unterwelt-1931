@@ -47,6 +47,7 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("applicationId 'com.winlator'", f"applicationId '{APP_ID}'")
+    s = s.replace("versionCode 33", "versionCode 202")
     s = s.replace('versionName "11.2"', 'versionName "0.2.0-ra2"')
     write(p, s)
 
