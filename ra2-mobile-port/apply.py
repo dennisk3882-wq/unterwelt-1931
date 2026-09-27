@@ -47,8 +47,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("applicationId 'com.winlator'", f"applicationId '{APP_ID}'")
-    s = s.replace("versionCode 33", "versionCode 209")
-    s = s.replace('versionName "11.2"', 'versionName "0.9.0-ra2"')
+    s = s.replace("versionCode 33", "versionCode 210")
+    s = s.replace('versionName "11.2"', 'versionName "0.10.0-ra2"')
     write(p, s)
 
 def patch_package_paths(root: Path) -> None:
@@ -350,15 +350,24 @@ def patch_xserver(root: Path) -> None:
         if (getIntent().getBooleanExtra("ra2_game_launch", false)) {
             final long ra2StartedAt = System.currentTimeMillis();
             final StringBuilder ra2Debug = new StringBuilder();
-            envVars.put("WINEDEBUG", "+seh,+process");
+            final File ra2LiveLog = new File(rootFS.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
+            File ra2LogParent = ra2LiveLog.getParentFile();
+            if (ra2LogParent != null && !ra2LogParent.isDirectory()) ra2LogParent.mkdirs();
+            FileUtils.writeString(ra2LiveLog,
+                "stage=wine-debug-attached\\nstartedAt=" + ra2StartedAt + "\\n");
+
+            envVars.put("WINEDEBUG", "+seh,+process,+loaddll,+service,+winedevice,+ntoskrnl");
             ProcessHelper.addDebugCallback((line) -> {
                 synchronized (ra2Debug) {
-                    if (ra2Debug.length() > 32000) ra2Debug.delete(0, Math.min(8000, ra2Debug.length()));
+                    if (ra2Debug.length() > 131072) {
+                        ra2Debug.delete(0, Math.min(32768, ra2Debug.length()));
+                    }
                     ra2Debug.append(line).append("\\n");
                 }
+                appendRa2Log(ra2LiveLog, line + "\\n");
             });
             guestProgramLauncherComponent.setTerminationCallback((status) ->
-                finishRa2GameLaunch(status, ra2StartedAt, ra2Debug));
+                finishRa2GameLaunch(status, ra2StartedAt, ra2Debug, ra2LiveLog));
         }
         else {
             guestProgramLauncherComponent.setTerminationCallback((status) -> exit());
@@ -368,14 +377,25 @@ def patch_xserver(root: Path) -> None:
         "RA2 detached game lifetime"
     )
 
-    ra2_helpers = '''    private void finishRa2GameLaunch(int status, long startedAt, StringBuilder debug) {
+    ra2_helpers = '''
+    private void finishRa2GameLaunch(int status, long startedAt, StringBuilder debug, File liveLog) {
+        getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
+            .putInt("last_exit_code", status)
+            .apply();
+        appendRa2Log(liveLog, "launcherExit=" + status + "\n");
+
         Executors.newSingleThreadExecutor().execute(() -> {
             boolean sawGameChild = false;
             long noChildDeadline = System.currentTimeMillis() + 12000L;
+            int snapshots = 0;
 
             while (true) {
                 boolean alive = isRa2GuestProcessAlive();
                 if (alive) sawGameChild = true;
+
+                if ((snapshots++ % 4) == 0) {
+                    appendRa2Log(liveLog, "processes=" + ra2ProcessSnapshot() + "\n");
+                }
 
                 if (sawGameChild && !alive) break;
                 if (!sawGameChild && System.currentTimeMillis() >= noChildDeadline) break;
@@ -390,9 +410,11 @@ def patch_xserver(root: Path) -> None:
 
             long elapsed = Math.max(0L, System.currentTimeMillis() - startedAt);
             StringBuilder output = new StringBuilder();
-            output.append("exit=").append(status).append("\\n");
-            output.append("elapsedMs=").append(elapsed).append("\\n");
-            output.append("sawGameChild=").append(sawGameChild).append("\\n");
+            output.append("stage=launcher-terminated\n");
+            output.append("exit=").append(status).append("\n");
+            output.append("elapsedMs=").append(elapsed).append("\n");
+            output.append("sawGameChild=").append(sawGameChild).append("\n");
+            output.append("processes=").append(ra2ProcessSnapshot()).append("\n");
             synchronized (debug) {
                 output.append(debug);
             }
@@ -401,17 +423,22 @@ def patch_xserver(root: Path) -> None:
             File parent = logFile.getParentFile();
             if (parent != null && !parent.isDirectory()) parent.mkdirs();
             FileUtils.writeString(logFile, output.toString());
+            appendRa2Log(liveLog,
+                "stage=launcher-terminated\nexit=" + status +
+                "\nelapsedMs=" + elapsed +
+                "\nsawGameChild=" + sawGameChild + "\n");
 
             String clue = "";
             synchronized (debug) {
-                String[] lines = debug.toString().split("\\n");
+                String[] lines = debug.toString().split("\n");
                 for (int i = lines.length - 1; i >= 0; i--) {
                     String line = lines[i].trim();
                     String lower = line.toLowerCase();
                     if (lower.contains("err:") || lower.contains("exception") ||
                         lower.contains("failed") || lower.contains("cannot") ||
-                        lower.contains("missing") || lower.contains("not found")) {
-                        clue = line.length() > 180 ? line.substring(0, 180) : line;
+                        lower.contains("missing") || lower.contains("not found") ||
+                        lower.contains("secdrv") || lower.contains("safedisc")) {
+                        clue = line.length() > 220 ? line.substring(0, 220) : line;
                         break;
                     }
                 }
@@ -426,6 +453,29 @@ def patch_xserver(root: Path) -> None:
             ProcessHelper.removeAllDebugCallbacks();
             runOnUiThread(this::exit);
         });
+    }
+
+    private void appendRa2Log(File file, String value) {
+        if (file == null || value == null) return;
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(file, true)) {
+            out.write(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            out.flush();
+        }
+        catch (Exception ignored) {}
+    }
+
+    private String ra2ProcessSnapshot() {
+        StringBuilder out = new StringBuilder();
+        for (ProcessHelper.PStat process : ProcessHelper.getChildProcesses()) {
+            if (!process.guestProcess) continue;
+            if (out.length() > 0) out.append(" | ");
+            out.append(process.pid).append(":")
+               .append(process.shortName).append("/")
+               .append(process.name).append("/")
+               .append(process.state);
+            if (out.length() > 700) break;
+        }
+        return out.length() == 0 ? "<none>" : out.toString();
     }
 
     private boolean isRa2GuestProcessAlive() {
@@ -445,6 +495,30 @@ def patch_xserver(root: Path) -> None:
             }
         }
         return false;
+    }
+
+    private void prepareRa2RuntimeWrapper() {
+        if (!getIntent().getBooleanExtra("ra2_game_launch", false)) return;
+
+        String execPath = getIntent().getStringExtra("exec_path");
+        if (execPath == null || execPath.isEmpty()) return;
+
+        File gameDir = new File(FileUtils.getDirname(execPath));
+        if (!gameDir.isDirectory()) return;
+
+        File systemDdraw = new File(rootFS.getRootDir(), ".wine/drive_c/windows/syswow64/ddraw.dll");
+        File localDdraw = new File(gameDir, "ddraw.dll");
+        if (systemDdraw.isFile()) FileUtils.copy(systemDdraw, localDdraw);
+
+        File globalIni = new File(rootFS.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
+        if (globalIni.isFile()) FileUtils.copy(globalIni, new File(gameDir, "ddraw.ini"));
+
+        File liveLog = new File(rootFS.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
+        appendRa2Log(liveLog,
+            "stage=runtime-wrapper-ready\n" +
+            "systemDdraw=" + systemDdraw.isFile() + ":" + systemDdraw.length() + "\n" +
+            "localDdraw=" + localDdraw.isFile() + ":" + localDdraw.length() + "\n" +
+            "cncIni=" + globalIni.isFile() + "\n");
     }
 
 '''
@@ -475,6 +549,18 @@ def patch_xserver(root: Path) -> None:
             execArgs = shortcut.getExtra("execArgs");
 '''
     s = replace_once(s, old, new, "direct DOS execution")
+    s = replace_once(
+        s,
+        '''                setupWineSystemFiles();
+                extractGraphicsDriverFiles();
+''',
+        '''                setupWineSystemFiles();
+                if (getIntent().getBooleanExtra("ra2_game_launch", false)) prepareRa2RuntimeWrapper();
+                extractGraphicsDriverFiles();
+''',
+        "RA2 runtime wrapper timing"
+    )
+
     write(p, s)
 
 def validate(root: Path) -> None:
