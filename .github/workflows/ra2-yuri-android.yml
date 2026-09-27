@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.14
+# build-version: 0.15-legacy-x86
 
 on:
   push:
@@ -27,20 +27,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: brunodev85/winlator-app
-          ref: 3981d86efa4f333b2a34a7da8b6521476cd8c8b9
+          ref: 96504ff
           path: upstream
+          lfs: true
 
       - name: Apply RA2 Android changes
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile ra2-mobile-port/apply.py
-          python3 ra2-mobile-port/apply.py upstream
+          python3 -m py_compile ra2-mobile-port/apply_legacy.py
+          python3 ra2-mobile-port/apply_legacy.py upstream
           grep -q "applicationId 'com.winlator'" upstream/app/build.gradle
           grep -q 'RA2LauncherActivity' upstream/app/src/main/AndroidManifest.xml
           grep -q 'setRtsMode' upstream/app/src/main/java/com/winlator/widget/TouchpadView.java
           grep -q 'exec_dos_path' upstream/app/src/main/java/com/winlator/XServerDisplayActivity.java
-          grep -q 'ddrawWrapper=cnc-ddraw' upstream/app/src/main/java/com/winlator/RA2LauncherActivity.java
+          grep -q 'setWoW64Mode(false)' upstream/app/src/main/java/com/winlator/RA2LauncherActivity.java
           grep -q 'RA2DiagnosticsActivity' upstream/app/src/main/AndroidManifest.xml
           test -s upstream/app/src/main/java/com/winlator/RA2DiagnosticsActivity.java
 
@@ -63,9 +64,10 @@ jobs:
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" \
+            "platforms;android-30" \
             "platforms;android-35" \
             "build-tools;35.0.0" \
-            "ndk;24.0.8215888" \
+            "ndk;22.1.7171670" \
             "cmake;3.22.1"
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > upstream/local.properties
 
