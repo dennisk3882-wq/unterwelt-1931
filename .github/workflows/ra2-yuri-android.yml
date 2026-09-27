@@ -35,7 +35,7 @@ jobs:
           set -euo pipefail
           python3 -m py_compile ra2-mobile-port/apply.py
           python3 ra2-mobile-port/apply.py upstream
-          grep -q 'de.ahnsen.ra2yuri' upstream/app/build.gradle
+          grep -q "applicationId 'com.winlator'" upstream/app/build.gradle
           grep -q 'RA2LauncherActivity' upstream/app/src/main/AndroidManifest.xml
           grep -q 'setRtsMode' upstream/app/src/main/java/com/winlator/widget/TouchpadView.java
           grep -q 'exec_dos_path' upstream/app/src/main/java/com/winlator/XServerDisplayActivity.java
