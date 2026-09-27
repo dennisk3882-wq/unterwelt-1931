@@ -29,7 +29,18 @@ jobs:
           repository: brunodev85/winlator-app
           ref: 96504ff4ef34a9cbad9d03d70d1f420fcb8338ec
           path: upstream
-          lfs: true
+          lfs: false
+
+      - name: Restore Winlator 7.1 runtime asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 6 --retry-all-errors --retry-delay 2 \
+            'https://github.com/brunodev85/winlator/releases/download/v7.1.0/Winlator_7.1.apk' \
+            -o /tmp/winlator-7.1.apk
+          unzip -p /tmp/winlator-7.1.apk assets/imagefs.txz > upstream/app/src/main/assets/imagefs.txz
+          test -s upstream/app/src/main/assets/imagefs.txz
+          test "$(stat -c%s upstream/app/src/main/assets/imagefs.txz)" -gt 100000000
 
       - name: Apply RA2 Android changes
         shell: bash
