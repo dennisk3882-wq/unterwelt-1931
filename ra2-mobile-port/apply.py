@@ -47,8 +47,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("applicationId 'com.winlator'", f"applicationId '{APP_ID}'")
-    s = s.replace("versionCode 33", "versionCode 213")
-    s = s.replace('versionName "11.2"', 'versionName "0.13.0-ra2"')
+    s = s.replace("versionCode 33", "versionCode 214")
+    s = s.replace('versionName "11.2"', 'versionName "0.14.0-ra2"')
     write(p, s)
 
 def patch_package_paths(root: Path) -> None:
@@ -260,7 +260,7 @@ def patch_xserver(root: Path) -> None:
     s = replace_once(
         s,
         "    private TouchpadView touchpadView;\n",
-        "    private TouchpadView touchpadView;\n    private RA2DisplayController ra2DisplayController;\n    private RA2TouchDock ra2TouchDock;\n",
+        "    private TouchpadView touchpadView;\n    private RA2DisplayController ra2DisplayController;\n    private RA2TouchDock ra2TouchDock;\n    private volatile boolean ra2MonitorExitRequested = false;\n",
         "RA2 controller fields"
     )
 
@@ -356,7 +356,7 @@ def patch_xserver(root: Path) -> None:
             FileUtils.writeString(ra2LiveLog,
                 "stage=wine-debug-attached\\nstartedAt=" + ra2StartedAt + "\\n");
 
-            envVars.put("WINEDEBUG", "+seh,+process,+loaddll,+service,+winedevice,+ntoskrnl");
+            envVars.put("WINEDEBUG", "+seh,+process,+loaddll,+service,+rpc,+ole,+winedevice,+ntoskrnl");
             ProcessHelper.addDebugCallback((line) -> {
                 synchronized (ra2Debug) {
                     if (ra2Debug.length() > 131072) {
@@ -451,7 +451,7 @@ def patch_xserver(root: Path) -> None:
                 .apply();
 
             ProcessHelper.removeAllDebugCallbacks();
-            runOnUiThread(this::exit);
+            requestRa2AutoExit();
         });
     }
 
@@ -497,6 +497,138 @@ def patch_xserver(root: Path) -> None:
         return false;
     }
 
+    private void startRa2RuntimeMonitor() {
+        if (!getIntent().getBooleanExtra("ra2_mode", false)) return;
+
+        final boolean gameLaunch = getIntent().getBooleanExtra("ra2_game_launch", false);
+        final String helperName = getIntent().getStringExtra("ra2_helper_process");
+        final String helperStage = getIntent().getStringExtra("ra2_helper_stage");
+        final File liveLog = new File(rootFS.getRootDir(),
+            RootFS.WINEPREFIX + "/drive_c/RA2Mobile/ra2-live.log");
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            long started = System.currentTimeMillis();
+            boolean sawTarget = false;
+            int missingTicks = 0;
+            long lastSizeA = -1;
+            long lastSizeB = -1;
+            int stableOutputTicks = 0;
+
+            while (!ra2MonitorExitRequested) {
+                appendRa2Log(liveLog, "monitorProcesses=" + ra2ProcessSnapshot() + "\\n");
+
+                if (gameLaunch) {
+                    boolean alive = isRa2GuestProcessAlive();
+                    if (alive) {
+                        sawTarget = true;
+                        missingTicks = 0;
+                        getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
+                            .putBoolean("last_saw_child", true).apply();
+                    }
+                    else if (sawTarget) {
+                        missingTicks++;
+                        if (missingTicks >= 4) {
+                            appendRa2Log(liveLog, "stage=game-process-ended\\n");
+                            requestRa2AutoExit();
+                            break;
+                        }
+                    }
+                    else if (System.currentTimeMillis() - started >= 30000L) {
+                        appendRa2Log(liveLog, "stage=target-not-seen\\n");
+                        getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
+                            .putBoolean("last_saw_child", false)
+                            .putString("last_diag_clue",
+                                "Kein stabiler GAME.EXE/GAMEMD.EXE-Prozess innerhalb von 30 s erkannt.")
+                            .apply();
+                        requestRa2AutoExit();
+                        break;
+                    }
+                }
+                else if (helperName != null && !helperName.isEmpty()) {
+                    boolean alive = isNamedGuestProcessAlive(helperName);
+                    if (alive) {
+                        sawTarget = true;
+                        missingTicks = 0;
+                    }
+                    else if (sawTarget) {
+                        missingTicks++;
+                        if (missingTicks >= 3) {
+                            appendRa2Log(liveLog, "stage=helper-complete\\ncompletion=process-ended\\n");
+                            requestRa2AutoExit();
+                            break;
+                        }
+                    }
+
+                    long[] output = ra2HelperOutputSizes(helperStage);
+                    if (output[0] > 0 && output[1] > 0 &&
+                        output[0] == lastSizeA && output[1] == lastSizeB) {
+                        stableOutputTicks++;
+                    }
+                    else stableOutputTicks = 0;
+
+                    lastSizeA = output[0];
+                    lastSizeB = output[1];
+
+                    if (stableOutputTicks >= 4) {
+                        appendRa2Log(liveLog,
+                            "stage=helper-complete\\ncompletion=stable-output-files\\n");
+                        requestRa2AutoExit();
+                        break;
+                    }
+                }
+
+                try {
+                    Thread.sleep(500L);
+                }
+                catch (InterruptedException ignored) {
+                    break;
+                }
+            }
+        });
+    }
+
+    private boolean isNamedGuestProcessAlive(String requested) {
+        String needle = requested == null ? "" : requested.toLowerCase();
+        if (needle.endsWith(".exe")) needle = needle.substring(0, needle.length() - 4);
+
+        for (ProcessHelper.PStat process : ProcessHelper.getChildProcesses()) {
+            if (!process.guestProcess) continue;
+            if (process.state == ProcessHelper.PState.DEAD ||
+                process.state == ProcessHelper.PState.ZOMBIE ||
+                process.state == ProcessHelper.PState.STOPPED) continue;
+
+            String name = ((process.name == null ? "" : process.name) + " " +
+                (process.shortName == null ? "" : process.shortName)).toLowerCase();
+            if (name.contains(needle)) return true;
+        }
+        return false;
+    }
+
+    private long[] ra2HelperOutputSizes(String stage) {
+        File dir = new File(rootFS.getRootDir(),
+            RootFS.WINEPREFIX + "/drive_c/Westwood/RA2");
+
+        if ("ra2_cab".equals(stage)) {
+            return new long[]{
+                new File(dir, "ra2.mix").length(),
+                new File(dir, "language.mix").length()
+            };
+        }
+        if ("yuri_cab".equals(stage)) {
+            return new long[]{
+                new File(dir, "ra2md.mix").length(),
+                new File(dir, "langmd.mix").length()
+            };
+        }
+        return new long[]{0, 0};
+    }
+
+    private void requestRa2AutoExit() {
+        if (ra2MonitorExitRequested) return;
+        ra2MonitorExitRequested = true;
+        runOnUiThread(this::exit);
+    }
+
     private void prepareRa2RuntimeWrapper() {
         if (!getIntent().getBooleanExtra("ra2_game_launch", false)) return;
 
@@ -533,6 +665,26 @@ def patch_xserver(root: Path) -> None:
             registry.setStringValue("Software\\\\Wine\\\\DllOverrides", "ddraw", "native,builtin");
         }
         catch (Exception ignored) {}
+
+        File systemReg = new File(winePrefix, "system.reg");
+        try (com.winlator.core.WineRegistryEditor registry = new com.winlator.core.WineRegistryEditor(systemReg)) {
+            String controlSet = registry.getSymlinkValue("System\\\\CurrentControlSet", "SymbolicLinkValue");
+            if (controlSet == null || controlSet.isEmpty()) controlSet = "System\\\\CurrentControlSet";
+            registry.setDwordValue(controlSet + "\\\\Services\\\\RpcSs", "Start", 2);
+        }
+        catch (Exception ignored) {}
+
+        String dosExec = com.winlator.core.WineUtils.unixToDOSPath(execPath, container);
+        int launchSlash = dosExec.lastIndexOf('\\\\');
+        String dosDir = launchSlash >= 0 ? dosExec.substring(0, launchSlash) : "C:\\\\Westwood\\\\RA2";
+        String dosFile = launchSlash >= 0 ? dosExec.substring(launchSlash + 1) : dosExec;
+        File launchBatch = new File(winePrefix, "drive_c/RA2Mobile/launch-ra2.bat");
+        String batch =
+            "@echo off\\r\\n" +
+            "sc.exe start RpcSs > C:\\\\RA2Mobile\\\\rpcss-preflight.txt 2>&1\\r\\n" +
+            "sc.exe query RpcSs >> C:\\\\RA2Mobile\\\\rpcss-preflight.txt 2>&1\\r\\n" +
+            "C:\\\\windows\\\\winhandler.exe /dir \\"" + dosDir + "\\" \\"" + dosFile + "\\"\\r\\n";
+        FileUtils.writeString(launchBatch, batch);
 
         File liveLog = new File(winePrefix, "drive_c/RA2Mobile/ra2-live.log");
         appendRa2Log(liveLog,
@@ -583,6 +735,14 @@ def patch_xserver(root: Path) -> None:
             execArgs = shortcut.getExtra("execArgs");
 '''
     new = '''        Intent directIntent = getIntent();
+        if (directIntent.getBooleanExtra("ra2_game_launch", false)) {
+            File launchBatch = new File(rootFS.getRootDir(),
+                RootFS.WINEPREFIX + "/drive_c/RA2Mobile/launch-ra2.bat");
+            if (launchBatch.isFile()) {
+                return "C:\\windows\\system32\\cmd.exe /c C:\\RA2Mobile\\launch-ra2.bat";
+            }
+        }
+
         if (directIntent.hasExtra("exec_dos_path")) {
             String directPath = directIntent.getStringExtra("exec_dos_path");
             String directArgs = directIntent.getStringExtra("exec_args");
@@ -608,6 +768,20 @@ def patch_xserver(root: Path) -> None:
                 extractGraphicsDriverFiles();
 ''',
         "RA2 runtime wrapper timing"
+    )
+
+    s = replace_once(
+        s,
+        '''        environment.startEnvironmentComponents();
+
+        winHandler.start();
+''',
+        '''        environment.startEnvironmentComponents();
+        if (getIntent().getBooleanExtra("ra2_mode", false)) startRa2RuntimeMonitor();
+
+        winHandler.start();
+''',
+        "RA2 runtime process monitor"
     )
 
     write(p, s)
