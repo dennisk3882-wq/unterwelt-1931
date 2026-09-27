@@ -171,6 +171,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 checkIsoSlot("Originalmedien", "Sowjet ISO", KEY_SOVIET, true);
                 checkIsoSlot("Originalmedien", "Yuri ISO", KEY_YURI, false);
                 checkContainerStorage();
+                checkArchiveStaging();
                 checkRa2Files();
                 checkYuriFiles();
                 checkRegistry();
@@ -288,6 +289,66 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         }
     }
 
+    private void checkArchiveStaging() {
+        if (container == null) return;
+        File base = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile");
+        File ra2Cab = new File(base, "RA2CAB");
+        File yuriCab = new File(base, "YURICAB");
+
+        reportArchiveFolder("RA2 CAB/HDR", ra2Cab, true);
+        reportArchiveFolder("Yuri CAB/HDR", yuriCab, false);
+    }
+
+    private void reportArchiveFolder(String label, File dir, boolean ra2) {
+        if (!dir.isDirectory()) {
+            add(Level.WARN, "Archive", label + "-Ordner fehlt",
+                dir.getAbsolutePath(),
+                "Der Ordner entsteht während der Einrichtung.");
+            return;
+        }
+
+        File[] files = dir.listFiles();
+        if (files == null || files.length == 0) {
+            add(Level.WARN, "Archive", label + "-Ordner ist leer",
+                dir.getAbsolutePath(),
+                "Einrichtung erneut starten.");
+            return;
+        }
+
+        int count = 0;
+        long bytes = 0;
+        StringBuilder names = new StringBuilder();
+        File preferred = null;
+        for (File file : files) {
+            if (!file.isFile()) continue;
+            String upper = file.getName().toUpperCase(Locale.ENGLISH);
+            if (!upper.endsWith(".CAB") && !upper.endsWith(".HDR")) continue;
+            count++;
+            bytes += file.length();
+            if (names.length() > 0) names.append(", ");
+            names.append(file.getName()).append(" (").append(humanSize(file.length())).append(")");
+            if (ra2 && upper.equals("GAME1.CAB")) preferred = file;
+        }
+
+        if (count == 0) {
+            add(Level.FAIL, "Archive", label + " nicht gefunden",
+                "Im Ordner liegen keine CAB/HDR-Dateien.",
+                "Originalmedium erneut einrichten.");
+            return;
+        }
+
+        add(Level.PASS, "Archive", label + " erkannt",
+            count + " Datei(en) • " + humanSize(bytes) + " • " + names, "");
+
+        if (ra2) {
+            add(preferred != null ? Level.PASS : Level.WARN,
+                "Archive",
+                preferred != null ? "RA2 Game1.CAB erkannt" : "Game1.CAB nicht exakt benannt",
+                preferred != null ? preferred.getName() : names.toString(),
+                preferred != null ? "" : "v0.9 sucht jetzt unabhängig von Groß-/Kleinschreibung und nutzt notfalls das größte CAB.");
+        }
+    }
+
     private void checkRa2Files() {
         if (container == null) return;
         File dir = gameDir();
@@ -314,7 +375,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         if (missingSupport > 0) {
             add(Level.WARN, "RA2 Dateien", "Zusatzbestand nicht vollständig",
                 missingSupport + " unterstützende Originaldatei(en) fehlen.",
-                "RA2 erneut einrichten; v0.8 übernimmt den gesamten INSTALL-Inhalt.");
+                "RA2 erneut einrichten; der aktuelle Build übernimmt den gesamten INSTALL-Inhalt.");
         }
 
         checkDirectory("RA2 Dateien", new File(dir, "rmcache"), "RMCACHE", false);
