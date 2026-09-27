@@ -422,7 +422,7 @@ def patch_xserver(root: Path) -> None:
 '''
     s = insert_before_once(
         s,
-        "    private String getWineStartCommand() {\\n",
+        "    private String getWineStartCommand() {\n",
         ra2_helpers,
         "finishRa2GameLaunch(int status",
         "RA2 lifetime helpers"
