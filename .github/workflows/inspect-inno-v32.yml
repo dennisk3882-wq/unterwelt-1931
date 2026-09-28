@@ -1,0 +1,27 @@
+name: Inspect innoextract v3.2 ARM64
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect v3.2 ARM64 library
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://github.com/alanwoolley/innoextract-android/releases/download/v3.2.0/App-arm64-v8a-release.apk'
+          curl -L --fail --retry 3 -o /tmp/inno.apk "$url"
+          sha256sum /tmp/inno.apk
+          unzip -l /tmp/inno.apk | grep 'lib/arm64-v8a'
+          unzip -p /tmp/inno.apk lib/arm64-v8a/libinnoextract.so > /tmp/libinnoextract.so
+          sha256sum /tmp/libinnoextract.so
+          file /tmp/libinnoextract.so
+          echo '=== exported symbols ==='
+          nm -D /tmp/libinnoextract.so | grep -E 'Java_uk_co_armedpineapple| main$|nativeDoExtract|nativeExtract|nativeCheck|nativeInit' || true
