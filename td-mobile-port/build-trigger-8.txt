@@ -1,0 +1,1 @@
+Build trigger for German automatic text, speech, unit voice and campaign video installer. Run now.
