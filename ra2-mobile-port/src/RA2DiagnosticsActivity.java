@@ -762,7 +762,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         File secdrv32 = new File(container.getRootDir(), ".wine/drive_c/windows/system32/drivers/secdrv.sys");
         File secdrv64 = new File(container.getRootDir(), ".wine/drive_c/windows/syswow64/drivers/secdrv.sys");
 
-        boolean indicator = drvmgt != null || (game != null && containsAscii(game, "secdrv"));
+        boolean indicator = RA2LaunchBatch.isSafeDisc(game) || drvmgt != null || (game != null && containsAscii(game, "secdrv"));
         if (indicator) {
             add(Level.WARN, "Kopierschutz", "Original-CD/SafeDisc erkannt",
                 "Die CD-Version verwendet den alten SafeDisc-Treiberpfad.",
@@ -954,6 +954,16 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         File rpcAfter = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/rpcss-after-game.txt");
         if (rpcAfter.isFile()) add(Level.INFO, "RPC nach Spielende", "RpcSs-Zustand nach GAME.EXE",
             compactLines(FileUtils.readString(rpcAfter), 10), "");
+        if (liveText != null) add(Level.INFO, "CD-Kompatibilität", "Startweg",
+            liveText.contains("cdCompatibility=true") ? "SafeDisc-Kompatibilitätshelfer" : "Direkter Spielstart", "");
+        for (String name : new String[]{"safedisc-injector.log", "safedisc.log"}) {
+            File helperLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/" + name);
+            if (helperLog.isFile()) {
+                String helperText = FileUtils.readString(helperLog);
+                if (helperText != null && !helperText.isEmpty()) add(Level.INFO, "CD-Kompatibilität", name,
+                    helperText.length() > 12000 ? helperText.substring(helperText.length() - 12000) : helperText, "");
+            }
+        }
         String phase = RA2LaunchBatch.gamePhase(liveText);
         if (!phase.isEmpty()) {
             String tail = phase.length() > 12000 ? phase.substring(phase.length() - 12000) : phase;
@@ -989,7 +999,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         }
 
         if (!clue.isEmpty()) {
-            add(Level.FAIL, "Letzter Start", "Letzte erkannte Fehlerursache",
+            add(clue.startsWith("Spielprozess beendet: 0") ? Level.INFO : Level.FAIL, "Letzter Start", "Letzte Startmeldung",
                 clue, hintForLog(clue));
         }
 
@@ -1179,6 +1189,13 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             add(Level.FAIL, "Intelligente Ursachenanalyse", "Priorität 1 – RpcSs-Starttest fehlgeschlagen",
                 compactLines(rpcPreflightText, 8),
                 "Wine-Service/WoW64-Laufzeit ist der primäre Kandidat; Spiel- und Grafikdateien sind aktuell nachrangig.");
+        }
+        else if (noGame && Integer.valueOf(0).equals(RA2LaunchBatch.readGameExit(
+                new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/game-exit.txt")))) {
+            primaryDiagnosis = "Spielprozess endet mit Code 0 vor dem Spielfenster. CD-Kompatibilität oder sehr früher Runtime-Abbruch; Ursache noch ungeklärt.";
+            add(Level.WARN, "Intelligente Ursachenanalyse", "Frühes Spielende ohne Spielfenster",
+                "Die Spiel-EXE wurde geladen und beendet sich ohne protokollierten Absturz. RpcSs- und Treiberdateien allein erklären das nicht.",
+                "Der erkannte SafeDisc-Startweg und seine beiden Protokolle liefern die nächste belastbare Prüfung.");
         }
         else if (rpc && rpcPreflightRunning) {
             primaryDiagnosis = "RPC-Meldungen während des Spielstarts trotz laufendem RpcSs; Zusammenhang mit dem Abbruch noch ungeklärt.";

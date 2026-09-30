@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 222")
-    s = s.replace('versionName "7.1"', 'versionName "0.22.0-ra2-game-result"')
+    s = s.replace("versionCode 16", "versionCode 223")
+    s = s.replace('versionName "7.1"', 'versionName "0.23.0-ra2-cd-compatibility"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -787,8 +787,27 @@ def patch_xserver(root: Path) -> None:
         FileUtils.delete(new File(session, "blowfish-register.txt"));
         FileUtils.delete(new File(session, "rpcss-preflight.txt"));
         FileUtils.writeString(new File(session, "ra2-live.log"), "stage=runtime-wrapper-ready\\n");
+        FileUtils.delete(new File(session, "safedisc.log"));
+        FileUtils.delete(new File(session, "safedisc-injector.log"));
+        boolean cdCompatibility = RA2LaunchBatch.isSafeDisc(new File(execPath));
+        if (cdCompatibility) {
+            File helper = new File(session, "SafeDisc");
+            helper.mkdirs();
+            boolean copied = FileUtils.write(new File(helper, "VersionInjector.exe"), FileUtils.read(this, "safedisc/VersionInjector.exe")) &&
+                FileUtils.write(new File(helper, "version.dll"), FileUtils.read(this, "safedisc/version.dll"));
+            org.json.JSONObject config = new org.json.JSONObject();
+            try {
+                config.put("logging", true);
+                config.put("logFile", "C:\\\\RA2Mobile\\\\safedisc.log");
+                config.put("injectorLogFile", "C:\\\\RA2Mobile\\\\safedisc-injector.log");
+                config.put("CDROMDriveLetter", "X");
+            } catch (org.json.JSONException ignored) {}
+            copied = copied && FileUtils.writeString(new File(dir, "ra2-cd-compat.json"), config.toString());
+            if (!copied) throw new IllegalStateException("CD compatibility helper could not be prepared");
+        }
+        appendRa2Log(new File(session, "ra2-live.log"), "cdCompatibility=" + cdCompatibility + "\\n");
         FileUtils.writeString(new File(session, "launch-ra2.bat"),
-            RA2LaunchBatch.create(legacyUnixToDOSPath(execPath)));
+            RA2LaunchBatch.create(legacyUnixToDOSPath(execPath), cdCompatibility));
 
         File globalIni = new File(container.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
         if (globalIni.isFile()) {

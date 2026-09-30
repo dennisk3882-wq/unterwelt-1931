@@ -20,12 +20,28 @@ public class RA2LaunchBatchTest {
         }
         java.nio.file.Files.write(result.toPath(), new byte[0]);
         if (RA2LaunchBatch.readGameExit(result) != null) throw new AssertionError("Partial write treated as success");
+        byte[] protectedExe = new byte[66000];
+        byte[] marker = "BoG_ *90.0&!!  Yy>".getBytes("US-ASCII");
+        System.arraycopy(marker, 0, protectedExe, 65530, marker.length);
+        protectedExe[65530 + 32] = 2;
+        java.nio.file.Files.write(result.toPath(), protectedExe);
+        if (!RA2LaunchBatch.isSafeDisc(result)) throw new AssertionError("SafeDisc signature missed");
+        protectedExe[65530 + 32] = 0;
+        java.nio.file.Files.write(result.toPath(), protectedExe);
+        if (RA2LaunchBatch.isSafeDisc(result)) throw new AssertionError("Invalid version accepted");
+        byte[] alt = new byte[80];
+        System.arraycopy("000001_!!!".getBytes("US-ASCII"), 0, alt, 2, 10);
+        alt[13] = 2;
+        java.nio.file.Files.write(result.toPath(), alt);
+        if (!RA2LaunchBatch.isSafeDisc(result)) throw new AssertionError("Alternate signature missed");
         result.delete();
+        String compatibility = RA2LaunchBatch.create("C:\\Westwood\\RA2\\GAME.EXE", true);
+        if (!compatibility.contains("start /wait \"\" \"C:\\RA2Mobile\\SafeDisc\\VersionInjector.exe\" \"C:\\Westwood\\RA2\\GAME.EXE\"")) throw new AssertionError("Helper or target lost");
         if (RA2LaunchBatch.isGameWindow("ConsoleWindowClass") || RA2LaunchBatch.isGameWindow("explorer")) throw new AssertionError("Helper detected as game");
         if (!RA2LaunchBatch.isGameWindow("Red Alert 2")) throw new AssertionError("Game window missed");
-        String timeline = "RPC_S_SERVER_UNAVAILABLE\nstage=game-command-started\ngame output\nstage=game-exited\nshutdown error";
+        String timeline = "RPC_S_SERVER_UNAVAILABLE\nstage=game-command-started\ngame output\nstage=game-command-ended\nreceive failed with error 6be\nstage=game-exited\nshutdown error";
         String phase = RA2LaunchBatch.gamePhase(timeline);
-        if (phase.contains("RPC_S") || phase.contains("shutdown") || !phase.contains("game output")) throw new AssertionError("Wrong RPC phase");
+        if (phase.contains("RPC_S") || phase.contains("shutdown") || phase.contains("6be") || !phase.contains("game output")) throw new AssertionError("Wrong RPC phase");
         System.out.println("RA2/Yuri launch batch regression checks passed");
     }
 }

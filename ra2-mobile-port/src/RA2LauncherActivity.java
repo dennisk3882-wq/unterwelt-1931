@@ -154,7 +154,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.22 · Spielstart & Diagnose");
+        version.setText("v0.23 · Original-CD-Kompatibilität");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
@@ -696,8 +696,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             if (optionalMissing.length() == 0) {
                 if (!secdrv.isFile() && savedUri(KEY_YURI) != null) {
                     setBusy(false, isGerman()
-                        ? "RA2-Dateien vollständig. Die Original-CD nutzt SafeDisc; richte jetzt Yuri’s Rache ein, damit ein vorhandener neuerer secdrv.sys-Treiber aus deinem Yuri-Medium übernommen werden kann."
-                        : "RA2 files are complete. The original CD uses SafeDisc; set up Yuri’s Revenge next so a newer secdrv.sys driver from your Yuri media can be installed if present.");
+                        ? "RA2-Dateien vollständig. Beim Start wird für erkannte SafeDisc-EXEs automatisch der CD-Kompatibilitätshelfer verwendet."
+                        : "RA2 files are complete. Recognized SafeDisc executables automatically use the CD compatibility helper at launch.");
                 }
                 else {
                     setBusy(false, isGerman()

@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.22-game-result
+# build-version: 0.23-cd-compatibility
 
 on:
   push:
@@ -15,7 +15,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  compatibility:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout pinned compatibility helper
+        uses: actions/checkout@v4
+        with:
+          repository: nckstwrt/SafeDiscLoader2
+          ref: 91b6b89da8296276c36ff1a8fea2456c892ca865
+          path: compatibility-source
+      - uses: microsoft/setup-msbuild@v2
+      - name: Build standalone 32-bit compatibility helper
+        shell: pwsh
+        run: |
+          python ra2-mobile-port/safedisc/prepare.py compatibility-source
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $out = "$env:GITHUB_WORKSPACE\compat-output\"
+          msbuild compatibility-source/version-proxy.sln /m /p:Configuration=Release /p:Platform=x86 /p:PlatformToolset=v143 /p:OutDir="$out"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ra2-mobile-port/safedisc/package.py compatibility-source compat-output
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cd-compatibility
+          path: |
+            compat-output/VersionInjector.exe
+            compat-output/version.dll
+            compat-output/SafeDiscLoader2-*
+          if-no-files-found: error
   build:
+    needs: compatibility
     runs-on: ubuntu-24.04
     timeout-minutes: 90
 
@@ -30,6 +61,16 @@ jobs:
           ref: 96504ff4ef34a9cbad9d03d70d1f420fcb8338ec
           path: upstream
           lfs: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cd-compatibility
+          path: cd-compatibility
+      - name: Include compatibility helper and corresponding source
+        run: |
+          mkdir -p upstream/app/src/main/assets/safedisc upstream/app/src/main/assets/licenses
+          cp cd-compatibility/VersionInjector.exe cd-compatibility/version.dll upstream/app/src/main/assets/safedisc/
+          cp cd-compatibility/SafeDiscLoader2-* upstream/app/src/main/assets/licenses/
 
       - name: Restore Winlator 7.1 runtime asset
         shell: bash
@@ -161,6 +202,9 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$apk"
           unzip -Z1 "$apk" > /tmp/ra2-apk-files.txt
           grep -q 'lib/arm64-v8a/libra2cab.so' /tmp/ra2-apk-files.txt
+          grep -q 'assets/safedisc/VersionInjector.exe' /tmp/ra2-apk-files.txt
+          grep -q 'assets/safedisc/version.dll' /tmp/ra2-apk-files.txt
+          grep -q 'assets/licenses/SafeDiscLoader2-source.zip' /tmp/ra2-apk-files.txt
           sha256sum "$apk" | tee ra2-yuri-mobile.sha256
 
       - name: Upload installable APK
