@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.16-legacy-x86
+# build-version: 0.20-native-cab
 
 on:
   push:
@@ -73,7 +73,7 @@ jobs:
           grep -q 'RA2LauncherActivity' upstream/app/src/main/AndroidManifest.xml
           grep -q 'setRtsMode' upstream/app/src/main/java/com/winlator/widget/TouchpadView.java
           grep -q 'exec_dos_path' upstream/app/src/main/java/com/winlator/XServerDisplayActivity.java
-          grep -q 'setWoW64Mode(false)' upstream/app/src/main/java/com/winlator/RA2LauncherActivity.java
+          grep -q 'SUPPORTED_32_BIT_ABIS' upstream/app/src/main/java/com/winlator/RA2LauncherActivity.java
           grep -q 'RA2DiagnosticsActivity' upstream/app/src/main/AndroidManifest.xml
           test -s upstream/app/src/main/java/com/winlator/RA2DiagnosticsActivity.java
 
@@ -102,6 +102,20 @@ jobs:
             "ndk;22.1.7171670" \
             "cmake;3.22.1"
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > upstream/local.properties
+
+      - name: Test and build native CAB extractor
+        shell: bash
+        run: |
+          set -euo pipefail
+          ra2-mobile-port/native/build.sh test-native cc -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux"
+          python3 ra2-mobile-port/tests/make_cabs.py
+          javac -d test-native ra2-mobile-port/src/CabExtractor.java ra2-mobile-port/tests/CabExtractorTest.java
+          java -Djava.library.path=test-native -cp test-native CabExtractorTest
+          toolchain="$ANDROID_HOME/ndk/22.1.7171670/toolchains/llvm/prebuilt/linux-x86_64"
+          LD_LIBRARY_PATH="$toolchain/lib64" ra2-mobile-port/native/build.sh upstream/app/src/main/jniLibs/arm64-v8a "$toolchain/bin/aarch64-linux-android26-clang" -fuse-ld=lld
+          mkdir -p upstream/app/src/main/assets/licenses
+          cp ra2-mobile-port/native/LICENSE.libmspack upstream/app/src/main/assets/licenses/
+          cp ra2-mobile-port/native/NOTICE upstream/app/src/main/assets/licenses/libmspack-NOTICE
 
       - name: Build debug APK
         working-directory: upstream
@@ -143,7 +157,8 @@ jobs:
           apk=upstream/app/build/outputs/apk/debug/app-debug.apk
           test -s "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$apk"
-          unzip -Z1 "$apk" | grep -q 'lib/arm64-v8a/'
+          unzip -Z1 "$apk" > /tmp/ra2-apk-files.txt
+          grep -q 'lib/arm64-v8a/libra2cab.so' /tmp/ra2-apk-files.txt
           sha256sum "$apk" | tee ra2-yuri-mobile.sha256
 
       - name: Upload installable APK

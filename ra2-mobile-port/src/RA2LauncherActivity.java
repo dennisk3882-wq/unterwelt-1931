@@ -87,6 +87,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private TextView storageHint;
     private ProgressBar progress;
     private Button languageDe;
+    private volatile boolean installationBusy;
     private Button languageEn;
     private Button alliedButton;
     private Button sovietButton;
@@ -152,6 +153,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setGravity(Gravity.CENTER);
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
+        TextView version = label(12, Color.LTGRAY);
+        version.setText("v0.20 · Android CAB-Installer");
+        version.setGravity(Gravity.CENTER);
+        root.addView(version, matchWrap(0));
 
         LinearLayout languageRow = horizontal();
         languageDe = button("");
@@ -447,13 +452,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                 (existingRa2Mix == null || existingLanguageMix == null)) {
             String cabName = existingCab.getName();
             prefs.edit().putString(KEY_STAGE, STAGE_RA2_CAB).apply();
-            setBusy(false, isGerman()
+            setBusy(true, isGerman()
                 ? "Vorhandenes GAME1.CAB erkannt. Die fehlenden MIX-Dateien werden direkt erneut entpackt…"
                 : "Existing GAME1.CAB found. Retrying the missing MIX extraction directly…");
-            launchRuntimeDos(
-                "Z:\\opt\\apps\\7-Zip\\7z.exe",
-                "x \"C:\\RA2Mobile\\RA2CAB\\" + cabName + "\" -o\"C:\\Westwood\\RA2\" -y -aoa"
-            );
+            extractCabPayload(false);
             return;
         }
         Uri allied = savedUri(KEY_ALLIED);
@@ -478,6 +480,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
     private void beginYuriInstall() {
         if (!readyForInstall()) return;
+        if (selectYuriCab() != null && findIgnoreCase(gameDir(), "gamemd.exe", 2) != null && isInstalled(false)) {
+            extractCabPayload(true);
+            return;
+        }
         Uri yuri = savedUri(KEY_YURI);
         if (yuri == null) {
             message(isGerman() ? "Bitte zuerst die Yuri’s-Rache-ISO auswählen." : "Select the Yuri’s Revenge ISO first.");
@@ -502,6 +508,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     }
 
     private boolean readyForInstall() {
+        if (installationBusy) return false;
         if (container == null) {
             message(isGerman() ? "Die Laufzeit wird noch vorbereitet." : "The runtime is still being prepared.");
             return false;
@@ -587,8 +594,12 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     }
 
     private void continuePipeline(String stage) {
+        ioExecutor.execute(() -> continuePipelineWorker(stage));
+    }
+
+    private void continuePipelineWorker(String stage) {
         if (container == null) {
-            ensureRuntimeAndContainer();
+            runOnUiThread(this::ensureRuntimeAndContainer);
             return;
         }
         FileUtils.delete(stagingIso());
@@ -627,13 +638,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
                 String cabName = cab.getName();
                 prefs.edit().putString(KEY_STAGE, STAGE_RA2_CAB).apply();
-                setBusy(false, isGerman()
+                setBusy(true, isGerman()
                     ? "RA2.MIX und LANGUAGE.MIX werden aus " + cabName + " entpackt…"
                     : "Extracting RA2.MIX and LANGUAGE.MIX from " + cabName + "…");
-                launchRuntimeDos(
-                    "Z:\\opt\\apps\\7-Zip\\7z.exe",
-                    "x \"C:\\RA2Mobile\\RA2CAB\\" + cabName + "\" -o\"C:\\Westwood\\RA2\" -y -aoa"
-                );
+                extractCabPayload(false);
             }
             catch (Exception e) {
                 stopPipeline((isGerman() ? "Dateifehler: " : "File error: ") + e.getMessage());
@@ -702,7 +710,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                     ? "RA2 installiert. Zusätzliche Kompatibilitätsdateien fehlen: "
                     : "RA2 installed. Additional compatibility files missing: ") + optionalMissing);
             }
-            refreshGameState();
+            runOnUiThread(this::refreshGameState);
             return;
         }
 
@@ -721,13 +729,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
                 String cabName = cab.getName();
                 prefs.edit().putString(KEY_STAGE, STAGE_YURI_CAB).apply();
-                setBusy(false, isGerman()
+                setBusy(true, isGerman()
                     ? "RA2MD.MIX und LANGMD.MIX werden aus den Yuri-CAB-Dateien entpackt…"
                     : "Extracting RA2MD.MIX and LANGMD.MIX from the Yuri CAB files…");
-                launchRuntimeDos(
-                    "Z:\\opt\\apps\\7-Zip\\7z.exe",
-                    "x \"C:\\RA2Mobile\\YURICAB\\" + cabName + "\" -o\"C:\\Westwood\\RA2\" -y -aoa"
-                );
+                extractCabPayload(true);
             }
             catch (Exception e) {
                 stopPipeline((isGerman() ? "Dateifehler: " : "File error: ") + e.getMessage());
@@ -769,10 +774,26 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             setBusy(false, isGerman()
                 ? "Yuri’s Rache wurde direkt aus der Original-CD installiert."
                 : "Yuri’s Revenge was installed directly from the original disc.");
-            refreshGameState();
+            runOnUiThread(this::refreshGameState);
         }
     }
 
+
+    private void extractCabPayload(boolean yuri) {
+        setBusy(true, isGerman() ? "Spieldateien werden direkt unter Android entpackt…" : "Extracting game files on Android…");
+        ioExecutor.execute(() -> {
+            try {
+                String report = CabExtractor.extractRequired(yuri ? yuriCabDir() : ra2CabDir(), gameDir(),
+                    yuri ? new String[]{"ra2md.mix", "langmd.mix"} : new String[]{"ra2.mix", "language.mix"},
+                    name -> runOnUiThread(() -> status.setText("Entpacke: " + name)));
+                FileUtils.writeString(new File(gameDir(), yuri ? "yuri-install.log" : "ra2-install.log"), report);
+                continuePipeline(yuri ? STAGE_YURI_CAB : STAGE_RA2_CAB);
+            } catch (Exception | LinkageError e) {
+                stopPipeline("CAB-Fehler: " + e.getMessage());
+                runOnUiThread(this::refreshGameState);
+            }
+        });
+    }
 
     private File gameDir() {
         File dir = new File(container.getRootDir(), ".wine/drive_c/Westwood/RA2");
@@ -1221,6 +1242,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
     private void launchGame(boolean yuri) {
         if (container == null) return;
+        if (installationBusy || !isInstalled(yuri)) {
+            message(isGerman() ? "Spieldateien fehlen. Bitte zuerst Einrichtung abschließen." : "Game files are missing. Complete setup first.");
+            return;
+        }
 
         File exe = findIgnoreCase(gameDir(), yuri ? "gamemd.exe" : "game.exe", 2);
         if (exe == null) {
@@ -1309,7 +1334,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                 refreshGameState();
                 if (report) {
                     boolean de = isGerman();
-                    if (ra2 != null || yuri != null) {
+                    if (isInstalled(false) || isInstalled(true)) {
                         setBusy(false, de ? "Installation erkannt. Spielstart ist bereit." : "Installation detected. Game launch is ready.");
                     }
                     else {
@@ -1324,20 +1349,26 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
     private void refreshGameState() {
         if (prefs == null || playRa2Button == null) return;
-        boolean ra2 = isInstalled(false);
-        boolean yuri = isInstalled(true);
+        boolean ra2 = !installationBusy && isInstalled(false);
+        boolean yuri = !installationBusy && isInstalled(true);
         playRa2Button.setEnabled(ra2);
         playYuriButton.setEnabled(yuri);
         playRa2Button.setAlpha(ra2 ? 1.0f : 0.45f);
         playYuriButton.setAlpha(yuri ? 1.0f : 0.45f);
-        installYuriButton.setEnabled(container != null && ra2 && savedUri(KEY_YURI) != null);
-        installRa2Button.setEnabled(container != null && savedUri(KEY_ALLIED) != null && savedUri(KEY_SOVIET) != null);
+        installYuriButton.setEnabled(!installationBusy && container != null && ra2 && savedUri(KEY_YURI) != null);
+        installRa2Button.setEnabled(!installationBusy && container != null && savedUri(KEY_ALLIED) != null && savedUri(KEY_SOVIET) != null);
     }
 
     private boolean isInstalled(boolean yuri) {
-        if (prefs == null) return false;
-        String path = prefs.getString(yuri ? KEY_YURI_EXE : KEY_RA2_EXE, "");
-        return !path.isEmpty() && new File(path).isFile();
+        if (prefs == null || container == null) return false;
+        String[] required = yuri
+            ? new String[]{"gamemd.exe", "ra2md.mix", "langmd.mix", "mapsmd03.mix", "movmd03.mix", "multimd.mix", "thememd.mix", "binkw32.dll", "blowfish.dll"}
+            : new String[]{"game.exe", "ra2.mix", "language.mix", "maps01.mix", "maps02.mix", "movies01.mix", "movies02.mix", "multi.mix", "theme.mix", "binkw32.dll", "blowfish.dll"};
+        for (String name : required) {
+            File file = findChildIgnoreCase(gameDir(), name);
+            if (file == null || !file.isFile() || file.length() == 0) return false;
+        }
+        return !yuri || isInstalled(false);
     }
 
     private void preparePhysicalDriveX() {
@@ -1359,6 +1390,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private void storeMedia(boolean yuri) {
         File driveX = driveX();
         File media = mediaDir(yuri);
+        File[] entries = driveX.listFiles();
+        if (FileUtils.isSymlink(driveX) || entries == null || entries.length == 0) return;
         FileUtils.delete(media);
         if (driveX.isDirectory() && !FileUtils.isSymlink(driveX)) {
             if (!driveX.renameTo(media)) {
@@ -1433,10 +1466,12 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     }
 
     private void setBusy(boolean busy, String text) {
+        installationBusy = busy;
         runOnUiThread(() -> {
             progress.setVisibility(busy ? View.VISIBLE : View.GONE);
             if (!busy) progress.setProgress(0);
             status.setText(text == null ? "" : text);
+            refreshGameState();
             installRa2Button.setEnabled(!busy && container != null && savedUri(KEY_ALLIED) != null && savedUri(KEY_SOVIET) != null);
             installYuriButton.setEnabled(!busy && container != null && isInstalled(false) && savedUri(KEY_YURI) != null);
         });

@@ -16,7 +16,7 @@ APP_ID = "com.winlator"
 def copy_sources_legacy(root: Path) -> None:
     dst = root / "app/src/main/java/com/winlator"
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java"]:
+    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java"]:
         require(SRC / name)
         text = read(SRC / name)
 
@@ -32,11 +32,11 @@ def copy_sources_legacy(root: Path) -> None:
             text = text.replace('data.put("dxwrapper", "wined3d");', 'data.put("dxwrapper", "cnc-ddraw");')
             text = text.replace('data.put("dxwrapperConfig", "ddrawWrapper=cnc-ddraw");', 'data.put("dxwrapperConfig", "");')
             text = text.replace('data.put("box64Preset", Box64Preset.STABILITY);',
-                'data.put("wow64Mode", false);\n            data.put("box86Preset", Box86_64Preset.STABILITY);\n            data.put("box64Preset", Box86_64Preset.STABILITY);')
+                'data.put("wow64Mode", android.os.Build.SUPPORTED_32_BIT_ABIS.length == 0);\n            data.put("box86Preset", Box86_64Preset.STABILITY);\n            data.put("box64Preset", Box86_64Preset.STABILITY);')
             text = text.replace('target.setDXWrapper("wined3d");', 'target.setDXWrapper("cnc-ddraw");')
             text = text.replace('target.setDXWrapperConfig("ddrawWrapper=cnc-ddraw");', 'target.setDXWrapperConfig("");')
             text = text.replace('target.setBox64Preset(Box64Preset.STABILITY);',
-                'target.setWoW64Mode(false);\n        target.setBox86Preset(Box86_64Preset.STABILITY);\n        target.setBox64Preset(Box86_64Preset.STABILITY);')
+                'target.setWoW64Mode(android.os.Build.SUPPORTED_32_BIT_ABIS.length == 0);\n        target.setBox86Preset(Box86_64Preset.STABILITY);\n        target.setBox64Preset(Box86_64Preset.STABILITY);')
             text = text.replace("WineUtils.changeServicesStatus(target, Container.STARTUP_SELECTION_NORMAL);",
                                 "WineUtils.changeServicesStatus(target, false);")
             text = text.replace("WineUtils.changeServicesStatus(container, Container.STARTUP_SELECTION_NORMAL);",
@@ -67,9 +67,10 @@ def copy_sources_legacy(root: Path) -> None:
                 "GAME.EXE läuft damit nicht mehr über Wines experimentellen neuen WoW64-Pfad.");
         }
         else {
-            add(Level.FAIL, "32-Bit-Laufzeit", "WoW64-Modus unerwartet aktiv",
-                "container.isWoW64Mode() = true",
-                "RA2 benötigt in diesem Build den Legacy-x86-/Box86-Pfad.");
+            add(Level.PASS, "32-Bit-Laufzeit", "WoW64 / Box64 aktiv",
+                "64-Bit-Android: " + (android.os.Build.SUPPORTED_32_BIT_ABIS.length == 0),
+                "32-Bit-Windows-Spiele nutzen die 64-Bit-Laufzeit; Box86 ist hier nicht erforderlich.");
+            return;
         }
 
         File imageRoot = ImageFs.find(this).getRootDir();
@@ -159,8 +160,9 @@ def copy_sources_legacy(root: Path) -> None:
 
             helper = """    private void restoreLegacyGameMode() {
         if (container == null) return;
-        if (container.isWoW64Mode()) {
-            container.setWoW64Mode(false);
+        boolean needsWow64 = android.os.Build.SUPPORTED_32_BIT_ABIS.length == 0;
+        if (container.isWoW64Mode() != needsWow64) {
+            container.setWoW64Mode(needsWow64);
             container.saveData();
         }
     }
@@ -187,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 217")
-    s = s.replace('versionName "7.1"', 'versionName "0.17.0-ra2-legacy"')
+    s = s.replace("versionCode 16", "versionCode 220")
+    s = s.replace('versionName "7.1"', 'versionName "0.20.0-ra2-native-cab"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -877,6 +879,15 @@ def validate(root: Path) -> None:
         if marker not in read(path):
             raise SystemExit(f"Validation marker {marker!r} missing from {path}")
 
+def patch_missing_translators(root: Path) -> None:
+    p = root / "app/src/main/java/com/winlator/xenvironment/components/GuestProgramLauncherComponent.java"
+    s = read(p)
+    for arch in ["86", "64"]:
+        s = s.replace('!box'+arch+'Version.equals(currentBox'+arch+'Version)', '!box'+arch+'Version.equals(currentBox'+arch+'Version) || !(new File(rootDir, "usr/local/bin/box'+arch+'")).isFile()')
+    write(p, s)
+    p = root / "app/proguard-rules.pro"
+    write(p, read(p) + "\n-keep class com.winlator.CabExtractor { *; }\n")
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("upstream", type=Path)
@@ -892,6 +903,7 @@ def main() -> None:
     patch_xserver(root)
     patch_winhandler_compat(root)
     patch_midi_compat(root)
+    patch_missing_translators(root)
     validate(root)
     print("RA2/Yuri legacy x86 Android patch applied successfully.")
 
