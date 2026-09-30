@@ -920,10 +920,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         File liveLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
         String finalText = log.isFile() ? FileUtils.readString(log) : "";
         String liveText = liveLog.isFile() ? FileUtils.readString(liveLog) : "";
-        String text = (finalText == null ? "" : finalText);
-        if (liveText != null && !liveText.isEmpty()) {
-            text += "\n--- LIVE WINE TRACE ---\n" + liveText;
-        }
+        String text = liveText != null && !liveText.isEmpty() ? liveText : (finalText == null ? "" : finalText);
         lastLaunchText = text;
 
         int exit = prefs.getInt("last_exit_code", Integer.MIN_VALUE);
@@ -1543,16 +1540,16 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         if (lower.contains("access denied") || lower.contains("permission"))
             return "Dateizugriff bzw. Wine-Pfade prüfen.";
         if (lower.contains("rpcss") || lower.contains("rpc_s_server_unavailable"))
-            return "Hohe Relevanz: RPC-Dienst war beim letzten Start nicht verfügbar. Dienstmodus und RpcSs prüfen.";
+            return "RPC-Meldung: mit Vor-/Nachabfrage und Spielphase vergleichen; allein kein Beweis für einen Dienstausfall.";
         if (lower.contains("experimental wow64"))
-            return "Kompatibilitätshinweis: GAME.EXE läuft im experimentellen WoW64-Pfad. Erst relevant, wenn RPC/Service-Fehler behoben sind.";
+            return "Kompatibilitätshinweis: Ein 32-Bit-Prozess läuft im WoW64-Pfad; diese Meldung allein ist kein Absturz.";
         if (lower.contains("nsi:poll_events") && lower.contains("errno 13"))
             return "Wahrscheinlich sekundär: Netzwerk-Socket wurde von Android/Wine abgewiesen; für Einzelspieler meist kein primärer Startblocker.";
         if (lower.contains("secdrv") || lower.contains("safedisc"))
             return "SafeDisc-Treiberpfad prüfen; Yuri enthält eine neuere secdrv.sys-Version.";
         if (lower.contains("registry"))
             return "Westwood-Registry-Einträge prüfen.";
-        return "Diese Zeile ist wahrscheinlich startrelevant.";
+        return "Diese Zeile kann relevant sein; Prozess und Zeitpunkt mit dem Spielprotokoll vergleichen.";
     }
 
     private String configValue(String cfg, String key) {

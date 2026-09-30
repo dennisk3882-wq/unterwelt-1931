@@ -60,3 +60,10 @@ for p in root.rglob('*.vcxproj'):
  for elem in tree.getroot().findall('.//m:UACExecutionLevel',ns):elem.text='AsInvoker'
  tree.write(p,encoding='utf-8',xml_declaration=True)
 print('SafeDisc compatibility helper adapted')
+# Upstream resource refers to the author's machine; use the tracked icon.
+p=root/'VersionInjector/VersionInjector.rc'
+s=p.read_text(encoding='utf-16')
+import re
+s,n=re.subn(r'"C:.*?SafeDiscLoaderIcon\.ico"', '"../SafeDiscLoaderIcon.ico"', s)
+assert n == 1, 'Upstream icon resource changed'
+p.write_text(s,encoding='utf-16')
