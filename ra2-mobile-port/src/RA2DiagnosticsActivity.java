@@ -115,7 +115,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         top.addView(back, new LinearLayout.LayoutParams(dp(100), dp(46)));
 
         headline = text(25, Color.rgb(238, 220, 170), true);
-        headline.setText("RA2 / Yuri Diagnose-Center");
+        headline.setText("RA2 / Yuri Diagnose-Center v0.24");
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         hp.leftMargin = dp(14);
         top.addView(headline, hp);
@@ -163,6 +163,15 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         cp.leftMargin = dp(8);
         actions.addView(copyButton, cp);
         page.addView(actions);
+        Button export = button("Diagnose-ZIP speichern");
+        export.setOnClickListener(v -> {
+            android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+            intent.setType("application/zip");
+            intent.putExtra(android.content.Intent.EXTRA_TITLE, "RA2-Diagnose-" + System.currentTimeMillis() + ".zip");
+            startActivityForResult(intent, 2401);
+        });
+        page.addView(export, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(46)));
 
         return page;
     }
@@ -766,7 +775,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         if (indicator) {
             add(Level.WARN, "Kopierschutz", "Original-CD/SafeDisc erkannt",
                 "Die CD-Version verwendet den alten SafeDisc-Treiberpfad.",
-                "Das erklärt einen stillen Spielabbruch trotz vollständiger RA2-Dateien wesentlich besser als die fehlenden WOL-Dateien.");
+                "Dies ist ein Kopierschutz-Indikator, kein Nachweis für die Ursache des letzten Spielendes.");
         }
         else {
             add(Level.INFO, "Kopierschutz", "Kein eindeutiger SafeDisc-Indikator erkannt",
@@ -775,9 +784,9 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
 
         File active = secdrv32.isFile() ? secdrv32 : (secdrv64.isFile() ? secdrv64 : secdrvGame);
         if (active == null || !active.isFile()) {
-            add(indicator ? Level.FAIL : Level.WARN, "Kopierschutz", "secdrv.sys fehlt",
+            add(Level.WARN, "Kopierschutz", "secdrv.sys fehlt",
                 "Weder im Wine-Treiberordner noch im Spielordner gefunden.",
-                "Yuri’s Rache einrichten. Der aktuelle Build übernimmt einen vorhandenen neueren Yuri-SafeDisc-Treiber automatisch.");
+                "Eine Treiberdatei ist für den CD-Kompatibilitätshelfer kein Funktionsnachweis. Tatsächlichen Startweg und Helferprotokoll prüfen.");
             return;
         }
 
@@ -919,7 +928,8 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         File log = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/last-start.log");
         File liveLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
         String finalText = log.isFile() ? FileUtils.readString(log) : "";
-        String liveText = liveLog.isFile() ? FileUtils.readString(liveLog) : "";
+        String liveText = sessionText("ra2-evidence.log");
+        if (liveText.isEmpty()) liveText = sessionText("ra2-live.previous.log") + (liveLog.isFile() ? FileUtils.readString(liveLog) : "");
         String text = liveText != null && !liveText.isEmpty() ? liveText : (finalText == null ? "" : finalText);
         lastLaunchText = text;
 
@@ -1147,110 +1157,45 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         }
     }
 
+    private String sessionText(String name) {
+        if (container == null) return "";
+        File file = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/" + name);
+        return file.isFile() ? FileUtils.readString(file) : "";
+    }
+
     private void createRootCauseAnalysis() {
-        String log = lastLaunchText == null ? "" : lastLaunchText.toLowerCase(Locale.ENGLISH);
-        String gameLog = RA2LaunchBatch.gamePhase(log);
-        boolean rpc = gameLog.contains("failed to start rpcss") || gameLog.contains("rpc_s_server_unavailable") ||
-            gameLog.contains("code=6ba") || gameLog.contains("receive failed with error 6be");
-        boolean wow64 = log.contains("experimental wow64 mode");
-        boolean nsi = log.contains("nsi:poll_events") && log.contains("errno 13");
-        boolean noGame = prefs.contains("last_saw_child") && !prefs.getBoolean("last_saw_child", false);
-
-        File rpcPreflight = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/rpcss-preflight.txt");
-        String rpcPreflightText = rpcPreflight.isFile() ? FileUtils.readString(rpcPreflight) : "";
-        String rpcPreflightLower = rpcPreflightText == null ? "" : rpcPreflightText.toLowerCase(Locale.ENGLISH);
-        boolean rpcPreflightFailed = rpcPreflightLower.contains("failed") || rpcPreflightLower.contains("error") ||
-            rpcPreflightLower.contains("1053") || rpcPreflightLower.contains("1058") || rpcPreflightLower.contains("1060");
-        boolean rpcPreflightRunning = rpcPreflightLower.contains("running") ||
-            (rpcPreflightLower.contains("state") && rpcPreflightLower.contains("4"));
-        boolean secdrvGood = new File(container.getRootDir(),
-            ".wine/drive_c/windows/system32/drivers/secdrv.sys").isFile();
-
-        boolean servicesGood = container.getStartupSelection() == Container.STARTUP_SELECTION_NORMAL;
-        Integer rpcStart = readServiceStart("RpcSs");
-        servicesGood = servicesGood && rpcStart != null && rpcStart == 2;
-
-        File globalIni = new File(container.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
-        String cfg = globalIni.isFile() ? FileUtils.readString(globalIni) : "";
-        boolean graphicsGood = "opengl".equalsIgnoreCase(activeConfigValue(cfg, "renderer")) &&
-            "true".equalsIgnoreCase(activeConfigValue(cfg, "singlecpu"));
-
-        if (log.contains("stage=target-not-seen")) {
-            primaryDiagnosis = "Die App hat Wine nach 30 Sekunden selbst beendet. Exit 137 ist hier kein Beweis für einen Spielabsturz.";
-            add(Level.WARN, "Intelligente Ursachenanalyse", "App-eigener Startabbruch",
-                "Der frühere Watchdog hat ohne erkanntes Spielfenster die gesamte Laufzeit beendet.",
-                "Ab v0.21 bleibt die Laufzeit aktiv; nur ein protokolliertes Spielende beendet die Sitzung automatisch.");
+        if (container == null) return;
+        Integer code = RA2LaunchBatch.readGameExit(new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/game-exit.txt"));
+        RA2DiagnosticEvidence.Analysis analysis = RA2DiagnosticEvidence.analyze(lastLaunchText,
+            sessionText("safedisc-injector.log"), sessionText("safedisc.log"),
+            sessionText("rpcss-preflight.txt"), sessionText("rpcss-after-game.txt"), code,
+            prefs.getBoolean("last_saw_child", false));
+        primaryDiagnosis = analysis.summary;
+        add(Level.INFO, "Sitzung", "Aktueller Testlauf", sessionText("session.json"),
+            "Nur Daten dieses Laufs werden für die Ursachenanalyse verwendet. Ältere Läufe stehen im ZIP getrennt bereit.");
+        add(Level.INFO, "Sitzung", "Ereignisse mit Zeitstempel", sessionText("events.log"),
+            "Zeitstempel sind Millisekunden seit Unix-Epoch; Wine-Zeilen tragen zusätzlich wineMs seit Laufzeitstart.");
+        File compactTrace = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-evidence.log");
+        if (compactTrace.length() >= 16 * 1024 * 1024) add(Level.WARN, "Messabdeckung", "Kompaktprotokoll hat Größenlimit erreicht",
+            "Spätere Wine-Zeilen können fehlen; Ereignisprotokoll und letzte rohe Trace-Segmente bleiben im ZIP.",
+            "Keine Aussage über spätere Fehler aus fehlenden Zeilen ableiten.");
+        for (RA2DiagnosticEvidence.Finding finding : analysis.findings) {
+            Level level = finding.severity.equals("FAIL") ? Level.FAIL : finding.severity.equals("WARN") ? Level.WARN : Level.INFO;
+            add(level, "Ursachenanalyse nach Fehlerbelegen", finding.confidence + " • " + finding.title,
+                finding.evidence, finding.next);
         }
-        else if (rpcPreflightFailed && !rpcPreflightRunning) {
-            primaryDiagnosis = "RpcSs lässt sich direkt vor GAME.EXE nicht starten.";
-            add(Level.FAIL, "Intelligente Ursachenanalyse", "Priorität 1 – RpcSs-Starttest fehlgeschlagen",
-                compactLines(rpcPreflightText, 8),
-                "Wine-Service/WoW64-Laufzeit ist der primäre Kandidat; Spiel- und Grafikdateien sind aktuell nachrangig.");
-        }
-        else if (noGame && Integer.valueOf(0).equals(RA2LaunchBatch.readGameExit(
-                new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/game-exit.txt")))) {
-            primaryDiagnosis = "Spielprozess endet mit Code 0 vor dem Spielfenster. CD-Kompatibilität oder sehr früher Runtime-Abbruch; Ursache noch ungeklärt.";
-            add(Level.WARN, "Intelligente Ursachenanalyse", "Frühes Spielende ohne Spielfenster",
-                "Die Spiel-EXE wurde geladen und beendet sich ohne protokollierten Absturz. RpcSs- und Treiberdateien allein erklären das nicht.",
-                "Der erkannte SafeDisc-Startweg und seine beiden Protokolle liefern die nächste belastbare Prüfung.");
-        }
-        else if (rpc && rpcPreflightRunning) {
-            primaryDiagnosis = "RPC-Meldungen während des Spielstarts trotz laufendem RpcSs; Zusammenhang mit dem Abbruch noch ungeklärt.";
-            add(Level.WARN, "Intelligente Ursachenanalyse", "RPC-Meldungen während des Spielstarts",
-                "sc.exe meldet RpcSs als laufend, das Wine-Log enthält aber RPC_S_SERVER_UNAVAILABLE.",
-                "Diese Meldungen allein beweisen keinen Dienstausfall. Spiel-Rückgabecode und zeitlichen Verlauf prüfen.");
-        }
-        else if (rpc) {
-            if (servicesGood) {
-                primaryDiagnosis = "RpcSs/RPC war beim letzten Start nicht verfügbar; Auto-Start und WoW64-RPC-Pfad werden jetzt gezielt geprüft.";
-                add(Level.WARN, "Intelligente Ursachenanalyse", "Priorität 1 – RPC/RpcSs",
-                    "Der letzte Start enthält RPC_S_SERVER_UNAVAILABLE bzw. Failed to start RpcSs. Der aktuelle Dienststatus ist inzwischen korrekt.",
-                    "Nächster RA2-Start ist der entscheidende Retest. Verschwindet RPC, wird automatisch die nächste Ursache sichtbar.");
+        File history = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/history");
+        File[] runs = history.listFiles();
+        if (runs != null) {
+            Arrays.sort(runs, (a,b) -> b.getName().compareTo(a.getName()));
+            for (int i=0; i<Math.min(3, runs.length); i++) {
+                File oldResult = new File(runs[i], "game-exit.txt");
+                File meta = new File(runs[i], "session.json");
+                add(Level.INFO, "Frühere Testläufe", runs[i].getName(),
+                    "Spielcode: " + RA2DiagnosticEvidence.decode(RA2LaunchBatch.readGameExit(oldResult)) +
+                    (meta.isFile() ? "\n" + FileUtils.readString(meta) : "\nKein Sitzungssnapshot im früheren Build"),
+                    "Frühere Fehler werden nicht in die aktuelle Ursachenanalyse übernommen.");
             }
-            else {
-                primaryDiagnosis = "RpcSs ist der aktuelle Startblocker.";
-                add(Level.FAIL, "Intelligente Ursachenanalyse", "Priorität 1 – RPC/RpcSs",
-                    "Log und aktuelle Dienstkonfiguration passen zusammen: RpcSs ist nicht korrekt verfügbar.",
-                    "„Sicher reparieren“ ausführen und erneut starten.");
-            }
-        }
-        else if (noGame) {
-            primaryDiagnosis = "GAME.EXE erreicht die eigentliche Spielphase nicht.";
-            add(Level.FAIL, "Intelligente Ursachenanalyse", "Priorität 1 – sehr früher GAME.EXE-Abbruch",
-                "Kein Spielfenster wurde erkannt; das beweist nicht, dass kein Spielprozess gestartet wurde.",
-                "Die darunter priorisierten Runtime-Hinweise sind jetzt wichtiger als Installationsdateien.");
-        }
-        else {
-            primaryDiagnosis = "Kein eindeutiger Primärfehler im letzten Startlog.";
-            add(Level.INFO, "Intelligente Ursachenanalyse", "Keine eindeutige Einzelursache",
-                "Statische Installation und letzter Start liefern keinen dominanten Fehler.",
-                "Weitere Start-Timeline und Wine-Signaturen vergleichen.");
-        }
-
-        if (wow64) {
-            add(Level.WARN, "Intelligente Ursachenanalyse", "Priorität 2 – experimenteller WoW64-Pfad",
-                "Wine meldet ausdrücklich „experimental wow64 mode“ für GAME.EXE.",
-                rpc
-                    ? "Erst nach dem RPC-Retest bewerten. Wenn RPC verschwindet und GAME.EXE weiter sofort endet, ist dies der nächste Kandidat."
-                    : "Bei weiterem Frühabbruch als nächstes den 32-Bit-Wine/WoW64-Pfad untersuchen.");
-        }
-
-        if (secdrvGood) {
-            add(Level.WARN, "Intelligente Ursachenanalyse", "SafeDisc-Kompatibilität ungeklärt",
-                "secdrv.sys liegt im Wine-Treiberpfad.",
-                "Die vorhandene Datei beweist nicht, dass Wine den Kopierschutz ausführen kann.");
-        }
-
-        if (graphicsGood) {
-            add(Level.PASS, "Intelligente Ursachenanalyse", "Grafikpfad konsistent",
-                "renderer=opengl und singlecpu=true sind aktiv.",
-                "CNC-DDraw-Konfiguration ist derzeit kein führender Verdacht.");
-        }
-
-        if (nsi) {
-            add(Level.INFO, "Intelligente Ursachenanalyse", "Sekundärer Netzwerkhinweis",
-                "nsi:poll_events bind failed, errno 13",
-                "Für Kampagne/Skirmish typischerweise nachrangig; nicht als Hauptursache behandeln, solange frühere RPC-/Runtime-Fehler bestehen.");
         }
     }
 
@@ -1389,7 +1334,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         }
 
         String baseSummary = "Fertig: " + pass + " OK • " + warn + " Warnungen • " + fail + " Fehler";
-        summary.setText(primaryDiagnosis.isEmpty() ? baseSummary : baseSummary + "\nHauptverdacht: " + primaryDiagnosis);
+        summary.setText(primaryDiagnosis.isEmpty() ? baseSummary : baseSummary + "\nDiagnose nach Fehlerbelegen: " + primaryDiagnosis);
 
         String lastGroup = "";
         StringBuilder report = new StringBuilder();
@@ -1436,6 +1381,48 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         ClipboardManager cm = (ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
         cm.setPrimaryClip(ClipData.newPlainText("RA2 Diagnose", reportText));
         summary.setText(summary.getText() + " • Protokoll kopiert");
+    }
+
+    @Override
+    protected void onActivityResult(int request, int result, android.content.Intent data) {
+        super.onActivityResult(request, result, data);
+        if (request != 2401 || result != RESULT_OK || data == null || data.getData() == null) return;
+        final Uri destination = data.getData();
+        final String report = reportText;
+        worker.execute(() -> {
+            try (java.io.OutputStream output = getContentResolver().openOutputStream(destination);
+                 java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(output)) {
+                zip.putNextEntry(new java.util.zip.ZipEntry("Diagnosebericht.txt"));
+                zip.write(report.getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+                if (container != null) {
+                    File session = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile");
+                    zipSession(zip, session, "aktueller-lauf/");
+                    File[] history = new File(session, "history").listFiles();
+                    if (history != null) {
+                        Arrays.sort(history, (a,b) -> b.getName().compareTo(a.getName()));
+                        for (int i=0;i<Math.min(3,history.length);i++) zipSession(zip,history[i],"history/"+history[i].getName()+"/");
+                    }
+                }
+                runOnUiThread(() -> android.widget.Toast.makeText(this,"Diagnose-ZIP gespeichert",android.widget.Toast.LENGTH_LONG).show());
+            } catch (Exception error) {
+                runOnUiThread(() -> android.widget.Toast.makeText(this,"ZIP konnte nicht gespeichert werden: " + error.getMessage(),android.widget.Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void zipSession(java.util.zip.ZipOutputStream zip, File session, String prefix) throws java.io.IOException {
+        // Explicit allowlist: no ISOs, registry, saved games or unrelated app files.
+        for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "game-exit.txt", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "safedisc.log", "safedisc-injector.log"}) {
+            File file = new File(session,name);
+            if (!file.isFile()) continue;
+            zip.putNextEntry(new java.util.zip.ZipEntry(prefix+name));
+            try (FileInputStream input = new FileInputStream(file)) {
+                byte[] buffer = new byte[65536]; int count;
+                while ((count=input.read(buffer))!=-1) zip.write(buffer,0,count);
+            }
+            zip.closeEntry();
+        }
     }
 
     private int checkFileSetDummy() { return 0; }
@@ -1549,7 +1536,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             return "SafeDisc-Treiberpfad prüfen; Yuri enthält eine neuere secdrv.sys-Version.";
         if (lower.contains("registry"))
             return "Westwood-Registry-Einträge prüfen.";
-        return "Diese Zeile kann relevant sein; Prozess und Zeitpunkt mit dem Spielprotokoll vergleichen.";
+        return "Nicht eindeutig zugeordnet. Maßgeblich ist die Analyse nach Spiel-TID und Startphase.";
     }
 
     private String configValue(String cfg, String key) {

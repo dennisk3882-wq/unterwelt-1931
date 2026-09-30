@@ -16,7 +16,7 @@ APP_ID = "com.winlator"
 def copy_sources_legacy(root: Path) -> None:
     dst = root / "app/src/main/java/com/winlator"
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java"]:
+    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java", "RA2DiagnosticEvidence.java"]:
         require(SRC / name)
         text = read(SRC / name)
 
@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 223")
-    s = s.replace('versionName "7.1"', 'versionName "0.23.0-ra2-cd-compatibility"')
+    s = s.replace("versionCode 16", "versionCode 224")
+    s = s.replace('versionName "7.1"', 'versionName "0.24.0-ra2-evidence-diagnostics"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -511,7 +511,7 @@ def patch_xserver(root: Path) -> None:
             appendRa2Log(ra2LiveLog,
                 "stage=wine-debug-attached\\nstartedAt=" + ra2StartedAt +
                 "\\nwow64Mode=" + container.isWoW64Mode() + "\\n");
-            envVars.put("WINEDEBUG", "+seh,+process,+loaddll,err+service,warn+rpc,err+ole");
+            envVars.put("WINEDEBUG", "+timestamp,+seh,+process,+loaddll,+file,err+service,warn+rpc,err+ole");
             ProcessHelper.addDebugCallback((line) -> {
                 synchronized (ra2Debug) {
                     if (ra2Debug.length() > 131072) {
@@ -519,7 +519,7 @@ def patch_xserver(root: Path) -> None:
                     }
                     ra2Debug.append(line).append("\\n");
                 }
-                appendRa2Log(ra2LiveLog, line + "\\n");
+                appendRa2Log(ra2LiveLog, "wineMs=" + (System.currentTimeMillis() - ra2StartedAt) + " " + line + "\\n");
             });
             guestProgramLauncherComponent.setTerminationCallback((status) ->
                 finishRa2LegacyLaunch(status, ra2StartedAt, ra2Debug, ra2LiveLog));
@@ -594,8 +594,31 @@ def patch_xserver(root: Path) -> None:
 
     }
 
-    private void appendRa2Log(File file, String value) {
+    private synchronized void appendRa2Log(File file, String value) {
         if (file == null || value == null) return;
+        // Preserve critical session events independently of bounded verbose Wine traces.
+        if (file.getName().equals("ra2-live.log")) {
+            if (value.contains("stage=") && !value.startsWith("wineMs=")) {
+                try (java.io.FileOutputStream events = new java.io.FileOutputStream(new File(file.getParentFile(), "events.log"), true)) {
+                    events.write(("eventAt=" + System.currentTimeMillis() + " " + value).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                } catch (Exception ignored) {}
+            }
+            // A compact ordered trace keeps phase markers even when verbose file tracing rotates.
+            String lower = value.toLowerCase(java.util.Locale.ROOT);
+            if (!lower.contains(":file:") || lower.contains("c0000034") || lower.contains("c000003a") || lower.contains("c0000022") || lower.contains(":err:")) {
+                File evidence = new File(file.getParentFile(), "ra2-evidence.log");
+                if (evidence.length() < 16 * 1024 * 1024) {
+                    try (java.io.FileOutputStream out = new java.io.FileOutputStream(evidence, true)) {
+                        out.write(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    } catch (Exception ignored) {}
+                }
+            }
+            if (file.length() > 8 * 1024 * 1024) {
+                File previous = new File(file.getParentFile(), "ra2-live.previous.log");
+                previous.delete();
+                file.renameTo(previous);
+            }
+        }
         try (java.io.FileOutputStream out = new java.io.FileOutputStream(file, true)) {
             out.write(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             out.flush();
@@ -781,6 +804,43 @@ def patch_xserver(root: Path) -> None:
 
         File session = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile");
         session.mkdirs();
+        // Keep three independent previous runs; never mix their errors into this run.
+        File history = new File(session, "history");
+        history.mkdirs();
+        if (new File(session, "session.json").isFile() || new File(session, "ra2-live.log").isFile()) {
+            File archive = new File(history, "run-" + System.currentTimeMillis());
+            archive.mkdirs();
+            for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "last-start.log", "game-exit.txt", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "safedisc.log", "safedisc-injector.log"}) {
+                File source = new File(session, name);
+                if (source.isFile()) source.renameTo(new File(archive, name));
+            }
+            File[] runs = history.listFiles();
+            if (runs != null) {
+                java.util.Arrays.sort(runs, (a,b) -> b.getName().compareTo(a.getName()));
+                for (int i = 3; i < runs.length; i++) FileUtils.delete(runs[i]);
+            }
+        }
+        FileUtils.delete(new File(session, "events.log"));
+        FileUtils.delete(new File(session, "ra2-evidence.log"));
+        FileUtils.delete(new File(session, "ra2-live.previous.log"));
+        org.json.JSONObject metadata = new org.json.JSONObject();
+        try {
+            metadata.put("runId", java.util.UUID.randomUUID().toString());
+            metadata.put("startedAt", System.currentTimeMillis());
+            metadata.put("appVersion", "0.24");
+            metadata.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
+            metadata.put("android", android.os.Build.VERSION.RELEASE);
+            metadata.put("abis", java.util.Arrays.toString(android.os.Build.SUPPORTED_ABIS));
+            metadata.put("wow64", container.isWoW64Mode());
+            metadata.put("game", new File(execPath).getName());
+            metadata.put("gameBytes", new File(execPath).length());
+            metadata.put("gameSHA256", RA2DiagnosticEvidence.sha256(new File(execPath)));
+            metadata.put("ddrawSHA256", RA2DiagnosticEvidence.sha256(new File(dir, "ddraw.dll")));
+            metadata.put("binkSHA256", RA2DiagnosticEvidence.sha256(new File(dir, "binkw32.dll")));
+            metadata.put("freeBytes", session.getUsableSpace());
+            metadata.put("trace", "process,loaddll,seh,file,timestamp; bounded last 16 MiB");
+        } catch (org.json.JSONException ignored) {}
+        FileUtils.writeString(new File(session, "session.json"), metadata.toString());
         FileUtils.delete(new File(session, "game-exit.txt"));
         FileUtils.delete(new File(session, "game-exit.tmp"));
         FileUtils.delete(new File(session, "rpcss-after-game.txt"));

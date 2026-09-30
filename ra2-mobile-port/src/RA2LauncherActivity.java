@@ -154,7 +154,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.23 · Original-CD-Kompatibilität");
+        version.setText("v0.24 · Diagnose mit Fehlerbelegen");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
