@@ -802,6 +802,12 @@ def patch_xserver(root: Path) -> None:
             (container.isWoW64Mode() ? "syswow64" : "system32") + "/ddraw.dll");
         if (systemDdraw.isFile()) FileUtils.copy(systemDdraw, new File(dir, "ddraw.dll"));
 
+        File driveRegistry = new File(container.getRootDir(), ".wine/system.reg");
+        if (driveRegistry.isFile()) {
+            try (com.winlator.core.WineRegistryEditor registry = new com.winlator.core.WineRegistryEditor(driveRegistry)) {
+                registry.setStringValue("Software\\\\Wine\\\\Drives", "x:", "cdrom");
+            }
+        }
         File debugRegistry = new File(container.getRootDir(), ".wine/user.reg");
         if (debugRegistry.isFile()) {
             try (com.winlator.core.WineRegistryEditor registry = new com.winlator.core.WineRegistryEditor(debugRegistry)) {
@@ -842,6 +848,7 @@ def patch_xserver(root: Path) -> None:
             metadata.put("android", android.os.Build.VERSION.RELEASE);
             metadata.put("abis", java.util.Arrays.toString(android.os.Build.SUPPORTED_ABIS));
             metadata.put("wow64", container.isWoW64Mode());
+            metadata.put("driveXRequestedType", "cdrom");
             metadata.put("game", new File(execPath).getName());
             metadata.put("gameBytes", new File(execPath).length());
             metadata.put("gameSHA256", RA2DiagnosticEvidence.sha256(new File(execPath)));

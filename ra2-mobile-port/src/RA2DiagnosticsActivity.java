@@ -1035,6 +1035,15 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             return;
         }
 
+        File system = new File(container.getRootDir(), ".wine/system.reg");
+        if (system.isFile()) {
+            try (WineRegistryEditor registry = new WineRegistryEditor(system)) {
+                String type = registry.getStringValue("Software\\Wine\\Drives", "x:");
+                add("cdrom".equalsIgnoreCase(type) ? Level.PASS : Level.WARN, "Wine-Laufwerke", "Konfigurierter Typ von X:",
+                    type == null || type.isEmpty() ? "Kein CD-ROM-Typ eingetragen" : type,
+                    "Die Registry ist nur die Soll-Konfiguration. Tatsächliche GetDriveType-Rückgabe im Spiel-Relay prüfen (5 = CD-ROM). Beim nächsten Start wird X: als cdrom eingetragen.");
+            }
+        }
         checkDosDevice(dos, "c:", true);
         checkDosDevice(dos, "x:", false);
         checkDosDevice(dos, "z:", false);
