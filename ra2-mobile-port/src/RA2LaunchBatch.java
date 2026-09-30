@@ -61,7 +61,7 @@ public final class RA2LaunchBatch {
             throw new IllegalArgumentException("Unexpected game path: " + exe);
         }
         String command = cdCompatibility ? "\"C:\\RA2Mobile\\SafeDisc\\VersionInjector.exe\" \"" + exe + "\"" : "\"" + exe + "\"";
-        return "@echo off\r\n"
+        String batch = "@echo off\r\n"
             + "echo stage=rpc-preflight-started>>C:\\RA2Mobile\\ra2-live.log\r\n"
             + "C:\\windows\\system32\\sc.exe start RpcSs >C:\\RA2Mobile\\rpcss-preflight.txt 2>&1\r\n"
             + "C:\\windows\\system32\\sc.exe query RpcSs >>C:\\RA2Mobile\\rpcss-preflight.txt 2>&1\r\n"
@@ -78,5 +78,14 @@ public final class RA2LaunchBatch {
             + "echo %RA2_GAME_EXIT%>C:\\RA2Mobile\\game-exit.tmp\r\n"
             + "move /y C:\\RA2Mobile\\game-exit.tmp C:\\RA2Mobile\\game-exit.txt >nul\r\n"
             + "exit /b %RA2_GAME_EXIT%\r\n";
+        StringBuilder mirrored = new StringBuilder();
+        for (String line : batch.split("\r\n")) {
+            mirrored.append(line).append("\r\n");
+            if (line.startsWith("echo stage=")) {
+                mirrored.append(line.replace("ra2-live.log", "ra2-evidence.log")).append("\r\n");
+                mirrored.append(line.replace("ra2-live.log", "events.log")).append("\r\n");
+            }
+        }
+        return mirrored.toString();
     }
 }

@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 224")
-    s = s.replace('versionName "7.1"', 'versionName "0.24.0-ra2-evidence-diagnostics"')
+    s = s.replace("versionCode 16", "versionCode 225")
+    s = s.replace('versionName "7.1"', 'versionName "0.25.0-ra2-exit-call-trace"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -511,7 +511,7 @@ def patch_xserver(root: Path) -> None:
             appendRa2Log(ra2LiveLog,
                 "stage=wine-debug-attached\\nstartedAt=" + ra2StartedAt +
                 "\\nwow64Mode=" + container.isWoW64Mode() + "\\n");
-            envVars.put("WINEDEBUG", "+timestamp,+seh,+process,+loaddll,+file,err+service,warn+rpc,err+ole");
+            envVars.put("WINEDEBUG", "+timestamp,+seh,+process,+loaddll,+module,+relay,+file,err+service,warn+rpc,+ole");
             ProcessHelper.addDebugCallback((line) -> {
                 synchronized (ra2Debug) {
                     if (ra2Debug.length() > 131072) {
@@ -802,6 +802,16 @@ def patch_xserver(root: Path) -> None:
             (container.isWoW64Mode() ? "syswow64" : "system32") + "/ddraw.dll");
         if (systemDdraw.isFile()) FileUtils.copy(systemDdraw, new File(dir, "ddraw.dll"));
 
+        File debugRegistry = new File(container.getRootDir(), ".wine/user.reg");
+        if (debugRegistry.isFile()) {
+            try (com.winlator.core.WineRegistryEditor registry = new com.winlator.core.WineRegistryEditor(debugRegistry)) {
+                String debugKey = "Software\\\\Wine\\\\Debug";
+                registry.removeValue(debugKey, "RelayExclude");
+                registry.removeValue(debugKey, "RelayFromExclude");
+                registry.setStringValue(debugKey, "RelayInclude",
+                    "ExitProcess;RtlExitUserProcess;TerminateProcess;NtTerminateProcess;CoCreateInstance;CoGetClassObject;GetVersion;GetVersionExA;GetVersionExW;GetDriveTypeA;GetDriveTypeW;CreateWindowExA;CreateWindowExW");
+            }
+        }
         File session = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile");
         session.mkdirs();
         // Keep three independent previous runs; never mix their errors into this run.
@@ -827,7 +837,7 @@ def patch_xserver(root: Path) -> None:
         try {
             metadata.put("runId", java.util.UUID.randomUUID().toString());
             metadata.put("startedAt", System.currentTimeMillis());
-            metadata.put("appVersion", "0.24");
+            metadata.put("appVersion", "0.25");
             metadata.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
             metadata.put("android", android.os.Build.VERSION.RELEASE);
             metadata.put("abis", java.util.Arrays.toString(android.os.Build.SUPPORTED_ABIS));
@@ -836,7 +846,7 @@ def patch_xserver(root: Path) -> None:
             metadata.put("gameBytes", new File(execPath).length());
             metadata.put("gameSHA256", RA2DiagnosticEvidence.sha256(new File(execPath)));
             metadata.put("ddrawSHA256", RA2DiagnosticEvidence.sha256(new File(dir, "ddraw.dll")));
-            metadata.put("binkSHA256", RA2DiagnosticEvidence.sha256(new File(dir, "binkw32.dll")));
+            metadata.put("binkSHA256", RA2DiagnosticEvidence.sha256(findLegacyHelperFile(dir, "binkw32.dll", 0)));
             metadata.put("freeBytes", session.getUsableSpace());
             metadata.put("trace", "process,loaddll,seh,file,timestamp; bounded last 16 MiB");
         } catch (org.json.JSONException ignored) {}
@@ -865,7 +875,7 @@ def patch_xserver(root: Path) -> None:
             copied = copied && FileUtils.writeString(new File(dir, "ra2-cd-compat.json"), config.toString());
             if (!copied) throw new IllegalStateException("CD compatibility helper could not be prepared");
         }
-        appendRa2Log(new File(session, "ra2-live.log"), "cdCompatibility=" + cdCompatibility + "\\n");
+        appendRa2Log(new File(session, "ra2-live.log"), "cdCompatibility=" + cdCompatibility + "\\ncdCompatibilityReason=" + (cdCompatibility ? "supported-signature" : "no-supported-signature") + "\\n");
         FileUtils.writeString(new File(session, "launch-ra2.bat"),
             RA2LaunchBatch.create(legacyUnixToDOSPath(execPath), cdCompatibility));
 

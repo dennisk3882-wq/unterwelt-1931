@@ -13,6 +13,9 @@ public class RA2LaunchBatchTest {
             try { RA2LaunchBatch.create(invalid); throw new AssertionError("Unsafe path accepted"); }
             catch (IllegalArgumentException expected) {}
         }
+        String mirrored = RA2LaunchBatch.create("C:\\Westwood\\RA2\\GAME.EXE");
+        if (!mirrored.contains("echo stage=game-command-started>>C:\\RA2Mobile\\ra2-evidence.log") ||
+            !mirrored.contains("echo stage=game-command-ended>>C:\\RA2Mobile\\events.log")) throw new AssertionError("Batch stages lost from evidence/export");
         java.io.File result = java.io.File.createTempFile("ra2-game-exit", ".txt");
         for (String value : new String[]{"0", "4294967295", "-1073741819"}) {
             java.nio.file.Files.write(result.toPath(), (value + "\r\n").getBytes());

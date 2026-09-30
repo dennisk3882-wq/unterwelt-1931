@@ -29,6 +29,15 @@ public class RA2DiagnosticEvidenceTest {
         a=analyze(START+GAME,"","",0,true);
         if(!a.summary.contains("Gameplay wurde nicht")) throw new AssertionError("window treated as gameplay test");
         if(!RA2DiagnosticEvidence.decode(0xc000007b).contains("INVALID_IMAGE")) throw new AssertionError("NTSTATUS decode");
+        String realFormat = "cdCompatibility=false\n" + START +
+            "wineMs=5681 100280.113:0160:err:environ:init_peb starting L\"C:\\Westwood\\RA2\\GAME.EXE\" in experimental wow64 mode\n" +
+            "wineMs=5758 100280.190:0160:trace:loaddll:build_module Loaded L\"C:\\Westwood\\RA2\\GAME.EXE\" at 00400000: native\n" +
+            "wineMs=6739 100281.169:0160:warn:file:NtCreateFile L\"C:\\windows\\AcGenral.dll\" not found (c0000034)\n" +
+            "wineMs=6740 100281.170:0160:Call KERNEL32.ExitProcess(00000000) ret=00401010\n" +
+            "stage=game-command-ended\n016c:warn:rpc:receive failed with error 6be\n";
+        a=analyze(realFormat,"","",0,false);
+        if (!a.loaded || a.files.isEmpty() || a.afterRpc!=1 || a.findings.stream().noneMatch(f->f.title.equals("Beendigungsaufrufe des Spiel-TIDs"))) throw new AssertionError("Actual uploaded log format / relay not handled");
+        if (!RA2DiagnosticEvidence.sha256(null).equals("missing")) throw new AssertionError("Missing case-insensitive file lookup crashed");
         System.out.println("PASS: diagnostic phase attribution, unrelated process suppression, handled exceptions, crashes, helper failure, measurement gaps");
     }
 }

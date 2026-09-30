@@ -928,8 +928,9 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         File log = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/last-start.log");
         File liveLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
         String finalText = log.isFile() ? FileUtils.readString(log) : "";
-        String liveText = sessionText("ra2-evidence.log");
-        if (liveText.isEmpty()) liveText = sessionText("ra2-live.previous.log") + (liveLog.isFile() ? FileUtils.readString(liveLog) : "");
+        // Batch markers are written directly by Wine, not through the Java callback.
+        String liveText = sessionText("ra2-live.previous.log") + (liveLog.isFile() ? FileUtils.readString(liveLog) : "");
+        if (liveText.isEmpty()) liveText = sessionText("ra2-evidence.log");
         String text = liveText != null && !liveText.isEmpty() ? liveText : (finalText == null ? "" : finalText);
         lastLaunchText = text;
 

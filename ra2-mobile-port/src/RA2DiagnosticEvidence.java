@@ -20,7 +20,7 @@ public final class RA2DiagnosticEvidence {
         public boolean created, loaded, crashed, helperLoaded;
         void add(String s,String c,String t,String e,String n) { findings.add(new Finding(s,c,t,e,n)); }
     }
-    private static final Pattern ACTOR=Pattern.compile("(?i)([0-9a-f]{4,}):(?:trace|err|warn|fixme):");
+    private static final Pattern ACTOR=Pattern.compile("(?i)([0-9a-f]{4,}):(?:(?:trace|err|warn|fixme):|(?:Call|Ret) )");
     private static final Pattern MODULE=Pattern.compile("(?i)Loaded L\\\"([^\\\"]+)\\\"");
     private static String actor(String line) { Matcher m=ACTOR.matcher(line); return m.find()?m.group(1).toLowerCase(Locale.ROOT):""; }
     private static boolean target(String s) { return s.contains("\\game.exe\"") || s.contains("\\gamemd.exe\""); }
@@ -96,13 +96,24 @@ public final class RA2DiagnosticEvidence {
         if(start<0) a.add("WARN","MESSLÜCKE","Startmarker fehlt","Spielphase kann zeitlich nicht sicher abgegrenzt werden.","Mit diesem Build erneut starten; ältere/rotierte Protokolle nicht mit neuen Ergebnissen vermischen.");
         if(a.threads.isEmpty()) a.add("WARN","MESSLÜCKE","Spiel-TID fehlt","Keine eindeutig zugeordnete GAME.EXE/GAMEMD.EXE-Zeile.","Wine-Trace oder Start des Kompatibilitätshelfers prüfen; Warnungen aus anderen Prozessen bleiben unzugeordnet.");
         if(helperRequested && !a.helperLoaded) a.add("WARN","MESSLÜCKE","Helferinitialisierung nicht bestätigt","Kein „Version.DLL Loaded!“ im aktuellen Helferlog.","Fehlendes Log beweist keinen Kopierschutzfehler; Injector-Log und Dateipfad prüfen.");
+        List<String> exitCalls = new ArrayList<>();
+        for (String line : lines) {
+            String lower = line.toLowerCase(Locale.ROOT);
+            if (a.threads.contains(actor(line)) && (lower.contains("exitprocess(") || lower.contains("exituserprocess(") || lower.contains("terminateprocess("))) {
+                if (exitCalls.size()<6) exitCalls.add(line);
+            }
+        }
+        if (!exitCalls.isEmpty()) a.add("INFO","BELEGT","Beendigungsaufrufe des Spiel-TIDs",join(exitCalls),
+            "ret= bezeichnet die protokollierte Rücksprungadresse. Adresse dem geladenen Modul zuordnen; der Aufruf allein erklärt noch nicht den Auslöser.");
+        else a.add("INFO","MESSLÜCKE","Beendigungsaufruf nicht protokolliert","Kein passender Relay-Aufruf im Spiel-TID.",
+            "Ältere Builds hatten keine gezielte Relay-Aufzeichnung. Auch mit Relay bleiben direkte/unprotokollierte Aufrufe möglich.");
         if(!a.errors.isEmpty()) a.add("INFO","BELEGT","Fehler des Spiel-TIDs",join(a.errors),"Originalzeilen bleiben für die Ursachenprüfung erhalten.");
         if(!a.files.isEmpty()) a.add("WARN","BELEGT","Fehlgeschlagene Dateizugriffe des Spiels",join(a.files),"Auch optionale Suchpfade können fehlschlagen. Erst Zusammenhang mit benötigter Datei und anschließendem Spielende prüfen.");
         if(!a.modules.isEmpty()) a.add("INFO","BELEGT","Im Spiel-TID geladene Module",join(a.modules),"Native/builtin und Architektur im Rohprotokoll prüfen; Laden allein beweist keine funktionierende DLL.");
         return a;
     }
     public static String sha256(java.io.File file) {
-        if (!file.isFile()) return "missing";
+        if (file == null || !file.isFile()) return "missing";
         try (java.io.FileInputStream input = new java.io.FileInputStream(file)) {
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
             byte[] buffer=new byte[65536]; int count;
