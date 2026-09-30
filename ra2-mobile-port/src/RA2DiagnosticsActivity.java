@@ -638,7 +638,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         boolean failed = lower.contains("failed") || lower.contains("error") ||
             lower.contains("1060") || lower.contains("1058") || lower.contains("1053");
 
-        if (running && !failed) {
+        if (running) {
             add(Level.PASS, "RPC-Preflight", "RpcSs vor GAME.EXE gestartet",
                 compactLines(text, 8),
                 "");
@@ -965,7 +965,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
 
         if (hasChild) {
             add(sawChild ? Level.PASS : Level.FAIL, "Letzter Start",
-                "GAME.EXE-Prozess erkannt",
+                "Spielfenster erkannt",
                 sawChild ? "Ja" : "Nein",
                 sawChild ? "" : "Start scheitert vor oder beim Erzeugen des eigentlichen Spiels.");
         }
@@ -1095,15 +1095,15 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             }
         }
 
-        boolean wineAttached = lastLaunchText.contains("stage=wine-debug-attached");
-        boolean wrapperReady = lastLaunchText.contains("stage=runtime-wrapper-ready");
-        boolean terminated = lastLaunchText.contains("stage=launcher-terminated");
+        boolean wineAttached = (lastLaunchText.contains("stage=wine-debug-attached") || lastLaunchText.contains("stage=legacy-x86-start"));
+        boolean wrapperReady = (lastLaunchText.contains("stage=runtime-wrapper-ready") || lastLaunchText.contains("stage=legacy-runtime-wrapper-ready"));
+        boolean terminated = (lastLaunchText.contains("stage=launcher-terminated") || lastLaunchText.contains("stage=legacy-launch-terminated"));
         boolean helperDone = lastLaunchText.contains("stage=helper-complete");
         boolean targetTimeout = lastLaunchText.contains("stage=target-not-seen");
 
         add(wineAttached ? Level.PASS : Level.WARN, "Start-Timeline",
             "Wine-Debugger gekoppelt", wineAttached ? "Ja" : "Nein",
-            wineAttached ? "" : "Ohne diesen Punkt scheitert der Start noch vor der eigentlichen Wine-Ausführung.");
+            wineAttached ? "" : "Dieser Protokollmarker fehlt; daraus allein lässt sich kein Wine-Startfehler ableiten.");
         add(wrapperReady ? Level.PASS : Level.WARN, "Start-Timeline",
             "Runtime-Wrapper vorbereitet", wrapperReady ? "Ja" : "Nein",
             wrapperReady ? "" : "CNC-DDraw/Runtime wurde nicht bis zum vorbereiteten Zustand erreicht.");
@@ -1116,9 +1116,9 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 "7-Zip/Setup-Prozess wurde erkannt und die App ist selbstständig zurückgekehrt.", "");
         }
         if (targetTimeout) {
-            add(Level.FAIL, "Start-Timeline", "Spielprozess-Timeout",
-                "Innerhalb des Diagnosefensters wurde kein stabiler GAME.EXE/GAMEMD.EXE-Prozess erkannt.",
-                "Wine-/WoW64-/RPC-Ursache priorisieren; Installationsdateien sind nachrangig.");
+            add(Level.FAIL, "Start-Timeline", "App hat den Start abgebrochen",
+                "Der alte 30-Sekunden-Watchdog hat die Laufzeit ohne erkanntes Spielfenster beendet.",
+                "Exit 137 kann dadurch entstehen und beweist keinen selbstständigen Spielabsturz.");
         }
     }
 
@@ -1148,7 +1148,13 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         boolean graphicsGood = "opengl".equalsIgnoreCase(activeConfigValue(cfg, "renderer")) &&
             "true".equalsIgnoreCase(activeConfigValue(cfg, "singlecpu"));
 
-        if (rpcPreflightFailed) {
+        if (log.contains("stage=target-not-seen")) {
+            primaryDiagnosis = "Die App hat Wine nach 30 Sekunden selbst beendet. Exit 137 ist hier kein Beweis für einen Spielabsturz.";
+            add(Level.WARN, "Intelligente Ursachenanalyse", "App-eigener Startabbruch",
+                "Der frühere Watchdog hat ohne erkanntes Spielfenster die gesamte Laufzeit beendet.",
+                "Ab v0.21 bleibt die Laufzeit aktiv; nur ein protokolliertes Spielende beendet die Sitzung automatisch.");
+        }
+        else if (rpcPreflightFailed && !rpcPreflightRunning) {
             primaryDiagnosis = "RpcSs lässt sich direkt vor GAME.EXE nicht starten.";
             add(Level.FAIL, "Intelligente Ursachenanalyse", "Priorität 1 – RpcSs-Starttest fehlgeschlagen",
                 compactLines(rpcPreflightText, 8),
@@ -1177,7 +1183,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         else if (noGame) {
             primaryDiagnosis = "GAME.EXE erreicht die eigentliche Spielphase nicht.";
             add(Level.FAIL, "Intelligente Ursachenanalyse", "Priorität 1 – sehr früher GAME.EXE-Abbruch",
-                "Kein stabiler GAME.EXE-Unterprozess wurde erkannt.",
+                "Kein Spielfenster wurde erkannt; das beweist nicht, dass kein Spielprozess gestartet wurde.",
                 "Die darunter priorisierten Runtime-Hinweise sind jetzt wichtiger als Installationsdateien.");
         }
         else {
@@ -1196,9 +1202,9 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         }
 
         if (secdrvGood) {
-            add(Level.PASS, "Intelligente Ursachenanalyse", "SafeDisc-Treiber vorhanden",
+            add(Level.WARN, "Intelligente Ursachenanalyse", "SafeDisc-Kompatibilität ungeklärt",
                 "secdrv.sys liegt im Wine-Treiberpfad.",
-                "Ein schlicht fehlender SafeDisc-Treiber ist damit als Ursache deutlich weniger wahrscheinlich.");
+                "Die vorhandene Datei beweist nicht, dass Wine den Kopierschutz ausführen kann.");
         }
 
         if (graphicsGood) {
@@ -1329,7 +1335,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 "Wenn RA2 weiterhin beendet wird, ist die Laufzeit-/Wine-Kompatibilität der nächste Schwerpunkt.");
         }
         else {
-            add(Level.FAIL, "Gesamtbewertung", fail + " Blocker erkannt",
+            add(Level.INFO, "Gesamtbewertung", fail + " fehlgeschlagene Prüfungen",
                 pass + " bestanden • " + warn + " Warnungen • " + fail + " Fehler.",
                 "Zuerst die roten Punkte beheben; danach erneut prüfen.");
         }

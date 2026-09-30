@@ -154,7 +154,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.20 · Android CAB-Installer");
+        version.setText("v0.21 · Startkorrektur");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
@@ -1407,7 +1407,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         if (!media.isDirectory()) return;
         File driveX = driveX();
         FileUtils.delete(driveX);
-        FileUtils.symlink(media, driveX);
+        FileUtils.symlink(media.getName(), driveX.getAbsolutePath());
     }
 
     private File stagingIso() {

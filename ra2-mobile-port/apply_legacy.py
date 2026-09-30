@@ -16,7 +16,7 @@ APP_ID = "com.winlator"
 def copy_sources_legacy(root: Path) -> None:
     dst = root / "app/src/main/java/com/winlator"
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java"]:
+    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java"]:
         require(SRC / name)
         text = read(SRC / name)
 
@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 220")
-    s = s.replace('versionName "7.1"', 'versionName "0.20.0-ra2-native-cab"')
+    s = s.replace("versionCode 16", "versionCode 221")
+    s = s.replace('versionName "7.1"', 'versionName "0.21.0-ra2-launch-fix"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -460,6 +460,10 @@ def patch_xserver(root: Path) -> None:
         "legacy pinch dispatcher"
     )
 
+    s = replace_once(s, "    protected void onDestroy() {\n",
+        "    protected void onDestroy() {\n        ra2AutoExitRequested = true;\n        ProcessHelper.removeAllDebugCallbacks();\n",
+        "stop RA2 monitor on activity destruction")
+
     # Mark a real non-explorer application window. This becomes our game-start signal.
     s = replace_once(
         s,
@@ -504,10 +508,10 @@ def patch_xserver(root: Path) -> None:
             final File ra2LiveLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
             File parent = ra2LiveLog.getParentFile();
             if (parent != null && !parent.isDirectory()) parent.mkdirs();
-            FileUtils.writeString(ra2LiveLog,
-                "stage=legacy-x86-start\\nstartedAt=" + ra2StartedAt +
+            appendRa2Log(ra2LiveLog,
+                "stage=wine-debug-attached\\nstartedAt=" + ra2StartedAt +
                 "\\nwow64Mode=" + container.isWoW64Mode() + "\\n");
-            envVars.put("WINEDEBUG", "+seh,+process,+loaddll,+service,+rpc,+ole");
+            envVars.put("WINEDEBUG", "+seh,+process,+loaddll,err+service,warn+rpc,err+ole");
             ProcessHelper.addDebugCallback((line) -> {
                 synchronized (ra2Debug) {
                     if (ra2Debug.length() > 131072) {
@@ -554,7 +558,7 @@ def patch_xserver(root: Path) -> None:
     private void finishRa2LegacyLaunch(int status, long startedAt, StringBuilder debug, File liveLog) {
         long elapsed = Math.max(0L, System.currentTimeMillis() - startedAt);
         StringBuilder output = new StringBuilder();
-        output.append("stage=legacy-launch-terminated\\n");
+        output.append("stage=launcher-terminated\\n");
         output.append("exit=").append(status).append("\\n");
         output.append("elapsedMs=").append(elapsed).append("\\n");
         output.append("gameWindowMapped=").append(ra2GameWindowMapped).append("\\n");
@@ -582,13 +586,15 @@ def patch_xserver(root: Path) -> None:
             }
         }
 
-        getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
+        if (!ra2AutoExitRequested) getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
             .putInt("last_exit_code", status)
             .putBoolean("last_saw_child", ra2GameWindowMapped)
             .putString("last_diag_clue", clue)
             .apply();
-        ProcessHelper.removeAllDebugCallbacks();
-        requestRa2Exit();
+        appendRa2Log(liveLog, "stage=launcher-terminated\\nlauncherExit=" + status + "\\n");
+        // The batch records the game's exit separately. Do not kill its child
+        // just because explorer/winhandler returned, or overwrite its result.
+
     }
 
     private void appendRa2Log(File file, String value) {
@@ -646,20 +652,29 @@ def patch_xserver(root: Path) -> None:
 
             while (!ra2AutoExitRequested) {
                 if (gameLaunch) {
-                    if (ra2GameWindowMapped) return;
-                    if (System.currentTimeMillis() - started >= 30000L) {
-                        appendRa2Log(liveLog, "stage=target-not-seen\\n");
-                        File last = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/last-start.log");
-                        FileUtils.writeString(last,
-                            "stage=target-not-seen\\nexit=0\\nelapsedMs=" +
-                            (System.currentTimeMillis() - started) +
-                            "\\ngameWindowMapped=false\\nwow64Mode=" + container.isWoW64Mode() + "\\n");
-                        getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
-                            .putBoolean("last_saw_child", false)
-                            .putString("last_diag_clue", "Kein RA2-Spiel-Fenster innerhalb von 30 s erkannt.")
-                            .apply();
-                        requestRa2Exit();
-                        return;
+                    File result = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/game-exit.txt");
+                    if (result.isFile()) {
+                        String value = FileUtils.readString(result).trim();
+                        try {
+                            int code = Integer.parseInt(value);
+                            appendRa2Log(liveLog, "stage=game-exited\\ngameExit=" + code + "\\n");
+                            getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
+                                .putInt("last_exit_code", code)
+                                .putBoolean("last_saw_child", ra2GameWindowMapped)
+                                .putString("last_diag_clue", "Spielprozess beendet: " + code)
+                                .apply();
+                            requestRa2Exit();
+                            return;
+                        }
+                        catch (NumberFormatException ignored) { /* writer still finishing */ }
+                    }
+                    if (!ra2GameWindowMapped && stable == 0 &&
+                            System.currentTimeMillis() - started >= 60000L) {
+                        stable = 1;
+                        appendRa2Log(liveLog, "stage=game-window-pending\\n");
+                        runOnUiThread(() -> android.widget.Toast.makeText(this,
+                            "Spielstart dauert länger. Die Laufzeit bleibt aktiv; Über Zurück und Beenden kannst du abbrechen.",
+                            android.widget.Toast.LENGTH_LONG).show());
                     }
                 }
                 else if (helperStage != null && !helperStage.isEmpty()) {
@@ -731,6 +746,9 @@ def patch_xserver(root: Path) -> None:
         }
         else if (directIntent.hasExtra("exec_path")) {
             String dosPath = legacyUnixToDOSPath(directIntent.getStringExtra("exec_path"));
+            if (directIntent.getBooleanExtra("ra2_game_launch", false)) {
+                return "winhandler.exe /dir C:\\\\RA2Mobile \\\"C:\\\\windows\\\\system32\\\\cmd.exe\\\" /d /c C:\\\\RA2Mobile\\\\launch-ra2.bat";
+            }
             int slash = dosPath == null ? -1 : dosPath.lastIndexOf('\\\\');
             String directDir = slash >= 0 ? dosPath.substring(0, slash) : "C:\\\\";
             String directFile = slash >= 0 ? dosPath.substring(slash + 1) : dosPath;
@@ -759,6 +777,23 @@ def patch_xserver(root: Path) -> None:
         if (execPath == null || execPath.isEmpty()) return;
 
         File dir = new File(FileUtils.getDirname(execPath));
+        // setupWineSystemFiles recreates DOS links; restore CD mapping afterwards.
+        File dosDevices = new File(container.getRootDir(), ".wine/dosdevices");
+        dosDevices.mkdirs();
+        new File(dosDevices, "x:").delete();
+        FileUtils.symlink("../drive_x", new File(dosDevices, "x:").getAbsolutePath());
+        File systemDdraw = new File(container.getRootDir(), ".wine/drive_c/windows/" +
+            (container.isWoW64Mode() ? "syswow64" : "system32") + "/ddraw.dll");
+        if (systemDdraw.isFile()) FileUtils.copy(systemDdraw, new File(dir, "ddraw.dll"));
+
+        File session = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile");
+        session.mkdirs();
+        FileUtils.delete(new File(session, "game-exit.txt"));
+        FileUtils.delete(new File(session, "rpcss-preflight.txt"));
+        FileUtils.writeString(new File(session, "ra2-live.log"), "stage=runtime-wrapper-ready\\n");
+        FileUtils.writeString(new File(session, "launch-ra2.bat"),
+            RA2LaunchBatch.create(legacyUnixToDOSPath(execPath)));
+
         File globalIni = new File(container.getRootDir(), ".wine/drive_c/ProgramData/cnc-ddraw/ddraw.ini");
         if (globalIni.isFile()) {
             String cfg = FileUtils.readString(globalIni);
@@ -870,7 +905,7 @@ def validate(root: Path) -> None:
     expected = {
         root / "app/src/main/java/com/winlator/RA2LauncherActivity.java": "restoreLegacyGameMode",
         root / "app/src/main/java/com/winlator/RA2DiagnosticsActivity.java": "Legacy-x86-Modus aktiv",
-        root / "app/src/main/java/com/winlator/XServerDisplayActivity.java": "legacy-x86-start",
+        root / "app/src/main/java/com/winlator/XServerDisplayActivity.java": "wine-debug-attached",
         root / "app/src/main/java/com/winlator/widget/TouchpadView.java": "setRtsMode",
         root / "app/src/main/AndroidManifest.xml": "RA2LauncherActivity",
     }

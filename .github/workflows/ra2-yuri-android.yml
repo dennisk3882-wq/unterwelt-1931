@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.20-native-cab
+# build-version: 0.21-launch-fix
 
 on:
   push:
@@ -107,6 +107,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          javac -d test-launch ra2-mobile-port/src/RA2LaunchBatch.java ra2-mobile-port/tests/RA2LaunchBatchTest.java
+          java -cp test-launch RA2LaunchBatchTest
           ra2-mobile-port/native/build.sh test-native cc -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux"
           python3 ra2-mobile-port/tests/make_cabs.py
           javac -d test-native ra2-mobile-port/src/CabExtractor.java ra2-mobile-port/tests/CabExtractorTest.java
