@@ -941,6 +941,24 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             }
         }
 
+        Integer gameResult = RA2LaunchBatch.readGameExit(new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/game-exit.txt"));
+        if (gameResult != null) exit = gameResult;
+        if (prefs.contains("last_launcher_exit_code")) {
+            add(Level.INFO, "Letzter Start", "Separater Laufzeit-Exit-Code",
+                String.valueOf(prefs.getInt("last_launcher_exit_code", 0)),
+                "Beim Beenden der Sitzung kann die App die Laufzeit mit Code 137 stoppen. Maßgeblich ist der Spiel-Rückgabecode.");
+        }
+        File registration = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/blowfish-register.txt");
+        if (registration.isFile()) add(Level.INFO, "Spielvorbereitung", "32-Bit-Blowfish-Registrierung",
+            FileUtils.readString(registration), "registerExit=0 bedeutet erfolgreich.");
+        File rpcAfter = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/rpcss-after-game.txt");
+        if (rpcAfter.isFile()) add(Level.INFO, "RPC nach Spielende", "RpcSs-Zustand nach GAME.EXE",
+            compactLines(FileUtils.readString(rpcAfter), 10), "");
+        String phase = RA2LaunchBatch.gamePhase(liveText);
+        if (!phase.isEmpty()) {
+            String tail = phase.length() > 12000 ? phase.substring(phase.length() - 12000) : phase;
+            add(Level.INFO, "Spielprotokoll", "Ausgabe während des Spielstarts", tail, "");
+        }
         String stage = lastValue(text, "stage=");
         if (!stage.isEmpty()) {
             add(Level.INFO, "Letzter Start", "Letzte erreichte Startphase",
@@ -956,7 +974,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
 
         if (exit != Integer.MIN_VALUE) {
             add(exit == 0 ? Level.WARN : Level.FAIL, "Letzter Start",
-                "Wine/Launcher Exit-Code",
+                gameResult != null ? "Spiel-Rückgabecode" : "Bisheriger Launcher-Code",
                 String.valueOf(exit),
                 exit == 0
                     ? "Exit-Code 0 bei schwarzem Bildschirm kann bei der Original-CD auf SafeDisc-Kompatibilität hindeuten."
@@ -1124,7 +1142,9 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
 
     private void createRootCauseAnalysis() {
         String log = lastLaunchText == null ? "" : lastLaunchText.toLowerCase(Locale.ENGLISH);
-        boolean rpc = log.contains("failed to start rpcss") || log.contains("rpc_s_server_unavailable");
+        String gameLog = RA2LaunchBatch.gamePhase(log);
+        boolean rpc = gameLog.contains("failed to start rpcss") || gameLog.contains("rpc_s_server_unavailable") ||
+            gameLog.contains("code=6ba") || gameLog.contains("receive failed with error 6be");
         boolean wow64 = log.contains("experimental wow64 mode");
         boolean nsi = log.contains("nsi:poll_events") && log.contains("errno 13");
         boolean noGame = prefs.contains("last_saw_child") && !prefs.getBoolean("last_saw_child", false);
@@ -1161,10 +1181,10 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 "Wine-Service/WoW64-Laufzeit ist der primäre Kandidat; Spiel- und Grafikdateien sind aktuell nachrangig.");
         }
         else if (rpc && rpcPreflightRunning) {
-            primaryDiagnosis = "RpcSs läuft im Preflight, aber RPC bricht danach trotzdem weg.";
-            add(Level.FAIL, "Intelligente Ursachenanalyse", "Priorität 1 – RPC fällt trotz laufendem RpcSs aus",
+            primaryDiagnosis = "RPC-Meldungen während des Spielstarts trotz laufendem RpcSs; Zusammenhang mit dem Abbruch noch ungeklärt.";
+            add(Level.WARN, "Intelligente Ursachenanalyse", "RPC-Meldungen während des Spielstarts",
                 "sc.exe meldet RpcSs als laufend, das Wine-Log enthält aber RPC_S_SERVER_UNAVAILABLE.",
-                "Dann liegt der Verdacht stärker auf dem 32-Bit-WoW64/RPC-Pfad als auf der Registry-Konfiguration.");
+                "Diese Meldungen allein beweisen keinen Dienstausfall. Spiel-Rückgabecode und zeitlichen Verlauf prüfen.");
         }
         else if (rpc) {
             if (servicesGood) {

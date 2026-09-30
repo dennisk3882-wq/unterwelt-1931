@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 221")
-    s = s.replace('versionName "7.1"', 'versionName "0.21.0-ra2-launch-fix"')
+    s = s.replace("versionCode 16", "versionCode 222")
+    s = s.replace('versionName "7.1"', 'versionName "0.22.0-ra2-game-result"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -478,7 +478,7 @@ def patch_xserver(root: Path) -> None:
                 if (getIntent().getBooleanExtra("ra2_game_launch", false) &&
                         window.isApplicationWindow()) {
                     String cls = window.getClassName() == null ? "" : window.getClassName().toLowerCase();
-                    if (!cls.contains("explorer")) {
+                    if (RA2LaunchBatch.isGameWindow(window.getClassName())) {
                         ra2GameWindowMapped = true;
                         appendRa2Log(new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log"),
                             "stage=game-window-mapped\\nclass=" + window.getClassName() + "\\n");
@@ -559,7 +559,7 @@ def patch_xserver(root: Path) -> None:
         long elapsed = Math.max(0L, System.currentTimeMillis() - startedAt);
         StringBuilder output = new StringBuilder();
         output.append("stage=launcher-terminated\\n");
-        output.append("exit=").append(status).append("\\n");
+        output.append("launcherExit=").append(status).append("\\n");
         output.append("elapsedMs=").append(elapsed).append("\\n");
         output.append("gameWindowMapped=").append(ra2GameWindowMapped).append("\\n");
         output.append("wow64Mode=").append(container != null && container.isWoW64Mode()).append("\\n");
@@ -586,11 +586,8 @@ def patch_xserver(root: Path) -> None:
             }
         }
 
-        if (!ra2AutoExitRequested) getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
-            .putInt("last_exit_code", status)
-            .putBoolean("last_saw_child", ra2GameWindowMapped)
-            .putString("last_diag_clue", clue)
-            .apply();
+        getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
+            .putInt("last_launcher_exit_code", status).commit();
         appendRa2Log(liveLog, "stage=launcher-terminated\\nlauncherExit=" + status + "\\n");
         // The batch records the game's exit separately. Do not kill its child
         // just because explorer/winhandler returned, or overwrite its result.
@@ -653,20 +650,16 @@ def patch_xserver(root: Path) -> None:
             while (!ra2AutoExitRequested) {
                 if (gameLaunch) {
                     File result = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/game-exit.txt");
-                    if (result.isFile()) {
-                        String value = FileUtils.readString(result).trim();
-                        try {
-                            int code = Integer.parseInt(value);
+                    Integer code = RA2LaunchBatch.readGameExit(result);
+                    if (code != null) {
                             appendRa2Log(liveLog, "stage=game-exited\\ngameExit=" + code + "\\n");
                             getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
                                 .putInt("last_exit_code", code)
                                 .putBoolean("last_saw_child", ra2GameWindowMapped)
                                 .putString("last_diag_clue", "Spielprozess beendet: " + code)
-                                .apply();
+                                .commit();
                             requestRa2Exit();
                             return;
-                        }
-                        catch (NumberFormatException ignored) { /* writer still finishing */ }
                     }
                     if (!ra2GameWindowMapped && stable == 0 &&
                             System.currentTimeMillis() - started >= 60000L) {
@@ -789,6 +782,9 @@ def patch_xserver(root: Path) -> None:
         File session = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile");
         session.mkdirs();
         FileUtils.delete(new File(session, "game-exit.txt"));
+        FileUtils.delete(new File(session, "game-exit.tmp"));
+        FileUtils.delete(new File(session, "rpcss-after-game.txt"));
+        FileUtils.delete(new File(session, "blowfish-register.txt"));
         FileUtils.delete(new File(session, "rpcss-preflight.txt"));
         FileUtils.writeString(new File(session, "ra2-live.log"), "stage=runtime-wrapper-ready\\n");
         FileUtils.writeString(new File(session, "launch-ra2.bat"),

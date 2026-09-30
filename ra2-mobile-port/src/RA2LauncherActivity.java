@@ -154,7 +154,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.21 · Startkorrektur");
+        version.setText("v0.22 · Spielstart & Diagnose");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
@@ -1169,18 +1169,22 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         String exitCode = prefs.contains(KEY_LAST_EXIT_CODE)
             ? String.valueOf(prefs.getInt(KEY_LAST_EXIT_CODE, -999))
             : diagnosticValue(diag, "exit=");
+        Integer gameResult = RA2LaunchBatch.readGameExit(new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/game-exit.txt"));
+        if (gameResult != null) exitCode = String.valueOf(gameResult);
         String child = prefs.contains(KEY_LAST_SAW_CHILD)
             ? String.valueOf(prefs.getBoolean(KEY_LAST_SAW_CHILD, false))
             : diagnosticValue(diag, "sawGameChild=");
         String clue = prefs.getString(KEY_LAST_DIAG_CLUE, "");
         if (clue.isEmpty()) clue = diagnosticClue(diag);
+        if (gameResult != null) clue = "Spiel-Rückgabecode " + gameResult +
+            "; Details im Diagnose-Center.";
         // Keep the last detailed diagnostics for the Diagnose-Center.
 
         StringBuilder message = new StringBuilder();
         if (isGerman()) {
             message.append(last).append(" wurde nach ").append(seconds).append(" s beendet.");
             if (!exitCode.isEmpty()) message.append(" Exit-Code ").append(exitCode).append(".");
-            if ("false".equalsIgnoreCase(child)) message.append(" Kein laufender GAME.EXE-Unterprozess wurde erkannt.");
+            if ("false".equalsIgnoreCase(child)) message.append(" Kein Spielfenster wurde erkannt.");
             if (!clue.isEmpty()) message.append(" Diagnose: ").append(clue);
         }
         else {
@@ -1261,6 +1265,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             .putString(yuri ? KEY_YURI_EXE : KEY_RA2_EXE, exe.getAbsolutePath())
             .putString(KEY_LAST_GAME_LAUNCH, yuri ? "Yuri’s Rache" : "Alarmstufe Rot 2")
             .putLong(KEY_LAST_GAME_LAUNCH_AT, System.currentTimeMillis())
+            .remove("last_launcher_exit_code")
             .remove(KEY_LAST_EXIT_CODE)
             .remove(KEY_LAST_SAW_CHILD)
             .remove(KEY_LAST_DIAG_CLUE)

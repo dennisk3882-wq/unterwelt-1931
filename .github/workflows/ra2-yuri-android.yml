@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.21-launch-fix
+# build-version: 0.22-game-result
 
 on:
   push:
