@@ -37,6 +37,22 @@ public class RA2DiagnosticEvidenceTest {
             "stage=game-command-ended\n016c:warn:rpc:receive failed with error 6be\n";
         a=analyze(realFormat,"","",0,false);
         if (!a.loaded || a.files.isEmpty() || a.afterRpc!=1 || a.findings.stream().noneMatch(f->f.title.equals("Beendigungsaufrufe des Spiel-TIDs"))) throw new AssertionError("Actual uploaded log format / relay not handled");
+        String relay = START + GAME +
+            "wineMs=1 1.000:0160:trace:module:map_image_into_view mapping PE file L\"C:\\Westwood\\RA2\\GAME.EXE\" at 0x400000-0xb29000\n" +
+            "wineMs=2 1.001:0160:Call KERNEL32.GetDriveTypeA(0021feb4 \"x:\\\\\" ) ret=004d1f0b\n" +
+            "wineMs=3 1.002:0160:Call kernelbase.GetDriveTypeA(0021feb4 \"x:\\\\\" ) ret=7ae2cc54\n" +
+            "wineMs=4 1.003:0160:Ret  kernelbase.GetDriveTypeA() retval=00000005 ret=7ae2cc54\n" +
+            "wineMs=5 1.004:0160:Ret  KERNEL32.GetDriveTypeA() retval=00000005 ret=004d1f0b\n" +
+            "wineMs=6 1.005:0160:Call KERNEL32.ExitProcess(00000000) ret=0077050f\n" +
+            "wineMs=7 1.006:0160:warn:file:NtCreateFile AcGenral.dll not found (c0000034)\n" +
+            "stage=game-command-ended\n";
+        a=analyze(relay,"","",0,false);
+        if(a.findings.stream().noneMatch(f->f.title.equals("Tatsächliche Laufwerkstypen im Spiel") && f.evidence.contains("X:=00000005"))) throw new AssertionError("Nested forwarded drive calls mismatched");
+        if(a.findings.stream().noneMatch(f->f.title.equals("Spiel ruft ExitProcess selbst auf") && f.evidence.contains("0x37050f"))) throw new AssertionError("Exit caller RVA not mapped");
+        if(!a.files.isEmpty()) throw new AssertionError("Post-exit cleanup blamed for startup");
+        String otherThread=relay.replace(":Ret  KERNEL32.GetDriveTypeA()",":Ret  KERNEL32.GetDriveTypeA()").replace("1.004:0160:","1.004:0180:");
+        a=analyze(otherThread,"","",0,false);
+        if(a.findings.stream().anyMatch(f->f.title.equals("Tatsächliche Laufwerkstypen im Spiel"))) throw new AssertionError("Return paired across unrelated thread");
         if (!RA2DiagnosticEvidence.sha256(null).equals("missing")) throw new AssertionError("Missing case-insensitive file lookup crashed");
         System.out.println("PASS: diagnostic phase attribution, unrelated process suppression, handled exceptions, crashes, helper failure, measurement gaps");
     }

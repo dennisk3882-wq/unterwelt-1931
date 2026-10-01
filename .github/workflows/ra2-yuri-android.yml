@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.25-exit-call-trace
+# build-version: 0.26-startup-gates
 
 on:
   push:

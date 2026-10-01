@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 225")
-    s = s.replace('versionName "7.1"', 'versionName "0.25.0-ra2-exit-call-trace"')
+    s = s.replace("versionCode 16", "versionCode 226")
+    s = s.replace('versionName "7.1"', 'versionName "0.26.0-ra2-startup-gates"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -815,7 +815,7 @@ def patch_xserver(root: Path) -> None:
                 registry.removeValue(debugKey, "RelayExclude");
                 registry.removeValue(debugKey, "RelayFromExclude");
                 registry.setStringValue(debugKey, "RelayInclude",
-                    "ExitProcess;RtlExitUserProcess;TerminateProcess;NtTerminateProcess;CoCreateInstance;CoGetClassObject;GetVersion;GetVersionExA;GetVersionExW;GetDriveTypeA;GetDriveTypeW;CreateWindowExA;CreateWindowExW");
+                    "ExitProcess;RtlExitUserProcess;TerminateProcess;NtTerminateProcess;CoCreateInstance;CoGetClassObject;GetVersion;GetVersionExA;GetVersionExW;GetDriveTypeA;GetDriveTypeW;CreateWindowExA;CreateWindowExW;OleInitialize;OleUninitialize;CoInitializeEx;GetCommandLineA;GetCommandLineW;GetCurrentDirectoryA;GetModuleFileNameA;FindWindowA;FindWindowW;FindWindowExA;FindWindowExW;CreateMutexA;CreateMutexW;OpenMutexA;OpenMutexW;GetLastError;RegOpenKeyExA;RegOpenKeyExW;RegQueryValueExA;RegQueryValueExW;RegGetValueA;RegGetValueW;GetVolumeInformationA;GetVolumeInformationW;GetFileAttributesA;CreateFileA;ReadFile;MessageBoxA;MessageBoxW;LoadLibraryA;LoadLibraryExA;GetProcAddress;IsDebuggerPresent;CheckRemoteDebuggerPresent;GetSystemMetrics;GetDeviceCaps");
             }
         }
         File session = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile");
@@ -843,7 +843,7 @@ def patch_xserver(root: Path) -> None:
         try {
             metadata.put("runId", java.util.UUID.randomUUID().toString());
             metadata.put("startedAt", System.currentTimeMillis());
-            metadata.put("appVersion", "0.25");
+            metadata.put("appVersion", "0.26");
             metadata.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
             metadata.put("android", android.os.Build.VERSION.RELEASE);
             metadata.put("abis", java.util.Arrays.toString(android.os.Build.SUPPORTED_ABIS));
@@ -855,7 +855,7 @@ def patch_xserver(root: Path) -> None:
             metadata.put("ddrawSHA256", RA2DiagnosticEvidence.sha256(new File(dir, "ddraw.dll")));
             metadata.put("binkSHA256", RA2DiagnosticEvidence.sha256(findLegacyHelperFile(dir, "binkw32.dll", 0)));
             metadata.put("freeBytes", session.getUsableSpace());
-            metadata.put("trace", "process,loaddll,seh,file,timestamp; bounded last 16 MiB");
+            metadata.put("trace", "process,loaddll,module,seh,file,filtered-relay,timestamp; bounded last 16 MiB");
         } catch (org.json.JSONException ignored) {}
         FileUtils.writeString(new File(session, "session.json"), metadata.toString());
         FileUtils.delete(new File(session, "game-exit.txt"));

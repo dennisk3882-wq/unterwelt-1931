@@ -115,7 +115,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         top.addView(back, new LinearLayout.LayoutParams(dp(100), dp(46)));
 
         headline = text(25, Color.rgb(238, 220, 170), true);
-        headline.setText("RA2 / Yuri Diagnose-Center v0.25");
+        headline.setText("RA2 / Yuri Diagnose-Center v0.26");
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         hp.leftMargin = dp(14);
         top.addView(headline, hp);
@@ -974,7 +974,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         }
         String phase = RA2LaunchBatch.gamePhase(liveText);
         if (!phase.isEmpty()) {
-            String tail = phase.length() > 12000 ? phase.substring(phase.length() - 12000) : phase;
+            String tail = phase.length() > 2200 ? phase.substring(phase.length() - 2200) : phase;
             add(Level.INFO, "Spielprotokoll", "Ausgabe während des Spielstarts", tail, "");
         }
         String stage = lastValue(text, "stage=");
@@ -995,7 +995,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                 gameResult != null ? "Spiel-Rückgabecode" : "Bisheriger Launcher-Code",
                 String.valueOf(exit),
                 exit == 0
-                    ? "Exit-Code 0 bei schwarzem Bildschirm kann bei der Original-CD auf SafeDisc-Kompatibilität hindeuten."
+                    ? "Normaler Rückgabecode ohne Spielfenster; die Ursache muss aus den frühen Startprüfungen ermittelt werden."
                     : "Fehlerzeilen darunter prüfen.");
         }
 
@@ -1015,14 +1015,14 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         int shown = 0;
         for (String line : suspiciousLogLines) {
             if (shown++ >= 16) break;
-            add(Level.WARN, "Wine-Protokoll", "Verdächtige Wine-Zeile",
+            add(Level.INFO, "Wine-Protokoll", "Unzugeordnete Rohmeldung",
                 line, hintForLog(line));
         }
 
         if (suspiciousLogLines.isEmpty() && (log.isFile() || liveLog.isFile())) {
             add(Level.INFO, "Wine-Protokoll", "Keine offensichtliche Wine-Fehlerzeile erkannt",
                 humanSize(log.isFile() ? log.length() : liveLog.length()) + " Logdaten ausgewertet.",
-                "Bei Exit-Code 0 und Original-CD ist SafeDisc als Ursache besonders relevant.");
+                "Die Analyse nach Spiel-TID und Startphase enthält die zugeordneten Befunde.");
         }
     }
 
