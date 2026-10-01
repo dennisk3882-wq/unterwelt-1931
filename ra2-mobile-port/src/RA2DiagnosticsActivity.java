@@ -535,6 +535,25 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             checkRegToken(lower, "westwood\\\\wolapi", "WOLAPI-Registry-Schlüssel");
         }
 
+        if(container.isWoW64Mode()) {
+            try (WineRegistryEditor editor = new WineRegistryEditor(reg)) {
+                for(String product : new String[]{"Red Alert 2", "Yuri's Revenge"}) {
+                    if(product.startsWith("Yuri") && findIgnoreCase(gameDir(), "gamemd.exe", 2)==null) continue;
+                    String key32 = "Software\\Wow6432Node\\Westwood\\" + product;
+                    String install = editor.getStringValue(key32, "InstallPath");
+                    add(install==null || install.isEmpty()?Level.WARN:Level.PASS, "Registry", product+" – 32-Bit-Ansicht",
+                        install==null || install.isEmpty()?"InstallPath fehlt unter Wow6432Node":install,
+                        "Der nächste Spielstart repariert beide Registry-Ansichten. Relay-Aufrufe prüfen, um die tatsächliche Sicht des Spiels zu bestätigen.");
+                    String serial = editor.getStringValue(key32, "Serial");
+                    add(serial==null || serial.isEmpty() || serial.equals("0")?Level.WARN:Level.INFO, "Registry", product+" – Seriennummer-Zustand",
+                        serial==null || serial.isEmpty()?"Nicht vorhanden":serial.equals("0")?"Platzhalter 0":"Vorhanden (Wert wird nicht exportiert)",
+                        "Ein vorhandener Wert beweist keine gültige Seriennummer und keinen Zusammenhang mit dem Abbruch. Bestehende Werte werden beim Start erhalten.");
+                }
+            } catch(Exception e) {
+                add(Level.WARN,"Registry","32-Bit-Ansicht nicht geprüft",e.getClass().getSimpleName(),"Registry-Relay des nächsten Starts auswerten.");
+            }
+        }
+
         boolean yuriInstalled = findIgnoreCase(gameDir(), "gamemd.exe", 2) != null;
         if (yuriInstalled) {
             checkRegToken(lower, "westwood\\\\yuri", "Yuri-Registry-Schlüssel");

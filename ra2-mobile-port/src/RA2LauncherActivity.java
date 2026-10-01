@@ -978,21 +978,31 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     }
 
     private void writeWestwoodRegistry(boolean yuri) {
+        if (yuri) writeWestwoodRegistry(false);
         File systemReg = new File(container.getRootDir(), ".wine/system.reg");
         try (WineRegistryEditor registry = new WineRegistryEditor(systemReg)) {
-            String root = yuri ? "Software\\Westwood\\Yuri's Revenge" : "Software\\Westwood\\Red Alert 2";
-            registry.setStringValue(root, "Name", yuri ? "Yuri's Revenge" : "Red Alert 2");
-            registry.setStringValue(root, "InstallPath", yuri
-                ? "C:\\Westwood\\RA2\\GAMEMD.EXE"
-                : "C:\\Westwood\\RA2\\GAME.EXE");
-            registry.setStringValue(root, "FolderPath", "C:\\Westwood\\RA2");
-            registry.setStringValue(root, "Serial", "0");
-            registry.setStringValue(root, "Language", isGerman() ? "German" : "English");
-            registry.setDwordValue(root, "SKU", yuri ? 0x00000901 : 0x00000801);
-            registry.setDwordValue(root, "Version", yuri ? 0x00010001 : 0x00010006);
+            String product = yuri ? "Yuri's Revenge" : "Red Alert 2";
+            String root = "Software\\Westwood\\" + product;
+            String root32 = "Software\\Wow6432Node\\Westwood\\" + product;
+            String serial = registry.getStringValue(root32, "Serial");
+            if (serial == null || serial.isEmpty() || serial.equals("0")) serial = registry.getStringValue(root, "Serial");
+            if (serial == null || serial.isEmpty()) serial = "0";
+            String[] views = container.isWoW64Mode() ? new String[]{root, root32} : new String[]{root};
+            for (String view : views) {
+                registry.setStringValue(view, "Name", product);
+                registry.setStringValue(view, "InstallPath", yuri
+                    ? "C:\\Westwood\\RA2\\GAMEMD.EXE"
+                    : "C:\\Westwood\\RA2\\GAME.EXE");
+                registry.setStringValue(view, "FolderPath", "C:\\Westwood\\RA2");
+                registry.setStringValue(view, "Serial", serial);
+                registry.setStringValue(view, "Language", isGerman() ? "German" : "English");
+                registry.setDwordValue(view, "SKU", yuri ? 0x00000901 : 0x00000801);
+                registry.setDwordValue(view, "Version", yuri ? 0x00010001 : 0x00010006);
+            }
             File wolapi = findIgnoreCase(gameDir(), "wolapi.dll", 2);
             if (wolapi != null) {
                 registry.setStringValue("Software\\Westwood\\WOLAPI", "InstallPath", "C:\\Westwood\\RA2\\WOLAPI.DLL");
+                if(container.isWoW64Mode()) registry.setStringValue("Software\\Wow6432Node\\Westwood\\WOLAPI", "InstallPath", "C:\\Westwood\\RA2\\WOLAPI.DLL");
             }
         }
         catch (Exception ignored) {}
