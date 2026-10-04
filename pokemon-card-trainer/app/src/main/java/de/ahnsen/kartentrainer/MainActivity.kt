@@ -739,8 +739,8 @@ private fun LearnScreen(padding: PaddingValues) {
                 "Jeder Spieler versucht, die Pokémon des Gegners kampfunfähig zu machen und seine Preiskarten zu nehmen. Normalerweise liegen 6 Preiskarten bereit. Wer alle eigenen Preiskarten genommen hat, gewinnt. Es gibt zusätzlich weitere Siegbedingungen, zum Beispiel wenn der Gegner zu Beginn seines Zuges keine Karte mehr ziehen kann."
             ),
             LearnStep(
-                "2 · Was gehört in ein Deck?",
-                "Ein normales Pokémon-TCG-Deck hat genau 60 Karten und mindestens ein Basis-Pokémon. Außer Basis-Energien darf eine Karte mit demselben Namen höchstens viermal im Deck sein. Für den Einstieg sind Pokémon, Trainerkarten und ungefähr 12–15 Energien ein gut verständlicher Ausgangspunkt."
+                "2 · Sammlung oder 60-Karten-Deck?",
+                "Deine Sammlung darf beliebig viele Karten aus vielen verschiedenen Sets enthalten. Für eine normale Partie stellt aber jeder Spieler aus seiner Sammlung ein eigenes Deck mit exakt 60 Karten zusammen. Es wird also nicht mit allen gesammelten Karten gleichzeitig gespielt. Das Deck braucht mindestens ein Basis-Pokémon; außer Basis-Energien darf eine Karte mit demselben Namen grundsätzlich höchstens viermal enthalten sein. Du kannst aus einer großen Sammlung natürlich mehrere verschiedene 60-Karten-Decks bauen."
             ),
             LearnStep(
                 "3 · Dürfen verschiedene Sets zusammen?",
