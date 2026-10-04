@@ -32,6 +32,9 @@ data class CardData(
     val standardLegal: Boolean,
     val expandedLegal: Boolean,
     val types: List<String>,
+    val weaknesses: List<String>,
+    val resistances: List<String>,
+    val retreatCost: Int,
     val attacks: List<CardAttack>,
     val effect: String?,
     val trainerType: String?,
@@ -204,6 +207,9 @@ fun CardData.toJson(): JSONObject = JSONObject().apply {
     put("standardLegal", standardLegal)
     put("expandedLegal", expandedLegal)
     put("types", JSONArray(types))
+    put("weaknesses", JSONArray(weaknesses))
+    put("resistances", JSONArray(resistances))
+    put("retreatCost", retreatCost)
     put("attacks", JSONArray().apply {
         attacks.forEach { a ->
             put(JSONObject().apply {
@@ -239,6 +245,16 @@ fun cardFromJson(o: JSONObject): CardData {
         for (i in 0 until typesArray.length()) add(typesArray.optString(i))
     }
 
+    val weaknessesArray = o.optJSONArray("weaknesses") ?: JSONArray()
+    val weaknesses = buildList {
+        for (i in 0 until weaknessesArray.length()) add(weaknessesArray.optString(i))
+    }
+
+    val resistancesArray = o.optJSONArray("resistances") ?: JSONArray()
+    val resistances = buildList {
+        for (i in 0 until resistancesArray.length()) add(resistancesArray.optString(i))
+    }
+
     val attacksArray = o.optJSONArray("attacks") ?: JSONArray()
     val attacks = buildList {
         for (i in 0 until attacksArray.length()) {
@@ -267,6 +283,9 @@ fun cardFromJson(o: JSONObject): CardData {
         standardLegal = o.optBoolean("standardLegal"),
         expandedLegal = o.optBoolean("expandedLegal"),
         types = types,
+        weaknesses = weaknesses,
+        resistances = resistances,
+        retreatCost = o.optInt("retreatCost", 1).coerceAtLeast(0),
         attacks = attacks,
         effect = nullableString("effect"),
         trainerType = nullableString("trainerType"),
