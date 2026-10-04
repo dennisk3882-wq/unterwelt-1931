@@ -916,22 +916,23 @@ class FullGameEngine(
     ) {
         val active = defending.active ?: return
         if (active.hp > 0) return
-        log += active.card.name + " ist kampfunfähig."
-        defending.discard += FullGameCard(-200000 - defending.discard.size, active.card, false)
+        val defeatedCard = active.card
+        log += defeatedCard.name + " ist kampfunfähig."
+        defending.discard += FullGameCard(-200000 - defending.discard.size, defeatedCard, false)
+        active.tool?.let {
+            defending.discard += FullGameCard(-210000 - defending.discard.size, it, false)
+        }
         defending.active = null
 
-        if (attacking.prizes.isNotEmpty()) {
-            val prize = attacking.prizes.removeAt(0)
-            attacking.hand += prize
-            log += (if (defenderName == "KI") "Du" else "KI") + " nimmt eine Preiskarte. Noch " + attacking.prizes.size + "."
-        }
+        val attackerLabel = if (defenderName == "KI") "Du" else "KI"
+        takePrizeCards(attacking, prizeValue(defeatedCard), attackerLabel)
 
         if (attacking.prizes.isEmpty()) {
-            finish(if (defenderName == "KI") "Du" else "KI")
+            finish(attackerLabel)
             return
         }
         if (defending.bench.isEmpty()) {
-            finish(if (defenderName == "KI") "Du" else "KI")
+            finish(attackerLabel)
             return
         }
 
@@ -957,16 +958,28 @@ class FullGameEngine(
     ) {
         val active = side.active ?: return
         if (active.hp > 0) return
-        log += active.card.name + " ist durch eigenen Schaden kampfunfähig."
-        side.discard += FullGameCard(-300000 - side.discard.size, active.card, false)
+        val defeatedCard = active.card
+        log += defeatedCard.name + " ist durch eigenen Schaden kampfunfähig."
+        side.discard += FullGameCard(-300000 - side.discard.size, defeatedCard, false)
+        active.tool?.let {
+            side.discard += FullGameCard(-310000 - side.discard.size, it, false)
+        }
         side.active = null
-        if (opponent.prizes.isNotEmpty()) {
-            opponent.hand += opponent.prizes.removeAt(0)
+
+        val opponentLabel = if (actor == "Du") "KI" else "Du"
+        takePrizeCards(opponent, prizeValue(defeatedCard), opponentLabel)
+
+        if (opponent.prizes.isEmpty()) {
+            finish(opponentLabel)
+            return
         }
         if (side.bench.isEmpty()) {
-            finish(if (actor == "Du") "KI" else "Du")
+            finish(opponentLabel)
         } else {
-            side.active = side.bench.removeAt(0)
+            val bestIndex = side.bench.indices.maxByOrNull {
+                boardPokemonScore(side.bench[it], opponent.active)
+            } ?: 0
+            side.active = side.bench.removeAt(bestIndex)
         }
     }
 
@@ -1308,17 +1321,45 @@ class FullGameEngine(
         defenderName: String
     ) {
         val knocked = defending.bench.filter { it.hp <= 0 }.toList()
+        val attackerLabel = if (defenderName == "KI") "Du" else "KI"
         knocked.forEach { pokemon ->
             defending.bench.remove(pokemon)
             defending.discard += FullGameCard(-700000 - defending.discard.size, pokemon.card, false)
-            if (attacking.prizes.isNotEmpty()) {
-                attacking.hand += attacking.prizes.removeAt(0)
+            pokemon.tool?.let {
+                defending.discard += FullGameCard(-710000 - defending.discard.size, it, false)
             }
             log += pokemon.card.name + " auf der Bank ist kampfunfähig."
+            takePrizeCards(attacking, prizeValue(pokemon.card), attackerLabel)
             if (attacking.prizes.isEmpty()) {
-                finish(if (defenderName == "KI") "Du" else "KI")
+                finish(attackerLabel)
                 return
             }
+        }
+    }
+
+    private fun takePrizeCards(side: FullSideState, count: Int, actor: String) {
+        var taken = 0
+        repeat(count.coerceAtLeast(1)) {
+            if (side.prizes.isNotEmpty()) {
+                side.hand += side.prizes.removeAt(0)
+                taken += 1
+            }
+        }
+        if (taken > 0) {
+            log += actor + " nimmt " + taken + " Preiskarte(n). Noch " + side.prizes.size + "."
+        }
+    }
+
+    private fun prizeValue(card: CardData): Int {
+        val name = card.name.lowercase(Locale.ROOT)
+        return when {
+            ("tag team" in name || "tag-team" in name) && "gx" in name -> 3
+            "vmax" in name -> 3
+            "vstar" in name -> 2
+            Regex("""(^|\s)ex($|\s|-)""", RegexOption.IGNORE_CASE).containsMatchIn(card.name) -> 2
+            Regex("""(^|\s)v($|\s|-)""", RegexOption.IGNORE_CASE).containsMatchIn(card.name) -> 2
+            "gx" in name -> 2
+            else -> 1
         }
     }
 
