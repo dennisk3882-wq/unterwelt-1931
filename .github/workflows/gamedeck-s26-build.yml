@@ -1,0 +1,88 @@
+name: Build GameDeck S26 APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gamedeck-s26-build
+    paths:
+      - "gamedeck-s26/**"
+      - ".github/workflows/gamedeck-s26-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout build branch
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept licenses and install Android toolchain
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager             "platform-tools"             "platforms;android-36"             "build-tools;36.0.0"             "ndk;28.2.13676358"             "cmake;3.31.6"
+
+      - name: Reconstruct GameDeck sources
+        shell: bash
+        run: |
+          mkdir -p gd
+          cat gamedeck-s26/parts/overlay.b64.* | tr -d '\n\r' | base64 -d > /tmp/gamedeck-overlay.tgz
+          tar -xzf /tmp/gamedeck-overlay.tgz -C gd
+          test -f gd/tools/apply_to_eden.py
+          test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
+
+      - name: Clone current Eden source
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/eden-emulator/mirror.git eden
+
+      - name: Apply GameDeck integration
+        shell: bash
+        run: |
+          python3 gd/tools/apply_to_eden.py eden
+          grep -q 'de.gamedeck.s26' eden/src/android/app/build.gradle.kts
+          grep -q 'GameDeckActivity' eden/src/android/app/src/main/AndroidManifest.xml
+
+      - name: Build GameDeck APK
+        working-directory: eden/src/android
+        env:
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleMainlineRelWithDebInfo --no-daemon --stacktrace
+
+      - name: Collect and verify APK
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          APK="$(find eden/src/android/app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          cp "$APK" artifacts/GameDeck-S26.apk
+          unzip -t artifacts/GameDeck-S26.apk >/dev/null
+          sha256sum artifacts/GameDeck-S26.apk | tee artifacts/GameDeck-S26.sha256
+          ls -lh artifacts/GameDeck-S26.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameDeck-S26-APK
+          path: |
+            artifacts/GameDeck-S26.apk
+            artifacts/GameDeck-S26.sha256
+          if-no-files-found: error
+          retention-days: 7
