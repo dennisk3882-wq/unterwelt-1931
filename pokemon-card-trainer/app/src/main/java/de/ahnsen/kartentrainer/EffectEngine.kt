@@ -29,6 +29,12 @@ data class DirectDamage(
 ) : EffectOp {
     override val description = amount.toString() + " Schaden an " + targetLabel(target)
 }
+data class SelfDamage(val amount: Int) : EffectOp {
+    override val description = amount.toString() + " Rückstoßschaden an diesem Pokémon"
+}
+data class DrawUntilHandSize(val size: Int) : EffectOp {
+    override val description = "Ziehe Karten, bis du " + size + " Karten auf der Hand hast"
+}
 data class ApplyCondition(val status: EffectStatus, val target: EffectTarget) : EffectOp {
     override val description = statusLabel(status) + " auf " + targetLabel(target)
 }
@@ -166,11 +172,13 @@ object EffectParser {
         parseCoin(s)?.let(ops::add)
         parseShuffleDraw(s)?.let(ops::add)
         parseDiscardHandDraw(s)?.let(ops::add)
+        parseDrawUntil(s)?.let(ops::add)
         parseDraw(s)?.let(ops::add)
         parseSearch(s)?.let(ops::add)
         parseHeal(s)?.let(ops::add)
         parseStatus(s)?.let(ops::add)
         parseDirectDamage(s)?.let(ops::add)
+        parseSelfDamage(s)?.let(ops::add)
         parseAttachEnergy(s)?.let(ops::add)
         parseDiscardEnergy(s)?.let(ops::add)
         parseSwitch(s)?.let(ops::add)
@@ -199,6 +207,17 @@ object EffectParser {
         val bonus = Regex("""(?:bei kopf|for each heads?|if heads).*?(\d+)\s+(?:mehr )?(?:schaden|damage)""")
             .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
         return CoinRule(flips.coerceAtLeast(1), cancel, bonus)
+    }
+
+    private fun parseDrawUntil(s: String): EffectOp? {
+        val regexes = listOf(
+            Regex("""(?:bis du|bis ihr)\s+(\d+)\s+karten?.*hand"""),
+            Regex("""until you have\s+(\d+)\s+cards?.*hand""")
+        )
+        val size = regexes.firstNotNullOfOrNull {
+            it.find(s)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        } ?: return null
+        return DrawUntilHandSize(size.coerceIn(1, 20))
     }
 
     private fun parseDraw(s: String): EffectOp? {
@@ -271,6 +290,18 @@ object EffectParser {
             .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: return null
         val target = if (containsAny(s, "jedem", "each")) EffectTarget.ALL_OPPONENT else EffectTarget.OPPONENT_BENCH
         return DirectDamage(amount, target, true)
+    }
+
+    private fun parseSelfDamage(s: String): EffectOp? {
+        val selfMention = containsAny(
+            s,
+            "diesem pokémon", "diesem pokemon", "sich selbst",
+            "this pokémon", "this pokemon", "itself"
+        )
+        if (!selfMention || !containsAny(s, "schaden", "damage")) return null
+        val amount = Regex("""(\d+)\s+(?:schadenspunkte|schaden|damage)""")
+            .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: return null
+        return SelfDamage(amount)
     }
 
     private fun parseAttachEnergy(s: String): EffectOp? {
@@ -392,8 +423,10 @@ object EffectAiEvaluator {
         parsed.operations.forEach { op ->
             score += when (op) {
                 is DrawCards -> op.count * 11.0
+                is DrawUntilHandSize -> op.size * 5.5
                 is HealDamage -> op.amount * 0.35
                 is DirectDamage -> op.amount * 0.9
+                is SelfDamage -> op.amount * -0.45
                 is ApplyCondition -> when (op.status) {
                     EffectStatus.PARALYZED -> 36.0
                     EffectStatus.ASLEEP -> 27.0
