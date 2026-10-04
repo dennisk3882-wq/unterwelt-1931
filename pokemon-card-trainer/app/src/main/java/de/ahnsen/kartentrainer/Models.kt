@@ -6,6 +6,12 @@ import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.max
 
+data class CardAbility(
+    val type: String,
+    val name: String,
+    val effect: String
+)
+
 data class CardAttack(
     val name: String,
     val damage: String,
@@ -35,6 +41,7 @@ data class CardData(
     val weaknesses: List<String>,
     val resistances: List<String>,
     val retreatCost: Int,
+    val abilities: List<CardAbility>,
     val attacks: List<CardAttack>,
     val effect: String?,
     val trainerType: String?,
@@ -210,6 +217,15 @@ fun CardData.toJson(): JSONObject = JSONObject().apply {
     put("weaknesses", JSONArray(weaknesses))
     put("resistances", JSONArray(resistances))
     put("retreatCost", retreatCost)
+    put("abilities", JSONArray().apply {
+        abilities.forEach { a ->
+            put(JSONObject().apply {
+                put("type", a.type)
+                put("name", a.name)
+                put("effect", a.effect)
+            })
+        }
+    })
     put("attacks", JSONArray().apply {
         attacks.forEach { a ->
             put(JSONObject().apply {
@@ -255,6 +271,20 @@ fun cardFromJson(o: JSONObject): CardData {
         for (i in 0 until resistancesArray.length()) add(resistancesArray.optString(i))
     }
 
+    val abilitiesArray = o.optJSONArray("abilities") ?: JSONArray()
+    val abilities = buildList {
+        for (i in 0 until abilitiesArray.length()) {
+            val a = abilitiesArray.optJSONObject(i) ?: continue
+            add(
+                CardAbility(
+                    type = a.optString("type"),
+                    name = a.optString("name"),
+                    effect = a.optString("effect")
+                )
+            )
+        }
+    }
+
     val attacksArray = o.optJSONArray("attacks") ?: JSONArray()
     val attacks = buildList {
         for (i in 0 until attacksArray.length()) {
@@ -286,6 +316,7 @@ fun cardFromJson(o: JSONObject): CardData {
         weaknesses = weaknesses,
         resistances = resistances,
         retreatCost = o.optInt("retreatCost", 1).coerceAtLeast(0),
+        abilities = abilities,
         attacks = attacks,
         effect = nullableString("effect"),
         trainerType = nullableString("trainerType"),
