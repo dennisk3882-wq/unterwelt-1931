@@ -300,7 +300,7 @@ object EffectParser {
 
     private fun parseDiscardHandCards(s: String): EffectOp? {
         if (!containsAny(s, "deiner hand", "your hand")) return null
-        if (!containsAny(s, "ablegen", "wirf", "discard")) return null
+        if (!containsAny(s, "ablegen", "lege", "wirf", "discard")) return null
         if (containsAny(s, "lege deine hand ab", "discard your hand")) return null
         val regexes = listOf(
             Regex("""(?:lege|wirf).*?(\d+)\s+karten?.*hand"""),
@@ -440,7 +440,12 @@ object EffectParser {
 
     private fun parseAttachEnergy(s: String): EffectOp? {
         if (!containsAny(s, "energie", "energy")) return null
-        if (!containsAny(s, "anlegen", "lege", "attach")) return null
+        val attachPhrase = containsAny(
+            s,
+            " an eines", " an einem", " an dein", " an dieses", " an das ",
+            " an 1 ", "attach"
+        )
+        if (!attachPhrase) return null
         val count = Regex("""(?:bis zu|up to)?\s*(\d+)""")
             .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 1
         val target = when {
@@ -453,7 +458,9 @@ object EffectParser {
 
     private fun parseDiscardEnergy(s: String): EffectOp? {
         if (!containsAny(s, "energie", "energy")) return null
-        if (!containsAny(s, "ablegen", "wirf", "discard")) return null
+        val discardPhrase = containsAny(s, "ablegen", "wirf", "discard") ||
+            (containsAny(s, "lege", "put") && containsAny(s, "ablagestapel", "discard pile"))
+        if (!discardPhrase) return null
         if (containsAny(s, "deiner hand", "your hand")) return null
         val count = Regex("""(?:bis zu|up to)?\s*(\d+)""")
             .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 1
@@ -463,7 +470,7 @@ object EffectParser {
 
     private fun parseSwitch(s: String): EffectOp? {
         if (!containsAny(s, "tausche", "wechsle", "switch")) return null
-        if (!containsAny(s, "aktives", "active")) return null
+        if (!containsAny(s, "aktives", "aktive ", "active")) return null
         return SwitchActive(containsAny(s, "gegner", "opponent"))
     }
 
