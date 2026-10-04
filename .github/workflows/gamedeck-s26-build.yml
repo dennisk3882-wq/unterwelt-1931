@@ -31,6 +31,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Install host build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y glslang-tools spirv-tools
+
       - name: Install Android toolchain
         shell: bash
         run: |
