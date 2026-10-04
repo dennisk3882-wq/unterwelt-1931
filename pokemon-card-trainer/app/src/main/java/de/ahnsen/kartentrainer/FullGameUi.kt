@@ -242,6 +242,57 @@ fun FullGameScreen(
                     }
                 }
 
+                val selectedPokemon = if (selectedTarget == 0) {
+                    state.player.active
+                } else {
+                    state.player.bench.getOrNull(selectedTarget - 1)
+                }
+                if (selectedPokemon != null && selectedPokemon.card.abilities.isNotEmpty()) {
+                    item {
+                        Text(
+                            "Fähigkeiten von " + selectedPokemon.card.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    items(selectedPokemon.card.abilities.indices.toList()) { abilityIndex ->
+                        val ability = selectedPokemon.card.abilities[abilityIndex]
+                        val timing = classifyAbilityTiming(ability.effect)
+                        val parsed = EffectParser.parse(ability.effect, EffectSourceKind.ABILITY)
+                        OutlinedCard {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(ability.name, fontWeight = FontWeight.Bold)
+                                Text(
+                                    timing.label + " · Automatik-Abdeckung " + parsed.coveragePercent + "%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(ability.effect, style = MaterialTheme.typography.bodySmall)
+                                if (parsed.operations.isNotEmpty()) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "Engine: " + parsed.summary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+                                if (timing == AbilityTiming.ACTIVATED || timing == AbilityTiming.UNKNOWN) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Button(
+                                        onClick = {
+                                            snapshot = engine?.usePlayerAbility(selectedTarget, abilityIndex)
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Fähigkeit benutzen")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 item {
                     Text(
                         "Deine Hand · " + state.player.hand.size + " Karten",
@@ -339,9 +390,21 @@ fun FullGameScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 if (attack.effect.isNotBlank()) {
+                                    val parsed = EffectParser.parse(attack.effect, EffectSourceKind.ATTACK)
                                     Text(
                                         attack.effect,
                                         style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        "Effekt-Engine " + parsed.coveragePercent + "% · " + parsed.summary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (parsed.fullySupported) {
+                                            MaterialTheme.colorScheme.tertiary
+                                        } else {
+                                            MaterialTheme.colorScheme.secondary
+                                        },
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -574,10 +637,22 @@ private fun HandCardRow(
                     }
                     val effect = gameCard.card?.effect.orEmpty()
                     if (effect.isNotBlank()) {
+                        val parsed = EffectParser.parse(effect, EffectSourceKind.TRAINER)
                         Text(
                             effect,
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            "Automatik " + parsed.coveragePercent + "% · " + parsed.summary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (parsed.fullySupported) {
+                                MaterialTheme.colorScheme.tertiary
+                            } else {
+                                MaterialTheme.colorScheme.secondary
+                            },
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
