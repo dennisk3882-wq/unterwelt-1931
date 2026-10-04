@@ -629,7 +629,8 @@ class FullGameEngine(
         } ?: return
         val best = ai.bench[bestIndex]
         val danger = active.hp <= (active.card.hp ?: 100) / 3
-        if (boardPokemonScore(best, enemy) > current + if (difficulty == AiDifficulty.EXPERT) 8 else 24 || danger) {
+        val switchThreshold = if (difficulty == AiDifficulty.EXPERT) 8.0 else 24.0
+        if (boardPokemonScore(best, enemy) > current + switchThreshold || danger) {
             active.energy -= active.card.retreatCost
             val old = active
             old.status = FullStatus.NONE
