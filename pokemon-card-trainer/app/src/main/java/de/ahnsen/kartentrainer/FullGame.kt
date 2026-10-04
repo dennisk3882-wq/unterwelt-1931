@@ -1011,10 +1011,18 @@ class FullGameEngine(
                 is DiscardEnergy -> {
                     val target = pokemonTargets(side, opponent, sourcePokemon, op.target, aiControlled).firstOrNull()
                     if (target != null) {
+                        val targetSide = when (op.target) {
+                            EffectTarget.OPPONENT_ACTIVE,
+                            EffectTarget.OPPONENT_BENCH,
+                            EffectTarget.OPPONENT_ANY,
+                            EffectTarget.ALL_OPPONENT,
+                            EffectTarget.ALL_OPPONENT_BENCH -> opponent
+                            else -> side
+                        }
                         val removed = min(op.count, target.energy)
                         target.energy -= removed
                         repeat(removed) {
-                            side.discard += FullGameCard(-500000 - side.discard.size, null, true)
+                            targetSide.discard += FullGameCard(-500000 - targetSide.discard.size, null, true)
                         }
                         if (removed > 0) log += actor + ": " + removed + " Energie von " + target.card.name + " abgelegt."
                     }
@@ -1053,6 +1061,32 @@ class FullGameEngine(
                     side.discard += side.hand
                     side.hand.clear()
                     draw(side, op.drawCount)
+                }
+
+                is DiscardHandCards -> {
+                    repeat(min(op.count, side.hand.size)) {
+                        val index = if (aiControlled) {
+                            side.hand.indices.minByOrNull { handIndex ->
+                                side.hand[handIndex].card?.let { boardCardScore(it) } ?: 1.0
+                            } ?: 0
+                        } else {
+                            side.hand.lastIndex
+                        }
+                        if (index >= 0) side.discard += side.hand.removeAt(index)
+                    }
+                }
+
+                is RecoverFromDiscard -> {
+                    repeat(op.count) {
+                        val index = side.discard.indexOfFirst { matchesSearch(it, op.kind) }
+                        if (index >= 0) side.hand += side.discard.removeAt(index)
+                    }
+                }
+
+                is ClearSpecialConditions -> {
+                    pokemonTargets(side, opponent, sourcePokemon, op.target, aiControlled).forEach {
+                        it.status = FullStatus.NONE
+                    }
                 }
 
                 is DiscardTopDeck -> {
