@@ -250,7 +250,7 @@ private fun HomeScreen(
             HomeTile(
                 icon = Icons.Default.SmartToy,
                 title = "KI-Trainer",
-                subtitle = "Strategische KI mit vier Stufen, Zugerklärung, KI-Coach sowie echte Karten gegen den digitalen Gegner.",
+                subtitle = "60-Karten-Vollspiel, strategische Arena, vier KI-Stufen, Zugerklärung, KI-Coach und echte Karten mit Kamera.",
                 onClick = { onOpen(AppScreen.AI) }
             )
         }
@@ -874,20 +874,26 @@ private fun AiTrainerScreen(padding: PaddingValues, collection: List<CollectionE
             Tab(
                 selected = tab == 0,
                 onClick = { tab = 0 },
-                text = { Text("Digital") },
+                text = { Text("Vollspiel") },
                 icon = { Icon(Icons.Default.SportsEsports, contentDescription = null) }
             )
             Tab(
                 selected = tab == 1,
                 onClick = { tab = 1 },
-                text = { Text("Echte Karten") },
+                text = { Text("Arena") },
+                icon = { Icon(Icons.Default.SmartToy, contentDescription = null) }
+            )
+            Tab(
+                selected = tab == 2,
+                onClick = { tab = 2 },
+                text = { Text("Echte") },
                 icon = { Icon(Icons.Default.CameraAlt, contentDescription = null) }
             )
         }
-        if (tab == 0) {
-            AdvancedDigitalBattleScreen(collection, Modifier.weight(1f))
-        } else {
-            PhysicalBattleScreen(collection, Modifier.weight(1f))
+        when (tab) {
+            0 -> FullGameScreen(collection, Modifier.weight(1f))
+            1 -> AdvancedDigitalBattleScreen(collection, Modifier.weight(1f))
+            else -> PhysicalBattleScreen(collection, Modifier.weight(1f))
         }
     }
 }
