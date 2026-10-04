@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.ImmobilienImperium" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F7FBFF</item>
+        <item name="android:navigationBarColor">#F7FBFF</item>
+    </style>
+</resources>
