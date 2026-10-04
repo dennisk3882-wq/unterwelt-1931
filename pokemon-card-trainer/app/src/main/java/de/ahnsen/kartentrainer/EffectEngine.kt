@@ -120,6 +120,15 @@ data class ShuffleHandAndDraw(val drawCount: Int) : EffectOp {
 data class DiscardHandAndDraw(val drawCount: Int) : EffectOp {
     override val description = "Lege die Hand ab und ziehe " + drawCount + " Karte(n)"
 }
+data class DiscardHandCards(val count: Int) : EffectOp {
+    override val description = "Lege " + count + " Karte(n) aus deiner Hand ab"
+}
+data class RecoverFromDiscard(val kind: SearchKind, val count: Int) : EffectOp {
+    override val description = "Nimm " + count + " " + searchLabel(kind) + " aus dem Ablagestapel auf die Hand"
+}
+data class ClearSpecialConditions(val target: EffectTarget) : EffectOp {
+    override val description = "Entferne alle Sonderzustände von " + targetLabel(target)
+}
 data class DiscardTopDeck(val count: Int, val opponent: Boolean) : EffectOp {
     override val description =
         "Lege die obersten " + count + " Karte(n) " +
@@ -208,7 +217,13 @@ object EffectParser {
 
         sentences.forEach { sentence ->
             val parsed = parseSentence(sentence)
-            if (parsed.isEmpty()) unsupported += sentence else operations += parsed
+            if (parsed.isEmpty()) {
+                unsupported += sentence
+            } else if (hasUnresolvedCondition(sentence, parsed)) {
+                unsupported += sentence
+            } else {
+                operations += parsed
+            }
         }
 
         val total = operations.size + unsupported.size
@@ -223,6 +238,9 @@ object EffectParser {
         parseCoin(s)?.let(ops::add)
         parseShuffleDraw(s)?.let(ops::add)
         parseDiscardHandDraw(s)?.let(ops::add)
+        parseDiscardHandCards(s)?.let(ops::add)
+        parseRecoverFromDiscard(s)?.let(ops::add)
+        parseClearConditions(s)?.let(ops::add)
         parseDrawUntil(s)?.let(ops::add)
         parseDraw(s)?.let(ops::add)
         parseSearch(s)?.let(ops::add)
@@ -258,6 +276,51 @@ object EffectParser {
         val bonus = Regex("""(?:bei kopf|for each heads?|if heads).*?(\d+)\s+(?:mehr )?(?:schaden|damage)""")
             .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
         return CoinRule(flips.coerceAtLeast(1), cancel, bonus)
+    }
+
+    private fun parseDiscardHandCards(s: String): EffectOp? {
+        if (!containsAny(s, "deiner hand", "your hand")) return null
+        if (!containsAny(s, "ablegen", "wirf", "discard")) return null
+        if (containsAny(s, "lege deine hand ab", "discard your hand")) return null
+        val regexes = listOf(
+            Regex("""(?:lege|wirf).*?(\d+)\s+karten?.*hand"""),
+            Regex("""discard\s+(\d+)\s+cards?.*hand""")
+        )
+        val count = regexes.firstNotNullOfOrNull {
+            it.find(s)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        } ?: return null
+        return DiscardHandCards(count.coerceIn(1, 10))
+    }
+
+    private fun parseRecoverFromDiscard(s: String): EffectOp? {
+        if (!containsAny(s, "ablagestapel", "discard pile")) return null
+        if (!containsAny(s, "auf deine hand", "into your hand", "to your hand")) return null
+        if (!containsAny(s, "nimm", "put", "return")) return null
+        val count = Regex("""(?:bis zu|up to)?\s*(\d+)""")
+            .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 1
+        val kind = when {
+            containsAny(s, "basis-energ", "basic energy") -> SearchKind.BASIC_ENERGY
+            containsAny(s, "energie", "energy") -> SearchKind.ENERGY
+            containsAny(s, "basis-pok", "basic pok") -> SearchKind.BASIC_POKEMON
+            containsAny(s, "pokemon", "pokémon") -> SearchKind.POKEMON
+            containsAny(s, "trainer") -> SearchKind.TRAINER
+            else -> SearchKind.ANY
+        }
+        return RecoverFromDiscard(kind, count.coerceIn(1, 6))
+    }
+
+    private fun parseClearConditions(s: String): EffectOp? {
+        if (!containsAny(
+                s,
+                "entferne alle sonderzustände",
+                "entferne alle speziellen zustände",
+                "remove all special conditions"
+            )
+        ) return null
+        val target = if (containsAny(s, "diesem pok", "this pok")) {
+            EffectTarget.SELF_ACTIVE
+        } else EffectTarget.OWN_ANY
+        return ClearSpecialConditions(target)
     }
 
     private fun parseDrawUntil(s: String): EffectOp? {
@@ -474,6 +537,21 @@ object EffectParser {
         }
     }
 
+    private fun hasUnresolvedCondition(sentence: String, parsed: List<EffectOp>): Boolean {
+        val s = sentence.lowercase(Locale.ROOT)
+        val conditional = listOf(
+            " wenn ", "wenn ", " falls ", "falls ", " solange ", "solange ",
+            " if ", "if ", " as long as ", "for each ", "für jede ", "für jeden "
+        ).any { s.contains(it) }
+        if (!conditional) return false
+
+        val supportedConditional = parsed.any {
+            it is CoinRule ||
+                (it is DamageBonus && (it.onHeads || it.perEnergy || it.perCounter))
+        }
+        return !supportedConditional
+    }
+
     private fun containsAny(text: String, vararg needles: String): Boolean =
         needles.any { text.contains(it) }
 }
@@ -507,6 +585,9 @@ object EffectAiEvaluator {
                 is SwitchActive -> 18.0
                 is ShuffleHandAndDraw -> op.drawCount * 7.0
                 is DiscardHandAndDraw -> op.drawCount * 6.0
+                is DiscardHandCards -> op.count * -5.0
+                is RecoverFromDiscard -> op.count * 17.0
+                is ClearSpecialConditions -> 18.0
                 is DiscardTopDeck -> op.count * if (op.opponent) 8.0 else -4.0
                 is ReturnToHand -> if (op.target == EffectTarget.OPPONENT_ACTIVE) 28.0 else 8.0
                 is DamageBonus -> op.amount * 0.75
