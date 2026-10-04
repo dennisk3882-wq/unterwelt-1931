@@ -33,7 +33,8 @@ data class FullPokemonView(
     val hp: Int,
     val energy: Int,
     val turnsInPlay: Int,
-    val status: FullStatus
+    val status: FullStatus,
+    val toolName: String?
 ) {
     val maxHp: Int get() = card.hp ?: 100
 }
@@ -58,6 +59,7 @@ data class FullGameSnapshot(
     val finished: Boolean,
     val winner: String?,
     val difficulty: AiDifficulty,
+    val stadiumName: String?,
     val lastAiReasoning: String,
     val log: List<String>
 )
@@ -76,9 +78,10 @@ private data class FullPokemonState(
     var preventAllDamageNext: Boolean = false,
     var damageReductionNext: Int = 0,
     var attackLocked: Boolean = false,
-    var retreatLocked: Boolean = false
+    var retreatLocked: Boolean = false,
+    var tool: CardData? = null
 ) {
-    fun view() = FullPokemonView(card, hp, energy, turnsInPlay, status)
+    fun view() = FullPokemonView(card, hp, energy, turnsInPlay, status, tool?.name)
 }
 
 private data class FullSideState(
@@ -209,6 +212,8 @@ class FullGameEngine(
             .shuffled(Random(seed + 991)).toMutableList()
     )
     private val log = mutableListOf<String>()
+    private var stadiumCard: FullGameCard? = null
+    private var stadiumOwner: FullSideState? = null
     private var turnNumber = 1
     private var firstPlayerTurn = true
     private var finished = false
@@ -236,6 +241,7 @@ class FullGameEngine(
         finished = finished,
         winner = winner,
         difficulty = difficulty,
+        stadiumName = stadiumCard?.name,
         lastAiReasoning = lastAiReasoning,
         log = log.toList()
     )
