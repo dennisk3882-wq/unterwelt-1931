@@ -1355,11 +1355,14 @@ class FullGameEngine(
         opponent: FullSideState,
         firstTurn: Boolean
     ): Double {
-        val type = card.trainerType.orEmpty().lowercase()
-        if (("support" in type || "unterstüt" in type) && (firstTurn || side.supporterUsed)) return -1000.0
-        if ("stad" in type && side.stadiumUsed) return -1000.0
+        if (isSupporterCard(card) && (firstTurn || side.supporterUsed)) return -1000.0
+        if (isStadiumCard(card) && side.stadiumUsed) return -1000.0
+        if (isStadiumCard(card) && stadiumCard?.card?.name.equals(card.name, ignoreCase = true)) return -1000.0
+        if (isToolCard(card) && allPokemon(side).none { it.tool == null }) return -1000.0
         val parsed = EffectParser.parse(card.effect.orEmpty(), EffectSourceKind.TRAINER)
         var score = 4.0 + EffectAiEvaluator.score(parsed)
+        if (isToolCard(card)) score += 16.0
+        if (isStadiumCard(card)) score += 10.0
         if (side.hand.size <= 4 && parsed.operations.any { it is DrawCards || it is DrawUntilHandSize }) {
             score += 18.0
         }
