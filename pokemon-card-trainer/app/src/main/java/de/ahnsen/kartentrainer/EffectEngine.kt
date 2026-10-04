@@ -6,7 +6,7 @@ enum class EffectSourceKind { ATTACK, TRAINER, ABILITY }
 enum class EffectTarget {
     SELF_ACTIVE, OWN_ACTIVE, OWN_BENCH, OWN_ANY,
     OPPONENT_ACTIVE, OPPONENT_BENCH, OPPONENT_ANY,
-    ALL_OWN, ALL_OPPONENT
+    ALL_OWN, ALL_OWN_BENCH, ALL_OPPONENT, ALL_OPPONENT_BENCH
 }
 enum class SearchKind {
     ANY, POKEMON, BASIC_POKEMON, EVOLUTION_POKEMON,
@@ -109,7 +109,8 @@ data class PreventDamage(val amount: Int?, val allDamage: Boolean) : EffectOp {
 }
 data class LockAction(
     val attack: Boolean = false,
-    val retreat: Boolean = false
+    val retreat: Boolean = false,
+    val target: EffectTarget = EffectTarget.SELF_ACTIVE
 ) : EffectOp {
     override val description = when {
         attack -> "Kann im nächsten Zug nicht angreifen"
@@ -288,7 +289,7 @@ object EffectParser {
         if (!containsAny(s, "bank", "bench")) return null
         val amount = Regex("""(\d+)\s+(?:schadenspunkte|schaden|damage)""")
             .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: return null
-        val target = if (containsAny(s, "jedem", "each")) EffectTarget.ALL_OPPONENT else EffectTarget.OPPONENT_BENCH
+        val target = if (containsAny(s, "jedem", "each")) EffectTarget.ALL_OPPONENT_BENCH else EffectTarget.OPPONENT_BENCH
         return DirectDamage(amount, target, true)
     }
 
@@ -369,7 +370,12 @@ object EffectParser {
                 "can't attack during your next turn",
                 "cannot attack during your next turn"
             )
-        ) return LockAction(attack = true)
+        ) {
+            val target = if (containsAny(s, "verteidigende", "defending pok", "gegner")) {
+                EffectTarget.OPPONENT_ACTIVE
+            } else EffectTarget.SELF_ACTIVE
+            return LockAction(attack = true, target = target)
+        }
 
         if (containsAny(
                 s,
@@ -378,7 +384,12 @@ object EffectParser {
                 "can't retreat",
                 "cannot retreat"
             )
-        ) return LockAction(retreat = true)
+        ) {
+            val target = if (containsAny(s, "verteidigende", "defending pok", "gegner")) {
+                EffectTarget.OPPONENT_ACTIVE
+            } else EffectTarget.SELF_ACTIVE
+            return LockAction(retreat = true, target = target)
+        }
 
         return null
     }
@@ -470,7 +481,9 @@ fun targetLabel(target: EffectTarget): String = when (target) {
     EffectTarget.OPPONENT_BENCH -> "einem gegnerischen Bank-Pokémon"
     EffectTarget.OPPONENT_ANY -> "einem Pokémon des Gegners"
     EffectTarget.ALL_OWN -> "allen deinen Pokémon"
+    EffectTarget.ALL_OWN_BENCH -> "allen deinen Bank-Pokémon"
     EffectTarget.ALL_OPPONENT -> "allen gegnerischen Pokémon"
+    EffectTarget.ALL_OPPONENT_BENCH -> "allen gegnerischen Bank-Pokémon"
 }
 
 private fun statusLabel(status: EffectStatus): String = when (status) {
