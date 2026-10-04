@@ -12,9 +12,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: gamedeck-s26-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
 
     steps:
@@ -27,18 +31,22 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept licenses and install Android toolchain
+      - name: Install Android toolchain
         shell: bash
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager             "platform-tools"             "platforms;android-36"             "build-tools;36.0.0"             "ndk;28.2.13676358"             "cmake;3.31.6"
+          set -euo pipefail
+          ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER"             "platform-tools"             "platforms;android-36"             "build-tools;36.0.0"             "ndk;28.2.13676358"             "cmake;3.31.6"
 
       - name: Reconstruct GameDeck sources
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p gd
           cat gamedeck-s26/parts/overlay.b64.* | tr -d '\n\r' | base64 -d > /tmp/gamedeck-overlay.tgz
           tar -xzf /tmp/gamedeck-overlay.tgz -C gd
@@ -48,11 +56,14 @@ jobs:
       - name: Clone current Eden source
         shell: bash
         run: |
+          set -euo pipefail
           git clone --depth 1 https://github.com/eden-emulator/mirror.git eden
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > eden/src/android/local.properties
 
       - name: Apply GameDeck integration
         shell: bash
         run: |
+          set -euo pipefail
           python3 gd/tools/apply_to_eden.py eden
           grep -q 'de.gamedeck.s26' eden/src/android/app/build.gradle.kts
           grep -q 'GameDeckActivity' eden/src/android/app/src/main/AndroidManifest.xml
@@ -63,17 +74,20 @@ jobs:
           ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
         shell: bash
         run: |
+          set -euo pipefail
           chmod +x gradlew
           ./gradlew assembleMainlineRelWithDebInfo --no-daemon --stacktrace
 
       - name: Collect and verify APK
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p artifacts
           APK="$(find eden/src/android/app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
           test -n "$APK"
           cp "$APK" artifacts/GameDeck-S26.apk
           unzip -t artifacts/GameDeck-S26.apk >/dev/null
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
           sha256sum artifacts/GameDeck-S26.apk | tee artifacts/GameDeck-S26.sha256
           ls -lh artifacts/GameDeck-S26.apk
 
