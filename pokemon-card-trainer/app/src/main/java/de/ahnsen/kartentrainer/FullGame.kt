@@ -887,6 +887,11 @@ class FullGameEngine(
     }
 
     private fun canAttack(attacker: FullPokemonState, actor: String): Boolean {
+        if (attacker.attackLocked) {
+            log += actor + ": " + attacker.card.name + " kann in diesem Zug wegen eines Karteneffekts nicht angreifen."
+            attacker.attackLocked = false
+            return false
+        }
         return when (attacker.status) {
             FullStatus.ASLEEP -> {
                 log += actor + ": " + attacker.card.name + " schläft und kann nicht angreifen."
@@ -913,6 +918,8 @@ class FullGameEngine(
         if (defender.card.resistances.any { resist -> attackerTypes.contains(resist.lowercase(Locale.ROOT)) }) {
             damage = max(0, damage - 30)
         }
+        if (defender.preventAllDamageNext) damage = 0
+        if (defender.damageReductionNext > 0) damage = max(0, damage - defender.damageReductionNext)
         return damage
     }
 
