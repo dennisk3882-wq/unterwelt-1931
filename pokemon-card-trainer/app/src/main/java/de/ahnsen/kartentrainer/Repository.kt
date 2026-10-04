@@ -67,6 +67,20 @@ class TcgDexRepository {
             }
         }
 
+        val abilitiesArr = o.optJSONArray("abilities") ?: JSONArray()
+        val abilities = buildList {
+            for (i in 0 until abilitiesArr.length()) {
+                val a = abilitiesArr.optJSONObject(i) ?: continue
+                add(
+                    CardAbility(
+                        type = a.optString("type"),
+                        name = a.optString("name"),
+                        effect = a.optString("effect")
+                    )
+                )
+            }
+        }
+
         val attacksArr = o.optJSONArray("attacks") ?: JSONArray()
         val attacks = buildList {
             for (i in 0 until attacksArr.length()) {
@@ -111,6 +125,7 @@ class TcgDexRepository {
             weaknesses = typeList("weaknesses"),
             resistances = typeList("resistances"),
             retreatCost = o.optInt("retreat", 1).coerceAtLeast(0),
+            abilities = abilities,
             attacks = attacks,
             effect = nullableString("effect"),
             trainerType = nullableString("trainerType"),
