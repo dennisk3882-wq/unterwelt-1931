@@ -253,8 +253,10 @@ class FullGameEngine(
         }
         val card = handCard.card ?: return snapshot()
         player.hand.removeAt(handIndex)
-        player.bench += FullPokemonState(card)
+        val state = FullPokemonState(card)
+        player.bench += state
         log += card.name + " kommt auf deine Bank."
+        triggerOnPlayAbilities(player, ai, state, "Du", false)
         return snapshot()
     }
 
@@ -307,6 +309,7 @@ class FullGameEngine(
         target.status = FullStatus.NONE
         player.hand.removeAt(handIndex)
         log += target.card.name + " wurde entwickelt. Sonderzustände wurden dabei entfernt."
+        triggerOnPlayAbilities(player, ai, target, "Du", false)
         return snapshot()
     }
 
@@ -340,6 +343,46 @@ class FullGameEngine(
         if (isStadium) player.stadiumUsed = true
         player.discard += gameCard
         log += "Trainerkarte gespielt: " + card.name + "."
+        return snapshot()
+    }
+
+    fun usePlayerAbility(targetIndex: Int, abilityIndex: Int): FullGameSnapshot {
+        if (finished) return snapshot()
+        val pokemon = targetPokemon(player, targetIndex)
+        if (pokemon == null) {
+            log += "Dieses Pokémon ist nicht verfügbar."
+            return snapshot()
+        }
+        val ability = pokemon.card.abilities.getOrNull(abilityIndex)
+        if (ability == null) {
+            log += "Diese Fähigkeit ist nicht verfügbar."
+            return snapshot()
+        }
+        val timing = classifyAbilityTiming(ability.effect)
+        if (timing != AbilityTiming.ACTIVATED && timing != AbilityTiming.UNKNOWN) {
+            log += ability.name + " ist " + timing.label + " und wird nicht als manuelle Zugaktion behandelt."
+            return snapshot()
+        }
+
+        val key = pokemon.card.id + "#" + ability.name
+        if (!player.usedAbilities.add(key)) {
+            log += ability.name + " wurde in diesem Zug bereits benutzt."
+            return snapshot()
+        }
+
+        val parsed = EffectParser.parse(ability.effect, EffectSourceKind.ABILITY)
+        executeParsedEffect(
+            side = player,
+            opponent = ai,
+            sourcePokemon = pokemon,
+            parsed = parsed,
+            actor = "Du",
+            aiControlled = false
+        )
+        log += "Fähigkeit benutzt: " + pokemon.card.name + " – " + ability.name + "."
+        logEffectCoverage(ability.name, parsed)
+        resolveKnockOut(ai, player, defenderName = "KI")
+        resolveBenchKnockOuts(ai, player, "KI")
         return snapshot()
     }
 
@@ -508,6 +551,7 @@ class FullGameEngine(
 
         aiPlayBasics(reasons)
         aiEvolve(reasons)
+        aiUseAbilities(reasons)
         aiPlayTrainers(reasons, aiFirstTurn)
         aiAttachEnergy(reasons)
         aiMaybeRetreat(reasons)
@@ -548,8 +592,10 @@ class FullGameEngine(
             } ?: break
             val card = best.value.card ?: break
             ai.hand.removeAt(best.index)
-            ai.bench += FullPokemonState(card)
+            val state = FullPokemonState(card)
+            ai.bench += state
             reasons += "Basis-Pokémon " + card.name + " wird auf die Bank gelegt."
+            triggerOnPlayAbilities(ai, player, state, "KI", true)
         }
     }
 
@@ -578,7 +624,54 @@ class FullGameEngine(
                 target.status = FullStatus.NONE
                 ai.hand.removeAt(handIndex)
                 reasons += "Die KI entwickelt zu " + card.name + "."
+                triggerOnPlayAbilities(ai, player, target, "KI", true)
                 changed = true
+            }
+        }
+    }
+
+    private fun triggerOnPlayAbilities(
+        side: FullSideState,
+        opponent: FullSideState,
+        pokemon: FullPokemonState,
+        actor: String,
+        aiControlled: Boolean
+    ) {
+        pokemon.card.abilities.forEach { ability ->
+            if (classifyAbilityTiming(ability.effect) == AbilityTiming.ON_PLAY) {
+                val parsed = EffectParser.parse(ability.effect, EffectSourceKind.ABILITY)
+                executeParsedEffect(side, opponent, pokemon, parsed, actor, aiControlled)
+                log += actor + ": Beim-Ausspielen-Fähigkeit " + ability.name + " ausgelöst."
+                logEffectCoverage(ability.name, parsed)
+            }
+        }
+    }
+
+    private fun aiUseAbilities(reasons: MutableList<String>) {
+        val candidates = allPokemon(ai).flatMap { pokemon ->
+            pokemon.card.abilities.mapIndexedNotNull { index, ability ->
+                val timing = classifyAbilityTiming(ability.effect)
+                if (timing != AbilityTiming.ACTIVATED && timing != AbilityTiming.UNKNOWN) return@mapIndexedNotNull null
+                val key = pokemon.card.id + "#" + ability.name
+                if (ai.usedAbilities.contains(key)) return@mapIndexedNotNull null
+                val parsed = EffectParser.parse(ability.effect, EffectSourceKind.ABILITY)
+                val score = EffectAiEvaluator.score(parsed)
+                if (score <= 3.0) return@mapIndexedNotNull null
+                Triple(pokemon, index, parsed)
+            }
+        }.sortedByDescending { EffectAiEvaluator.score(it.third) }
+
+        candidates.take(if (difficulty == AiDifficulty.EXPERT) 3 else 2).forEach { candidate ->
+            val pokemon = candidate.first
+            val index = candidate.second
+            val parsed = candidate.third
+            val ability = pokemon.card.abilities[index]
+            val key = pokemon.card.id + "#" + ability.name
+            if (ai.usedAbilities.add(key)) {
+                executeParsedEffect(ai, player, pokemon, parsed, "KI", true)
+                reasons += "Die KI nutzt " + pokemon.card.name + " – " + ability.name +
+                    " (Effektwert " + EffectAiEvaluator.score(parsed).toInt() + ")."
+                logEffectCoverage(ability.name, parsed)
             }
         }
     }
