@@ -207,10 +207,30 @@ object EffectParser {
             .replace(Regex("""\s+"""), " ")
             .trim()
 
-        val sentences = normalized
+        val rawSentences = normalized
             .split(Regex("""(?<=[.!?])\s+|;\s*"""))
             .map { it.trim() }
             .filter { it.isNotBlank() }
+
+        val sentences = mutableListOf<String>()
+        rawSentences.forEach { sentence ->
+            val lower = sentence.lowercase(Locale.ROOT)
+            val isCoinContinuation = lower.startsWith("bei kopf") ||
+                lower.startsWith("bei zahl") ||
+                lower.startsWith("if heads") ||
+                lower.startsWith("if tails") ||
+                lower.startsWith("for each heads")
+            if (isCoinContinuation && sentences.isNotEmpty()) {
+                val previous = sentences.last().lowercase(Locale.ROOT)
+                if (previous.contains("münze") || previous.contains("coin")) {
+                    sentences[sentences.lastIndex] = sentences.last() + " " + sentence
+                } else {
+                    sentences += sentence
+                }
+            } else {
+                sentences += sentence
+            }
+        }
 
         val operations = mutableListOf<EffectOp>()
         val unsupported = mutableListOf<String>()
@@ -273,7 +293,7 @@ object EffectParser {
             "if tails, this attack does no damage",
             "if tails, this effect does nothing"
         )
-        val bonus = Regex("""(?:bei kopf|for each heads?|if heads).*?(\d+)\s+(?:mehr )?(?:schaden|damage)""")
+        val bonus = Regex("""(?:bei kopf|für jeden kopf|for each heads?|if heads).*?(\d+)\s+(?:mehr )?(?:schadenspunkte|schaden|damage)""")
             .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
         return CoinRule(flips.coerceAtLeast(1), cancel, bonus)
     }
