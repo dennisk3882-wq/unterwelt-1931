@@ -54,6 +54,19 @@ class TcgDexRepository {
             for (i in 0 until typesArr.length()) add(typesArr.optString(i))
         }
 
+        fun typeList(key: String): List<String> {
+            val arr = o.optJSONArray(key) ?: JSONArray()
+            return buildList {
+                for (i in 0 until arr.length()) {
+                    val entry = arr.optJSONObject(i)
+                    if (entry != null) {
+                        val type = entry.optString("type")
+                        if (type.isNotBlank()) add(type)
+                    }
+                }
+            }
+        }
+
         val attacksArr = o.optJSONArray("attacks") ?: JSONArray()
         val attacks = buildList {
             for (i in 0 until attacksArr.length()) {
@@ -95,6 +108,9 @@ class TcgDexRepository {
             standardLegal = legal.optBoolean("standard"),
             expandedLegal = legal.optBoolean("expanded"),
             types = types,
+            weaknesses = typeList("weaknesses"),
+            resistances = typeList("resistances"),
+            retreatCost = o.optInt("retreat", 1).coerceAtLeast(0),
             attacks = attacks,
             effect = nullableString("effect"),
             trainerType = nullableString("trainerType"),
