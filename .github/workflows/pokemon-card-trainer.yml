@@ -51,6 +51,31 @@ jobs:
         working-directory: pokemon-card-trainer
         run: gradle --no-daemon :app:assembleDebug
 
+      - name: Apply stable development signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=pokemon-card-trainer/app/build/outputs/apk/debug/app-debug.apk
+          if ! curl -fsSL --retry 6 --retry-all-errors --retry-delay 2 \
+            'https://android.googlesource.com/platform/build/+/android-14.0.0_r1/target/product/security/testkey.pk8?format=TEXT' \
+            | base64 -d > /tmp/tcg-testkey.pk8; then
+            curl -fsSL --retry 6 --retry-all-errors \
+              'https://raw.githubusercontent.com/aosp-mirror/platform_build/android-14.0.0_r1/target/product/security/testkey.pk8' \
+              -o /tmp/tcg-testkey.pk8
+          fi
+          if ! curl -fsSL --retry 6 --retry-all-errors --retry-delay 2 \
+            'https://android.googlesource.com/platform/build/+/android-14.0.0_r1/target/product/security/testkey.x509.pem?format=TEXT' \
+            | base64 -d > /tmp/tcg-testkey.x509.pem; then
+            curl -fsSL --retry 6 --retry-all-errors \
+              'https://raw.githubusercontent.com/aosp-mirror/platform_build/android-14.0.0_r1/target/product/security/testkey.x509.pem' \
+              -o /tmp/tcg-testkey.x509.pem
+          fi
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+            --key /tmp/tcg-testkey.pk8 \
+            --cert /tmp/tcg-testkey.x509.pem \
+            --out "$apk.signed" "$apk"
+          mv "$apk.signed" "$apk"
+
       - name: Verify and package APK
         shell: bash
         run: |
