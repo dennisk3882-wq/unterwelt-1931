@@ -20,3 +20,5 @@ Inoffizielle Lern-, Sammlungs- und Trainings-App für Pokémon-Sammelkarten.
 Kartendaten, Bilder, Legalität und verfügbare Marktpreise werden über TCGdex bezogen. Preise sind Schätzwerte und können je nach Zustand, Sprache und Variante abweichen.
 
 Pokémon und zugehörige Marken gehören ihren jeweiligen Rechteinhabern. Diese App ist ein inoffizielles Fan-/Lernprojekt.
+
+Build-Pipeline: Android 35 / Gradle 8.9.
