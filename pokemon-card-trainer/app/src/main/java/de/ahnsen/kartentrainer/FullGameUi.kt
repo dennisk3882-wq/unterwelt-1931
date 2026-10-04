@@ -320,7 +320,7 @@ fun FullGameScreen(
                                 snapshot = engine?.evolveFromHand(handIndex, selectedTarget)
                             },
                             onTrainer = {
-                                snapshot = engine?.playTrainerFromHand(handIndex)
+                                snapshot = engine?.playTrainerFromHand(handIndex, selectedTarget)
                             }
                         )
                     }
@@ -515,6 +515,13 @@ private fun FullStatusHeader(state: FullGameSnapshot) {
                     " · KI-Hand " + state.ai.hand.size,
                 style = MaterialTheme.typography.bodySmall
             )
+            if (!state.stadiumName.isNullOrBlank()) {
+                Text(
+                    "Stadion: " + state.stadiumName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
         }
     }
 }
@@ -541,6 +548,13 @@ private fun FullActivePokemon(pokemon: FullPokemonView?, label: String) {
                     "Rückzug " + pokemon.card.retreatCost + " · Status " + pokemon.status.label,
                     style = MaterialTheme.typography.bodySmall
                 )
+                if (!pokemon.toolName.isNullOrBlank()) {
+                    Text(
+                        "Ausrüstung: " + pokemon.toolName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
                 Spacer(Modifier.height(5.dp))
                 LinearProgressIndicator(
                     progress = { pokemon.hp.toFloat() / max(1, pokemon.maxHp).toFloat() },
