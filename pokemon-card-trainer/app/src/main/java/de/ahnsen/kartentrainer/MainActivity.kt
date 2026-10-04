@@ -549,6 +549,21 @@ private fun CardDetailDialog(
                 Text("Einfach erklärt", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(card.friendlyExplanation())
 
+                if (card.abilities.isNotEmpty()) {
+                    Text("Fähigkeiten", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    card.abilities.forEach { ability ->
+                        val timing = classifyAbilityTiming(ability.effect)
+                        val parsed = EffectParser.parse(ability.effect, EffectSourceKind.ABILITY)
+                        Text("• " + ability.name + " · " + timing.label, fontWeight = FontWeight.SemiBold)
+                        Text(ability.effect, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "Effekt-Engine: " + parsed.coveragePercent + "% · " + parsed.summary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (parsed.fullySupported) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
+
                 if (card.attacks.isNotEmpty()) {
                     Text("Attacken", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     card.attacks.forEach { attack ->
@@ -557,9 +572,33 @@ private fun CardDetailDialog(
                                 (if (attack.damage.isNotBlank()) " · Schaden " + attack.damage else "")
                         )
                         if (attack.effect.isNotBlank()) {
+                            val parsed = EffectParser.parse(attack.effect, EffectSourceKind.ATTACK)
                             Text(attack.effect, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "Effekt-Engine: " + parsed.coveragePercent + "% · " + parsed.summary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (parsed.fullySupported) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary
+                            )
+                            if (parsed.unsupportedParts.isNotEmpty()) {
+                                Text(
+                                    "Manuell: " + parsed.unsupportedParts.joinToString(" | "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
+                }
+
+                if (card.isTrainer() && !card.effect.isNullOrBlank()) {
+                    val parsed = EffectParser.parse(card.effect, EffectSourceKind.TRAINER)
+                    Text("Trainer-Effekt", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(card.effect)
+                    Text(
+                        "Effekt-Engine: " + parsed.coveragePercent + "% · " + parsed.summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (parsed.fullySupported) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary
+                    )
                 }
 
                 HorizontalDivider()
