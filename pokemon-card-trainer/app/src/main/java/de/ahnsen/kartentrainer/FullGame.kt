@@ -786,44 +786,327 @@ class FullGameEngine(
         card: CardData,
         aiControlled: Boolean
     ) {
-        val text = card.effect.orEmpty().lowercase(Locale.ROOT)
-        val drawCount = parseNumberAfter(text, listOf("ziehe", "draw"))
-        if (drawCount > 0) {
-            draw(side, min(drawCount, 7))
-            log += card.name + ": " + min(drawCount, 7) + " Karte(n) gezogen."
+        val parsed = EffectParser.parse(card.effect.orEmpty(), EffectSourceKind.TRAINER)
+        executeParsedEffect(
+            side = side,
+            opponent = opponent,
+            sourcePokemon = side.active,
+            parsed = parsed,
+            actor = if (aiControlled) "KI" else "Du",
+            aiControlled = aiControlled
+        )
+        logEffectCoverage(card.name, parsed)
+    }
+
+    private fun executeParsedEffect(
+        side: FullSideState,
+        opponent: FullSideState,
+        sourcePokemon: FullPokemonState?,
+        parsed: ParsedEffect,
+        actor: String,
+        aiControlled: Boolean
+    ) {
+        parsed.operations.forEach { op ->
+            when (op) {
+                is DrawCards -> draw(side, op.count)
+
+                is DrawUntilHandSize -> {
+                    val missing = max(0, op.size - side.hand.size)
+                    if (missing > 0) draw(side, missing)
+                }
+
+                is HealDamage -> {
+                    val targets = pokemonTargets(side, opponent, sourcePokemon, op.target, aiControlled)
+                    targets.forEach { target ->
+                        val before = target.hp
+                        target.hp = min(target.card.hp ?: 100, target.hp + op.amount)
+                        val healed = target.hp - before
+                        if (healed > 0) {
+                            log += actor + ": " + target.card.name + " heilt " + healed + " KP."
+                        }
+                    }
+                }
+
+                is DirectDamage -> {
+                    val targets = pokemonTargets(side, opponent, sourcePokemon, op.target, aiControlled)
+                    targets.forEach { target ->
+                        target.hp = max(0, target.hp - op.amount)
+                        log += actor + ": Karteneffekt macht " + op.amount + " Schaden an " + target.card.name + "."
+                    }
+                    resolveBenchKnockOuts(opponent, side, if (side === player) "KI" else "Du")
+                }
+
+                is SelfDamage -> {
+                    val target = sourcePokemon
+                    if (target != null) {
+                        target.hp = max(0, target.hp - op.amount)
+                        log += actor + ": " + target.card.name + " nimmt " + op.amount + " Rückstoßschaden."
+                    }
+                }
+
+                is ApplyCondition -> {
+                    val target = pokemonTargets(side, opponent, sourcePokemon, op.target, aiControlled).firstOrNull()
+                    if (target != null) {
+                        target.status = when (op.status) {
+                            EffectStatus.POISONED -> FullStatus.POISONED
+                            EffectStatus.BURNED -> FullStatus.BURNED
+                            EffectStatus.ASLEEP -> FullStatus.ASLEEP
+                            EffectStatus.PARALYZED -> FullStatus.PARALYZED
+                            EffectStatus.CONFUSED -> FullStatus.CONFUSED
+                        }
+                        log += actor + ": " + target.card.name + " ist jetzt " + target.status.label + "."
+                    }
+                }
+
+                is SearchDeck -> {
+                    var moved = 0
+                    repeat(op.count) {
+                        val index = side.deck.indexOfFirst { matchesSearch(it, op.kind) }
+                        if (index >= 0) {
+                            val found = side.deck.removeAt(index)
+                            if (op.destinationBench && found.isBasicPokemon() && side.bench.size < 5) {
+                                val card = found.card
+                                if (card != null) side.bench += FullPokemonState(card)
+                            } else {
+                                side.hand += found
+                            }
+                            moved += 1
+                        }
+                    }
+                    if (moved > 0) {
+                        side.deck.shuffle(random)
+                        log += actor + ": " + moved + " Karte(n) wurden aus dem Deck gesucht."
+                    }
+                }
+
+                is AttachEnergy -> {
+                    repeat(op.count) {
+                        val energyCard = if (op.fromDiscard) {
+                            val index = side.discard.indexOfFirst { it.isEnergy() }
+                            if (index >= 0) side.discard.removeAt(index) else null
+                        } else {
+                            val index = side.deck.indexOfFirst { it.isEnergy() }
+                            if (index >= 0) side.deck.removeAt(index) else null
+                        }
+                        if (energyCard != null) {
+                            val target = pokemonTargets(side, opponent, sourcePokemon, op.target, aiControlled).firstOrNull()
+                            if (target != null) {
+                                target.energy += 1
+                                log += actor + ": Zusätzliche Energie an " + target.card.name + "."
+                            } else {
+                                side.hand += energyCard
+                            }
+                        }
+                    }
+                }
+
+                is DiscardEnergy -> {
+                    val target = pokemonTargets(side, opponent, sourcePokemon, op.target, aiControlled).firstOrNull()
+                    if (target != null) {
+                        val removed = min(op.count, target.energy)
+                        target.energy -= removed
+                        repeat(removed) {
+                            side.discard += FullGameCard(-500000 - side.discard.size, null, true)
+                        }
+                        if (removed > 0) log += actor + ": " + removed + " Energie von " + target.card.name + " abgelegt."
+                    }
+                }
+
+                is SwitchActive -> {
+                    val switchSide = if (op.opponent) opponent else side
+                    if (switchSide.active != null && switchSide.bench.isNotEmpty()) {
+                        val index = if (op.opponent) {
+                            switchSide.bench.indices.minByOrNull {
+                                boardPokemonScore(switchSide.bench[it], side.active)
+                            } ?: 0
+                        } else {
+                            switchSide.bench.indices.maxByOrNull {
+                                boardPokemonScore(switchSide.bench[it], opponent.active)
+                            } ?: 0
+                        }
+                        val old = switchSide.active!!
+                        val replacement = switchSide.bench[index]
+                        old.status = FullStatus.NONE
+                        replacement.status = FullStatus.NONE
+                        switchSide.bench[index] = old
+                        switchSide.active = replacement
+                        log += actor + ": Aktives Pokémon wird durch " + replacement.card.name + " ersetzt."
+                    }
+                }
+
+                is ShuffleHandAndDraw -> {
+                    side.deck += side.hand
+                    side.hand.clear()
+                    side.deck.shuffle(random)
+                    draw(side, op.drawCount)
+                }
+
+                is DiscardHandAndDraw -> {
+                    side.discard += side.hand
+                    side.hand.clear()
+                    draw(side, op.drawCount)
+                }
+
+                is DiscardTopDeck -> {
+                    val targetSide = if (op.opponent) opponent else side
+                    repeat(min(op.count, targetSide.deck.size)) {
+                        targetSide.discard += targetSide.deck.removeAt(0)
+                    }
+                }
+
+                is ReturnToHand -> {
+                    returnPokemonToHand(side, opponent, sourcePokemon, op.target, aiControlled, actor)
+                }
+
+                is PreventDamage -> {
+                    val target = sourcePokemon ?: side.active
+                    if (target != null) {
+                        if (op.allDamage) target.preventAllDamageNext = true
+                        else target.damageReductionNext = max(target.damageReductionNext, op.amount ?: 0)
+                    }
+                }
+
+                is LockAction -> {
+                    val target = pokemonTargets(side, opponent, sourcePokemon, op.target, aiControlled).firstOrNull()
+                    if (target != null) {
+                        if (op.attack) target.attackLocked = true
+                        if (op.retreat) target.retreatLocked = true
+                    }
+                }
+
+                is ExtraPrize -> {
+                    repeat(op.count) {
+                        if (side.prizes.isNotEmpty()) {
+                            side.hand += side.prizes.removeAt(0)
+                        }
+                    }
+                    if (side.prizes.isEmpty()) finish(if (side === player) "Du" else "KI")
+                }
+
+                is DamageBonus,
+                is CoinRule,
+                is UnsupportedEffect -> Unit
+            }
         }
 
-        if (("suche" in text || "search" in text) && ("energie" in text || "energy" in text)) {
-            val index = side.deck.indexOfFirst { it.isEnergy() }
+        sourcePokemon?.let { pokemon ->
+            if (pokemon.hp <= 0) {
+                resolveSelfKnockOut(side, opponent, actor)
+            }
+        }
+    }
+
+    private fun pokemonTargets(
+        side: FullSideState,
+        opponent: FullSideState,
+        sourcePokemon: FullPokemonState?,
+        target: EffectTarget,
+        aiControlled: Boolean
+    ): List<FullPokemonState> {
+        return when (target) {
+            EffectTarget.SELF_ACTIVE -> listOfNotNull(sourcePokemon ?: side.active)
+            EffectTarget.OWN_ACTIVE -> listOfNotNull(side.active)
+            EffectTarget.OWN_BENCH -> listOfNotNull(
+                if (aiControlled) side.bench.minByOrNull { it.hp.toDouble() / max(1, it.card.hp ?: 100) }
+                else side.bench.firstOrNull()
+            )
+            EffectTarget.OWN_ANY -> listOfNotNull(
+                allPokemon(side).minByOrNull { it.hp.toDouble() / max(1, it.card.hp ?: 100) }
+            )
+            EffectTarget.OPPONENT_ACTIVE -> listOfNotNull(opponent.active)
+            EffectTarget.OPPONENT_BENCH -> listOfNotNull(
+                opponent.bench.minByOrNull { boardPokemonScore(it, side.active) }
+            )
+            EffectTarget.OPPONENT_ANY -> listOfNotNull(
+                allPokemon(opponent).minByOrNull { boardPokemonScore(it, side.active) }
+            )
+            EffectTarget.ALL_OWN -> allPokemon(side)
+            EffectTarget.ALL_OWN_BENCH -> side.bench.toList()
+            EffectTarget.ALL_OPPONENT -> allPokemon(opponent)
+            EffectTarget.ALL_OPPONENT_BENCH -> opponent.bench.toList()
+        }
+    }
+
+    private fun matchesSearch(gameCard: FullGameCard, kind: SearchKind): Boolean {
+        val card = gameCard.card
+        return when (kind) {
+            SearchKind.ANY -> true
+            SearchKind.POKEMON -> card?.isPokemon() == true
+            SearchKind.BASIC_POKEMON -> gameCard.isBasicPokemon()
+            SearchKind.EVOLUTION_POKEMON -> card?.isPokemon() == true && card.isBasicPokemon().not()
+            SearchKind.ENERGY -> gameCard.isEnergy()
+            SearchKind.BASIC_ENERGY -> gameCard.virtualEnergy || card?.isBasicEnergy() == true
+            SearchKind.TRAINER -> card?.isTrainer() == true
+            SearchKind.ITEM -> card?.trainerType.orEmpty().lowercase(Locale.ROOT).contains("item")
+            SearchKind.SUPPORTER -> {
+                val type = card?.trainerType.orEmpty().lowercase(Locale.ROOT)
+                type.contains("support") || type.contains("unterstüt")
+            }
+            SearchKind.STADIUM -> card?.trainerType.orEmpty().lowercase(Locale.ROOT).contains("stad")
+        }
+    }
+
+    private fun returnPokemonToHand(
+        side: FullSideState,
+        opponent: FullSideState,
+        sourcePokemon: FullPokemonState?,
+        target: EffectTarget,
+        aiControlled: Boolean,
+        actor: String
+    ) {
+        val targetSide = when (target) {
+            EffectTarget.OPPONENT_ACTIVE,
+            EffectTarget.OPPONENT_BENCH,
+            EffectTarget.OPPONENT_ANY,
+            EffectTarget.ALL_OPPONENT,
+            EffectTarget.ALL_OPPONENT_BENCH -> opponent
+            else -> side
+        }
+
+        val pokemon = pokemonTargets(side, opponent, sourcePokemon, target, aiControlled).firstOrNull() ?: return
+        if (targetSide.active === pokemon) {
+            if (targetSide.bench.isEmpty()) return
+            targetSide.hand += FullGameCard(-600000 - targetSide.hand.size, pokemon.card, false)
+            targetSide.active = targetSide.bench.removeAt(0)
+        } else {
+            val index = targetSide.bench.indexOfFirst { it === pokemon }
             if (index >= 0) {
-                side.hand += side.deck.removeAt(index)
-                log += card.name + ": Eine Energie wurde aus dem Deck auf die Hand genommen."
+                val removed = targetSide.bench.removeAt(index)
+                targetSide.hand += FullGameCard(-600000 - targetSide.hand.size, removed.card, false)
             }
         }
+        log += actor + ": " + pokemon.card.name + " wird auf die Hand zurückgenommen."
+    }
 
-        val heal = parseNumberAfter(text, listOf("heile", "heal"))
-        if (heal > 0) {
-            val target = if (aiControlled) {
-                allPokemon(side).minByOrNull { p -> p.hp.toDouble() / max(1, p.card.hp ?: 100) }
-            } else side.active
-            if (target != null) {
-                val before = target.hp
-                target.hp = min(target.card.hp ?: 100, target.hp + heal)
-                log += card.name + ": " + target.card.name + " heilt " + (target.hp - before) + " KP."
+    private fun resolveBenchKnockOuts(
+        defending: FullSideState,
+        attacking: FullSideState,
+        defenderName: String
+    ) {
+        val knocked = defending.bench.filter { it.hp <= 0 }.toList()
+        knocked.forEach { pokemon ->
+            defending.bench.remove(pokemon)
+            defending.discard += FullGameCard(-700000 - defending.discard.size, pokemon.card, false)
+            if (attacking.prizes.isNotEmpty()) {
+                attacking.hand += attacking.prizes.removeAt(0)
+            }
+            log += pokemon.card.name + " auf der Bank ist kampfunfähig."
+            if (attacking.prizes.isEmpty()) {
+                finish(if (defenderName == "KI") "Du" else "KI")
+                return
             }
         }
+    }
 
-        if (("tausche" in text || "switch" in text) && side.bench.isNotEmpty() && side.active != null) {
-            val index = if (aiControlled) {
-                side.bench.indices.maxByOrNull { boardPokemonScore(side.bench[it], opponent.active) } ?: 0
-            } else 0
-            val old = side.active!!
-            val replacement = side.bench[index]
-            old.status = FullStatus.NONE
-            replacement.status = FullStatus.NONE
-            side.bench[index] = old
-            side.active = replacement
-            log += card.name + ": Aktives Pokémon wurde gewechselt."
+    private fun logEffectCoverage(sourceName: String, parsed: ParsedEffect) {
+        if (parsed.sourceText.isBlank()) return
+        if (parsed.fullySupported) {
+            log += sourceName + ": Effekt vollständig automatisch verarbeitet (" + parsed.coveragePercent + "%)."
+        } else {
+            log += sourceName + ": Effektabdeckung " + parsed.coveragePercent + "%."
+            parsed.unsupportedParts.take(2).forEach {
+                log += "Noch manuell zu beachten: " + it
+            }
         }
     }
 
