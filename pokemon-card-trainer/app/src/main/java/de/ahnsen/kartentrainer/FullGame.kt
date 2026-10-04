@@ -1503,7 +1503,11 @@ class FullGameEngine(
                     raw += bonus.amount * (damageTaken / 10)
                 }
                 bonus.onHeads && !hasCoinBonus -> {
-                    raw += if (expected) bonus.amount * 0.5 else if (actualHeads > 0) bonus.amount else 0.0
+                    raw += if (expected) {
+                        bonus.amount * 0.5
+                    } else {
+                        if (actualHeads > 0) bonus.amount.toDouble() else 0.0
+                    }
                 }
                 !bonus.onHeads -> raw += bonus.amount
             }
