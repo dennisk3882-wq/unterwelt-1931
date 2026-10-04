@@ -72,7 +72,11 @@ private data class FullPokemonState(
     var hp: Int = card.hp ?: 100,
     var energy: Int = 0,
     var turnsInPlay: Int = 0,
-    var status: FullStatus = FullStatus.NONE
+    var status: FullStatus = FullStatus.NONE,
+    var preventAllDamageNext: Boolean = false,
+    var damageReductionNext: Int = 0,
+    var attackLocked: Boolean = false,
+    var retreatLocked: Boolean = false
 ) {
     fun view() = FullPokemonView(card, hp, energy, turnsInPlay, status)
 }
@@ -87,7 +91,8 @@ private data class FullSideState(
     var energyAttached: Boolean = false,
     var supporterUsed: Boolean = false,
     var stadiumUsed: Boolean = false,
-    var retreated: Boolean = false
+    var retreated: Boolean = false,
+    val usedAbilities: MutableSet<String> = mutableSetOf()
 )
 
 object FullDeckFactory {
@@ -350,7 +355,7 @@ class FullGameEngine(
             log += "Dieses Bank-Pokémon gibt es nicht."
             return snapshot()
         }
-        if (active.status == FullStatus.ASLEEP || active.status == FullStatus.PARALYZED) {
+        if (active.status == FullStatus.ASLEEP || active.status == FullStatus.PARALYZED || active.retreatLocked) {
             log += active.card.name + " kann wegen " + active.status.label + " nicht zurückziehen."
             return snapshot()
         }
@@ -965,6 +970,7 @@ class FullGameEngine(
         side.supporterUsed = false
         side.stadiumUsed = false
         side.retreated = false
+        side.usedAbilities.clear()
     }
 
     private fun ageInPlay(side: FullSideState) {
