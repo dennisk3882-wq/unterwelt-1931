@@ -728,7 +728,7 @@ class FullGameEngine(
 
     private fun aiPlayTrainers(reasons: MutableList<String>, firstAiTurn: Boolean) {
         var guard = 0
-        while (guard++ < 6) {
+        while (guard++ < 8) {
             val choices = ai.hand.withIndex().filter { it.value.card?.isTrainer() == true }
             if (choices.isEmpty()) break
             val best = choices.maxByOrNull { indexed ->
@@ -737,18 +737,50 @@ class FullGameEngine(
             val card = best.value.card ?: break
             val score = trainerPlayScore(card, ai, player, firstAiTurn)
             if (score <= 0) break
-            val type = card.trainerType.orEmpty().lowercase()
-            val isSupporter = "support" in type || "unterstüt" in type
-            val isStadium = "stad" in type
-            if (isSupporter && (firstAiTurn || ai.supporterUsed)) {
+
+            val isSupporter = isSupporterCard(card)
+            val isStadium = isStadiumCard(card)
+            val isTool = isToolCard(card)
+            if (isSupporter && (firstAiTurn || ai.supporterUsed)) break
+            if (isStadium && ai.stadiumUsed) break
+
+            val parsed = EffectParser.parse(card.effect.orEmpty(), EffectSourceKind.TRAINER)
+            val discardCost = parsed.operations.filterIsInstance<DiscardHandCards>().sumOf { it.count }
+            if (discardCost > ai.hand.size - 1) {
+                reasons += card.name + " wird zurückgehalten, weil die Zusatzkosten nicht bezahlt werden können."
                 break
             }
-            if (isStadium && ai.stadiumUsed) break
+
+            if (isTool) {
+                val target = allPokemon(ai)
+                    .filter { it.tool == null }
+                    .maxByOrNull { boardPokemonScore(it, player.active) }
+                if (target == null) break
+                ai.hand.removeAt(best.index)
+                target.tool = card
+                reasons += "Die KI legt " + card.name + " an " + target.card.name + " an."
+                logEffectCoverage(card.name, parsed)
+                continue
+            }
+
+            if (isStadium) {
+                if (stadiumCard?.card?.name.equals(card.name, ignoreCase = true)) break
+                ai.hand.removeAt(best.index)
+                val old = stadiumCard
+                val oldOwner = stadiumOwner
+                if (old != null && oldOwner != null) oldOwner.discard += old
+                stadiumCard = best.value
+                stadiumOwner = ai
+                ai.stadiumUsed = true
+                reasons += "Die KI spielt das Stadion " + card.name + "."
+                logEffectCoverage(card.name, parsed)
+                continue
+            }
+
             ai.hand.removeAt(best.index)
             applyTrainerEffect(ai, player, card, true)
             ai.discard += best.value
             if (isSupporter) ai.supporterUsed = true
-            if (isStadium) ai.stadiumUsed = true
             reasons += "Trainerkarte " + card.name + " wird eingesetzt."
             if (isSupporter) break
         }
