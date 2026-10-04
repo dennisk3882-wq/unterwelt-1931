@@ -319,7 +319,7 @@ class FullGameEngine(
         return snapshot()
     }
 
-    fun playTrainerFromHand(handIndex: Int): FullGameSnapshot {
+    fun playTrainerFromHand(handIndex: Int, targetIndex: Int = 0): FullGameSnapshot {
         if (finished) return snapshot()
         val gameCard = player.hand.getOrNull(handIndex)
         val card = gameCard?.card
@@ -327,9 +327,11 @@ class FullGameEngine(
             log += "Diese Karte ist keine Trainerkarte."
             return snapshot()
         }
-        val type = card.trainerType.orEmpty().lowercase(Locale.ROOT)
-        val isSupporter = "support" in type || "unterstüt" in type
-        val isStadium = "stad" in type
+
+        val isSupporter = isSupporterCard(card)
+        val isStadium = isStadiumCard(card)
+        val isTool = isToolCard(card)
+
         if (isSupporter && firstPlayerTurn) {
             log += "Im allerersten Zug darf der startende Spieler keinen Unterstützer spielen."
             return snapshot()
@@ -343,10 +345,52 @@ class FullGameEngine(
             return snapshot()
         }
 
+        val parsed = EffectParser.parse(card.effect.orEmpty(), EffectSourceKind.TRAINER)
+        val discardCost = parsed.operations.filterIsInstance<DiscardHandCards>().sumOf { it.count }
+        if (discardCost > player.hand.size - 1) {
+            log += card.name + " kann nicht gespielt werden: Für die Kosten fehlen Handkarten."
+            return snapshot()
+        }
+
+        if (isTool) {
+            val target = targetPokemon(player, targetIndex)
+            if (target == null) {
+                log += "Wähle zuerst ein Pokémon für die Ausrüstung."
+                return snapshot()
+            }
+            if (target.tool != null) {
+                log += target.card.name + " hat bereits eine Pokémon-Ausrüstung."
+                return snapshot()
+            }
+            player.hand.removeAt(handIndex)
+            target.tool = card
+            log += card.name + " wurde an " + target.card.name + " angelegt."
+            logEffectCoverage(card.name, parsed)
+            return snapshot()
+        }
+
+        if (isStadium) {
+            if (stadiumCard?.card?.name.equals(card.name, ignoreCase = true)) {
+                log += "Ein Stadion mit demselben Namen liegt bereits im Spiel."
+                return snapshot()
+            }
+            player.hand.removeAt(handIndex)
+            val old = stadiumCard
+            val oldOwner = stadiumOwner
+            if (old != null && oldOwner != null) {
+                oldOwner.discard += old
+            }
+            stadiumCard = gameCard
+            stadiumOwner = player
+            player.stadiumUsed = true
+            log += "Stadion im Spiel: " + card.name + "."
+            logEffectCoverage(card.name, parsed)
+            return snapshot()
+        }
+
         player.hand.removeAt(handIndex)
         applyTrainerEffect(player, ai, card, false)
         if (isSupporter) player.supporterUsed = true
-        if (isStadium) player.stadiumUsed = true
         player.discard += gameCard
         log += "Trainerkarte gespielt: " + card.name + "."
         return snapshot()
@@ -1256,6 +1300,21 @@ class FullGameEngine(
                 log += "Noch manuell zu beachten: " + it
             }
         }
+    }
+
+    private fun isSupporterCard(card: CardData): Boolean {
+        val type = card.trainerType.orEmpty().lowercase(Locale.ROOT)
+        return type.contains("support") || type.contains("unterstüt")
+    }
+
+    private fun isStadiumCard(card: CardData): Boolean {
+        val type = card.trainerType.orEmpty().lowercase(Locale.ROOT)
+        return type.contains("stad")
+    }
+
+    private fun isToolCard(card: CardData): Boolean {
+        val type = card.trainerType.orEmpty().lowercase(Locale.ROOT)
+        return type.contains("tool") || type.contains("ausrüstung") || type.contains("werkzeug")
     }
 
     private fun trainerPlayScore(
