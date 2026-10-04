@@ -3,6 +3,56 @@ package de.ahnsen.kartentrainer
 import java.util.Locale
 
 enum class EffectSourceKind { ATTACK, TRAINER, ABILITY }
+
+enum class AbilityTiming(val label: String) {
+    ACTIVATED("Im eigenen Zug aktivierbar"),
+    ON_PLAY("Beim Ausspielen/Entwickeln"),
+    PASSIVE("Dauerhafte Fähigkeit"),
+    REACTIVE("Reaktive Fähigkeit"),
+    UNKNOWN("Sonderfähigkeit")
+}
+
+fun classifyAbilityTiming(effect: String): AbilityTiming {
+    val s = effect.lowercase(Locale.ROOT)
+    return when {
+        listOf(
+            "einmal während deines zuges",
+            "once during your turn",
+            "du kannst diese fähigkeit",
+            "you may use this ability"
+        ).any { s.contains(it) } -> AbilityTiming.ACTIVATED
+
+        listOf(
+            "wenn du dieses pokémon aus deiner hand",
+            "wenn du dieses pokemon aus deiner hand",
+            "when you play this pokémon from your hand",
+            "when you play this pokemon from your hand",
+            "wenn sich dieses pokémon entwickelt",
+            "when this pokémon evolves"
+        ).any { s.contains(it) } -> AbilityTiming.ON_PLAY
+
+        listOf(
+            "wenn dieses pokémon schaden",
+            "when this pokémon is damaged",
+            "when your opponent",
+            "wenn dein gegner",
+            "wenn dieses pokémon kampfunfähig",
+            "when this pokémon is knocked out"
+        ).any { s.contains(it) } -> AbilityTiming.REACTIVE
+
+        listOf(
+            "solange dieses pokémon",
+            "as long as this pokémon",
+            "dieses pokémon kann nicht",
+            "this pokémon can't",
+            "this pokemon can't",
+            "alle deine pokémon",
+            "all of your pokémon"
+        ).any { s.contains(it) } -> AbilityTiming.PASSIVE
+
+        else -> AbilityTiming.UNKNOWN
+    }
+}
 enum class EffectTarget {
     SELF_ACTIVE, OWN_ACTIVE, OWN_BENCH, OWN_ANY,
     OPPONENT_ACTIVE, OPPONENT_BENCH, OPPONENT_ANY,
