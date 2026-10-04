@@ -250,7 +250,7 @@ private fun HomeScreen(
             HomeTile(
                 icon = Icons.Default.SmartToy,
                 title = "KI-Trainer",
-                subtitle = "Digitaler Lernkampf oder echte Karten vor der Kamera gegen einen KI-Gegner.",
+                subtitle = "Strategische KI mit vier Stufen, Zugerklärung, KI-Coach sowie echte Karten gegen den digitalen Gegner.",
                 onClick = { onOpen(AppScreen.AI) }
             )
         }
@@ -885,7 +885,7 @@ private fun AiTrainerScreen(padding: PaddingValues, collection: List<CollectionE
             )
         }
         if (tab == 0) {
-            DigitalBattleScreen(collection, Modifier.weight(1f))
+            AdvancedDigitalBattleScreen(collection, Modifier.weight(1f))
         } else {
             PhysicalBattleScreen(collection, Modifier.weight(1f))
         }
