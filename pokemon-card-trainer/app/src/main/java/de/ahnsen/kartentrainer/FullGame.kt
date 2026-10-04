@@ -661,7 +661,8 @@ class FullGameEngine(
             val cost = max(1, attack.cost.size)
             val ko = if (damage >= defender.hp) 650.0 else 0.0
             val efficiency = damage.toDouble() / cost
-            val effect = strategicTextValue(attack.effect)
+            val parsedEffect = EffectParser.parse(attack.effect, EffectSourceKind.ATTACK)
+            val effect = EffectAiEvaluator.score(parsedEffect)
             val risk = if (difficulty == AiDifficulty.EXPERT) {
                 val response = defender.card.attacks
                     .filter { defender.energy >= max(1, it.cost.size) }
@@ -835,17 +836,19 @@ class FullGameEngine(
         val type = card.trainerType.orEmpty().lowercase()
         if (("support" in type || "unterstüt" in type) && (firstTurn || side.supporterUsed)) return -1000.0
         if ("stad" in type && side.stadiumUsed) return -1000.0
-        val text = card.effect.orEmpty().lowercase()
-        var score = 4.0
-        val draw = parseNumberAfter(text, listOf("ziehe", "draw"))
-        score += draw * if (side.hand.size <= 4) 10 else 4
-        if (("suche" in text || "search" in text) && ("energie" in text || "energy" in text)) {
-            score += if (side.hand.none { it.isEnergy() }) 35 else 12
+        val parsed = EffectParser.parse(card.effect.orEmpty(), EffectSourceKind.TRAINER)
+        var score = 4.0 + EffectAiEvaluator.score(parsed)
+        if (side.hand.size <= 4 && parsed.operations.any { it is DrawCards || it is DrawUntilHandSize }) {
+            score += 18.0
         }
-        val heal = parseNumberAfter(text, listOf("heile", "heal"))
-        val damaged = side.active?.let { (it.card.hp ?: 100) - it.hp } ?: 0
-        score += min(heal, damaged) * 0.4
-        if (("switch" in text || "tausche" in text) && side.bench.isNotEmpty()) {
+        if (side.hand.none { it.isEnergy() } && parsed.operations.any { it is SearchDeck && (it.kind == SearchKind.ENERGY || it.kind == SearchKind.BASIC_ENERGY) }) {
+            score += 24.0
+        }
+        if (parsed.operations.any { it is HealDamage }) {
+            val damaged = side.active?.let { (it.card.hp ?: 100) - it.hp } ?: 0
+            if (damaged <= 0) score -= 18.0
+        }
+        if (parsed.operations.any { it is SwitchActive } && side.bench.isNotEmpty()) {
             val activeScore = side.active?.let { boardPokemonScore(it, opponent.active) } ?: 0.0
             val better = side.bench.maxOfOrNull { boardPokemonScore(it, opponent.active) } ?: activeScore
             score += max(0.0, better - activeScore)
