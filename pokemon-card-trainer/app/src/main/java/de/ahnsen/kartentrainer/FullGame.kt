@@ -688,35 +688,50 @@ class FullGameEngine(
             return
         }
 
-        val damage = expectedDamage(attacker, defender, attack)
+        val parsed = EffectParser.parse(attack.effect, EffectSourceKind.ATTACK)
+        var totalHeads = 0
+        val coinRules = parsed.operations.filterIsInstance<CoinRule>()
+        for (rule in coinRules) {
+            var heads = 0
+            repeat(rule.flips) {
+                if (random.nextBoolean()) heads += 1
+            }
+            totalHeads += heads
+            log += actor + ": Münzwurf " + heads + "× Kopf bei " + rule.flips + " Wurf/Würfen."
+            if (rule.cancelOnTails && heads < rule.flips) {
+                log += actor + ": Der Kartentext lässt die Attacke wegen Zahl vollständig misslingen."
+                logEffectCoverage(attack.name, parsed)
+                return
+            }
+        }
+
+        val damage = calculateAttackDamage(attacker, defender, attack, parsed, totalHeads, expected = false)
         defender.hp = max(0, defender.hp - damage)
         log += actor + ": " + attacker.card.name + " setzt " + attack.name + " ein und macht " + damage + " Schaden."
 
-        val lower = attack.effect.lowercase(Locale.ROOT)
-        val heal = parseNumberAfter(lower, listOf("heile", "heal"))
-        if (heal > 0) {
-            val before = attacker.hp
-            attacker.hp = min(attacker.card.hp ?: 100, attacker.hp + heal)
-            if (attacker.hp > before) log += attacker.card.name + " heilt " + (attacker.hp - before) + " KP."
+        if (defender.preventAllDamageNext) {
+            defender.preventAllDamageNext = false
+            log += defender.card.name + ": Schutz vor dem nächsten Angriff wurde verbraucht."
+        }
+        if (defender.damageReductionNext > 0) {
+            defender.damageReductionNext = 0
         }
 
-        if ("vergiftet" in lower || "poisoned" in lower) defender.status = FullStatus.POISONED
-        if ("verbrannt" in lower || "burned" in lower) defender.status = FullStatus.BURNED
-        if ("paralys" in lower) defender.status = FullStatus.PARALYZED
-        if ("schläft" in lower || "asleep" in lower) defender.status = FullStatus.ASLEEP
-        if ("verwirrt" in lower || "confused" in lower) defender.status = FullStatus.CONFUSED
+        executeParsedEffect(
+            side = attackingSide,
+            opponent = defendingSide,
+            sourcePokemon = attacker,
+            parsed = parsed,
+            actor = actor,
+            aiControlled = attackingSide === ai
+        )
+        logEffectCoverage(attack.name, parsed)
 
-        val recoil = if ("diesem pok" in lower || "itself" in lower || "sich selbst" in lower) {
-            parseNumberAfter(lower, listOf("selbst", "itself", "diesem pok"))
-        } else 0
-        if (recoil > 0) {
-            attacker.hp = max(0, attacker.hp - recoil)
-            log += attacker.card.name + " nimmt " + recoil + " Rückstoßschaden."
-        }
-
-        if (attack.effect.isNotBlank()) {
-            log += "Karteneffekt: " + attack.effect
-        }
+        resolveBenchKnockOuts(
+            defending = defendingSide,
+            attacking = attackingSide,
+            defenderName = if (defendingSide === ai) "KI" else "Du"
+        )
     }
 
     private fun resolveKnockOut(
@@ -1196,7 +1211,51 @@ class FullGameEngine(
         defender: FullPokemonState,
         attack: CardAttack
     ): Int {
-        var damage = estimatedAttackDamage(attack, attacker.energy)
+        val parsed = EffectParser.parse(attack.effect, EffectSourceKind.ATTACK)
+        return calculateAttackDamage(attacker, defender, attack, parsed, 0, expected = true)
+    }
+
+    private fun calculateAttackDamage(
+        attacker: FullPokemonState,
+        defender: FullPokemonState,
+        attack: CardAttack,
+        parsed: ParsedEffect,
+        actualHeads: Int,
+        expected: Boolean
+    ): Int {
+        var raw = estimatedAttackDamage(attack, attacker.energy).toDouble()
+        val coinRules = parsed.operations.filterIsInstance<CoinRule>()
+        val hasCoinBonus = coinRules.any { it.bonusPerHeads > 0 }
+
+        parsed.operations.filterIsInstance<DamageBonus>().forEach { bonus ->
+            when {
+                bonus.perEnergy -> raw += bonus.amount * attacker.energy
+                bonus.perCounter -> {
+                    val damageTaken = max(0, (attacker.card.hp ?: 100) - attacker.hp)
+                    raw += bonus.amount * (damageTaken / 10)
+                }
+                bonus.onHeads && !hasCoinBonus -> {
+                    raw += if (expected) bonus.amount * 0.5 else if (actualHeads > 0) bonus.amount else 0.0
+                }
+                !bonus.onHeads -> raw += bonus.amount
+            }
+        }
+
+        coinRules.forEach { rule ->
+            if (rule.bonusPerHeads > 0) {
+                raw += if (expected) {
+                    rule.flips * rule.bonusPerHeads * 0.5
+                } else {
+                    actualHeads * rule.bonusPerHeads.toDouble()
+                }
+            }
+            if (rule.cancelOnTails && expected) {
+                val successProbability = Math.pow(0.5, rule.flips.toDouble())
+                raw *= successProbability
+            }
+        }
+
+        var damage = raw.toInt().coerceAtLeast(0)
         val attackerTypes = attacker.card.types.map { it.lowercase(Locale.ROOT) }
         if (defender.card.weaknesses.any { weak -> attackerTypes.contains(weak.lowercase(Locale.ROOT)) }) {
             damage *= 2
