@@ -5,6 +5,12 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
 
+enum class FullStartMode(val label: String) {
+    PLAYER_FIRST("Ich beginne"),
+    AI_FIRST("KI beginnt"),
+    COIN_FLIP("Münzwurf")
+}
+
 enum class FullStatus(val label: String) {
     NONE("Normal"),
     POISONED("Vergiftet"),
@@ -62,6 +68,9 @@ data class FullGameSnapshot(
     val finished: Boolean,
     val winner: String?,
     val difficulty: AiDifficulty,
+    val playerStarted: Boolean,
+    val playerMulligans: Int,
+    val aiMulligans: Int,
     val stadiumName: String?,
     val lastAiReasoning: String,
     val log: List<String>
@@ -214,6 +223,7 @@ class FullGameEngine(
     entries: List<CollectionEntry>,
     private val difficulty: AiDifficulty,
     standardOnly: Boolean = true,
+    startMode: FullStartMode = FullStartMode.COIN_FLIP,
     seed: Int = 12026
 ) {
     private val random = Random(seed)
@@ -226,21 +236,50 @@ class FullGameEngine(
             .shuffled(Random(seed + 991)).toMutableList()
     )
     private val log = mutableListOf<String>()
+    private val playerStarts: Boolean = when (startMode) {
+        FullStartMode.PLAYER_FIRST -> true
+        FullStartMode.AI_FIRST -> false
+        FullStartMode.COIN_FLIP -> random.nextBoolean()
+    }
+    private var playerMulligans: Int = 0
+    private var aiMulligans: Int = 0
     private var stadiumCard: FullGameCard? = null
     private var stadiumOwner: FullSideState? = null
-    private var turnNumber = 1
-    private var firstPlayerTurn = true
+    private var turnNumber = if (playerStarts) 1 else 0
+    private var firstPlayerTurn = playerStarts
     private var finished = false
     private var winner: String? = null
     private var lastAiReasoning = "Die KI hat noch keinen Zug gemacht."
 
     init {
-        setupSide(player, "Du")
-        setupSide(ai, "KI")
+        playerMulligans = setupSide(player, "Du")
+        aiMulligans = setupSide(ai, "KI")
+
+        if (aiMulligans > 0) {
+            draw(player, aiMulligans)
+            log += "KI hatte " + aiMulligans + " Mulligan(s). Du ziehst " + aiMulligans + " zusätzliche Karte(n)."
+        }
+        if (playerMulligans > 0) {
+            draw(ai, playerMulligans)
+            log += "Du hattest " + playerMulligans + " Mulligan(s). Die KI zieht " + playerMulligans + " zusätzliche Karte(n)."
+        }
+
         if (!finished) {
-            draw(player, 1)
-            resetTurnFlags(player)
-            log += "Zug 1: Du beginnst. Ziehe eine Karte. Im ersten Zug darfst du keinen Unterstützer spielen und noch nicht angreifen."
+            if (playerStarts) {
+                draw(player, 1)
+                resetTurnFlags(player)
+                log += "Startspieler: Du. Im ersten Zug darfst du keinen Unterstützer spielen und noch nicht angreifen."
+            } else {
+                log += "Startspieler: KI. Ihr erster Zug darf keinen Unterstützer und keinen Angriff enthalten."
+                aiTurn(opening = true)
+                if (!finished) {
+                    turnNumber += 1
+                    draw(player, 1)
+                    resetTurnFlags(player)
+                    firstPlayerTurn = false
+                    log += "Zug " + turnNumber + ": Du bist als zweiter Spieler dran und darfst angreifen."
+                }
+            }
         }
     }
 
@@ -255,6 +294,9 @@ class FullGameEngine(
         finished = finished,
         winner = winner,
         difficulty = difficulty,
+        playerStarted = playerStarts,
+        playerMulligans = playerMulligans,
+        aiMulligans = aiMulligans,
         stadiumName = stadiumCard?.name,
         lastAiReasoning = lastAiReasoning,
         log = log.toList()
@@ -606,13 +648,13 @@ class FullGameEngine(
         log += "Zug " + turnNumber + ": Du ziehst eine Karte und bist wieder dran."
     }
 
-    private fun aiTurn() {
+    private fun aiTurn(opening: Boolean = false) {
         if (finished) return
         turnNumber += 1
         draw(ai, 1)
         resetTurnFlags(ai)
         val reasons = mutableListOf<String>()
-        val aiFirstTurn = turnNumber == 2
+        val aiFirstTurn = opening
 
         aiPlayBasics(reasons)
         aiEvolve(reasons)
@@ -623,7 +665,7 @@ class FullGameEngine(
 
         val attacker = ai.active
         val defender = player.active
-        if (attacker != null && defender != null) {
+        if (!opening && attacker != null && defender != null) {
             val ready = attacker.card.attacks.withIndex()
                 .filter { canPayAttack(attacker, it.value) }
             if (ready.isNotEmpty() && canAttack(attacker, "KI")) {
@@ -1578,7 +1620,7 @@ class FullGameEngine(
         return damage
     }
 
-    private fun setupSide(side: FullSideState, label: String) {
+    private fun setupSide(side: FullSideState, label: String): Int {
         var attempts = 0
         do {
             side.deck += side.hand
@@ -1599,7 +1641,7 @@ class FullGameEngine(
         if (activeIndex < 0) {
             finish(if (label == "Du") "KI" else "Du")
             log += label + " hat kein Basis-Pokémon für den Spielstart."
-            return
+            return attempts.coerceAtLeast(1) - 1
         }
         val activeCard = side.hand.removeAt(activeIndex).card!!
         side.active = FullPokemonState(activeCard)
@@ -1614,7 +1656,10 @@ class FullGameEngine(
         repeat(min(6, side.deck.size)) {
             side.prizes += side.deck.removeAt(0)
         }
-        log += label + " startet mit " + side.active!!.card.name + ", " + side.bench.size + " Pokémon auf der Bank und " + side.prizes.size + " Preiskarten."
+        val mulligans = (attempts - 1).coerceAtLeast(0)
+        log += label + " startet mit " + side.active!!.card.name + ", " + side.bench.size +
+            " Pokémon auf der Bank und " + side.prizes.size + " Preiskarten. Mulligans: " + mulligans + "."
+        return mulligans
     }
 
     private fun draw(side: FullSideState, count: Int) {
