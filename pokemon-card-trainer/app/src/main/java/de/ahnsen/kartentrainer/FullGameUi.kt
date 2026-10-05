@@ -557,7 +557,7 @@ fun FullGameScreen(
 }
 
 @Composable
-private fun FullStatusHeader(state: FullGameSnapshot) {
+fun FullStatusHeader(state: FullGameSnapshot) {
     OutlinedCard {
         Column(Modifier.padding(12.dp)) {
             Row(
@@ -606,7 +606,7 @@ private fun FullStatusHeader(state: FullGameSnapshot) {
 }
 
 @Composable
-private fun FullActivePokemon(pokemon: FullPokemonView?, label: String) {
+fun FullActivePokemon(pokemon: FullPokemonView?, label: String) {
     if (pokemon == null) {
         FullInfoCard(label + ": kein Pokémon")
         return
@@ -652,7 +652,7 @@ private fun FullActivePokemon(pokemon: FullPokemonView?, label: String) {
 }
 
 @Composable
-private fun FullBench(bench: List<FullPokemonView>, title: String) {
+fun FullBench(bench: List<FullPokemonView>, title: String) {
     Column {
         Text(title, style = MaterialTheme.typography.labelLarge)
         if (bench.isEmpty()) {
@@ -776,7 +776,7 @@ private fun HandCardRow(
 }
 
 @Composable
-private fun FullInfoCard(text: String) {
+fun FullInfoCard(text: String) {
     OutlinedCard {
         Text(text, modifier = Modifier.padding(12.dp))
     }
