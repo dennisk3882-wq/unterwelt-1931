@@ -76,6 +76,30 @@ data class CardData(
 
     fun isStandardPlayable(): Boolean = standardLegal || isBasicEnergy()
 
+    fun isAceSpec(): Boolean {
+        val all = (name + " " + rarity + " " + trainerType.orEmpty() + " " + effect.orEmpty()).lowercase(Locale.ROOT)
+        return "ace spec" in all || "ass-klasse" in all || "assklasse" in all
+    }
+
+    fun isRadiantPokemon(): Boolean {
+        val n = name.lowercase(Locale.ROOT)
+        return isPokemon() && (n.startsWith("radiant ") || n.startsWith("strahlend") || n.startsWith("strahlendes"))
+    }
+
+    fun isPokemonStar(): Boolean {
+        val n = name.lowercase(Locale.ROOT)
+        return isPokemon() && (name.contains("☆") || " pokémon star" in n || " pokemon star" in n)
+    }
+
+    fun isPrismStar(): Boolean {
+        val all = (name + " " + rarity).lowercase(Locale.ROOT)
+        return name.contains("◇") || "prism star" in all || "prisma-stern" in all
+    }
+
+    fun isVStarPokemon(): Boolean = isPokemon() && name.lowercase(Locale.ROOT).contains("vstar")
+    fun isVMaxPokemon(): Boolean = isPokemon() && name.lowercase(Locale.ROOT).contains("vmax")
+    fun isPokemonGX(): Boolean = isPokemon() && name.lowercase(Locale.ROOT).contains("gx")
+
     fun availableVariants(): List<String> = buildList {
         if (variantsNormal) add("Normal")
         if (variantsReverse) add("Reverse")
