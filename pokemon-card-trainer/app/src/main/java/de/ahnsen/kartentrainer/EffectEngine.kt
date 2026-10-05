@@ -180,6 +180,17 @@ data class LockAction(
 data class ExtraPrize(val count: Int) : EffectOp {
     override val description = "Nimm " + count + " zusätzliche Preiskarte(n)"
 }
+data class SendToLostZone(
+    val count: Int,
+    val opponent: Boolean = false,
+    val fromDiscard: Boolean = false,
+    val fromDeckTop: Boolean = false
+) : EffectOp {
+    override val description =
+        "Lege " + count + " Karte(n) " +
+            (if (opponent) "des Gegners " else "") +
+            "ins Nirgendwo / in die Lost Zone"
+}
 data class UnsupportedEffect(val raw: String) : EffectOp {
     override val description = "Noch nicht vollautomatisch: " + raw
 }
@@ -277,6 +288,7 @@ object EffectParser {
         parseLock(s)?.let(ops::add)
         parseBonusDamage(s)?.let(ops::add)
         parsePrize(s)?.let(ops::add)
+        parseLostZone(s)?.let(ops::add)
         return ops.distinctBy { it::class.simpleName + "|" + it.description }
     }
 
@@ -547,6 +559,19 @@ object EffectParser {
         }
     }
 
+    private fun parseLostZone(s: String): EffectOp? {
+        if (!containsAny(s, "lost zone", "nirgendwo")) return null
+        if (!containsAny(s, "lege", "put", "move", "verschiebe")) return null
+        val count = Regex("""(?:bis zu|up to)?\s*(\d+)""")
+            .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 1
+        return SendToLostZone(
+            count = count.coerceIn(1, 20),
+            opponent = containsAny(s, "gegner", "opponent"),
+            fromDiscard = containsAny(s, "ablagestapel", "discard pile"),
+            fromDeckTop = containsAny(s, "obersten", "top of")
+        )
+    }
+
     private fun parsePrize(s: String): EffectOp? {
         if (!containsAny(s, "preiskarte", "prize card")) return null
         if (!containsAny(s, "zusätzlich", "extra", "additional")) return null
@@ -622,6 +647,7 @@ object EffectAiEvaluator {
                 is PreventDamage -> if (op.allDamage) 42.0 else (op.amount ?: 0) * 0.45
                 is LockAction -> if (op.attack) 34.0 else if (op.retreat) 17.0 else 0.0
                 is ExtraPrize -> op.count * 80.0
+                is SendToLostZone -> op.count * if (op.opponent) 14.0 else -4.0
                 is UnsupportedEffect -> 0.0
             }
         }
