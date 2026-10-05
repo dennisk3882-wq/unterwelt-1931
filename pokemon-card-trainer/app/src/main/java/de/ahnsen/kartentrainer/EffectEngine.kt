@@ -161,6 +161,21 @@ data class CoinRule(
         else -> "Wirf " + flips + " Münze(n)"
     }
 }
+data class ContinuousHpModifier(val amount: Int) : EffectOp {
+    override val description = (if (amount >= 0) "+" else "") + amount + " maximale KP"
+}
+data class ContinuousRetreatModifier(val amount: Int) : EffectOp {
+    override val description = (if (amount >= 0) "+" else "") + amount + " Rückzugskosten"
+}
+data class ContinuousOutgoingDamageModifier(val amount: Int) : EffectOp {
+    override val description = (if (amount >= 0) "+" else "") + amount + " Angriffsschaden"
+}
+data class ContinuousIncomingDamageModifier(val amount: Int) : EffectOp {
+    override val description = (if (amount >= 0) "+" else "") + amount + " erhaltener Angriffsschaden"
+}
+data class SpecialConditionImmunity(val all: Boolean = true) : EffectOp {
+    override val description = "Immun gegen Sonderzustände"
+}
 data class PreventDamage(val amount: Int?, val allDamage: Boolean) : EffectOp {
     override val description =
         if (allDamage) "Verhindere allen Schaden im nächsten gegnerischen Zug"
@@ -284,6 +299,7 @@ object EffectParser {
         parseSwitch(s)?.let(ops::add)
         parseDiscardTopDeck(s)?.let(ops::add)
         parseReturnToHand(s)?.let(ops::add)
+        parseContinuousModifiers(s).forEach(ops::add)
         parsePrevent(s)?.let(ops::add)
         parseLock(s)?.let(ops::add)
         parseBonusDamage(s)?.let(ops::add)
@@ -506,6 +522,61 @@ object EffectParser {
         return ReturnToHand(target)
     }
 
+    private fun parseContinuousModifiers(s: String): List<EffectOp> {
+        val ops = mutableListOf<EffectOp>()
+
+        val hp = listOf(
+            Regex("""(?:erhält|bekommt|hat)\s*\+?(\d+)\s*(?:kp|hp)"""),
+            Regex("""gets?\s*\+?(\d+)\s*hp""")
+        ).firstNotNullOfOrNull {
+            it.find(s)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        }
+        if (hp != null && containsAny(s, "solange", "as long as", "angelegt", "attached", "dieses pok", "this pok")) {
+            ops += ContinuousHpModifier(hp)
+        }
+
+        val retreatLess = listOf(
+            Regex("""rückzugskosten.*?(\d+)\s*(?:weniger|niedriger)"""),
+            Regex("""retreat cost.*?(\d+)\s*less""")
+        ).firstNotNullOfOrNull {
+            it.find(s)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        }
+        if (retreatLess != null) ops += ContinuousRetreatModifier(-retreatLess)
+
+        if (containsAny(s, "keine rückzugskosten", "no retreat cost", "retreat cost is 0")) {
+            ops += ContinuousRetreatModifier(-99)
+        }
+
+        val outgoing = listOf(
+            Regex("""attacken.*?(\d+)\s*(?:mehr|zusätzlichen?)\s*(?:schaden|schadenspunkte)"""),
+            Regex("""attacks?.*?(\d+)\s*more damage""")
+        ).firstNotNullOfOrNull {
+            it.find(s)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        }
+        if (outgoing != null) ops += ContinuousOutgoingDamageModifier(outgoing)
+
+        val incomingLess = listOf(
+            Regex("""(?:nimmt|erhält).*?(\d+)\s*(?:weniger)\s*(?:schaden|schadenspunkte)"""),
+            Regex("""takes?\s+(\d+)\s+less damage""")
+        ).firstNotNullOfOrNull {
+            it.find(s)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        }
+        if (incomingLess != null) ops += ContinuousIncomingDamageModifier(-incomingLess)
+
+        if (containsAny(
+                s,
+                "kann nicht von sonderzuständen betroffen",
+                "kann keine sonderzustände erhalten",
+                "can't be affected by special conditions",
+                "cannot be affected by special conditions"
+            )
+        ) {
+            ops += SpecialConditionImmunity()
+        }
+
+        return ops
+    }
+
     private fun parsePrevent(s: String): EffectOp? {
         if (containsAny(s, "verhindere allen schaden", "prevent all damage")) return PreventDamage(null, true)
         if (containsAny(s, "weniger schaden", "less damage")) {
@@ -644,6 +715,11 @@ object EffectAiEvaluator {
                 is ReturnToHand -> if (op.target == EffectTarget.OPPONENT_ACTIVE) 28.0 else 8.0
                 is DamageBonus -> op.amount * 0.75
                 is CoinRule -> if (op.cancelOnTails) -9.0 else op.bonusPerHeads * 0.35
+                is ContinuousHpModifier -> op.amount * 0.25
+                is ContinuousRetreatModifier -> op.amount * -8.0
+                is ContinuousOutgoingDamageModifier -> op.amount * 0.7
+                is ContinuousIncomingDamageModifier -> op.amount * -0.55
+                is SpecialConditionImmunity -> 24.0
                 is PreventDamage -> if (op.allDamage) 42.0 else (op.amount ?: 0) * 0.45
                 is LockAction -> if (op.attack) 34.0 else if (op.retreat) 17.0 else 0.0
                 is ExtraPrize -> op.count * 80.0
