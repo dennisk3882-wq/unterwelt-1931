@@ -3,6 +3,18 @@ package de.ahnsen.kartentrainer
 import kotlin.math.max
 import kotlin.math.min
 
+enum class DeckFormat(val label: String) {
+    STANDARD("Standard"),
+    EXPANDED("Erweitert"),
+    FREE("Freie Partie")
+}
+
+private fun CardData.isPlayableIn(format: DeckFormat): Boolean = when (format) {
+    DeckFormat.STANDARD -> isStandardPlayable()
+    DeckFormat.EXPANDED -> expandedLegal || isBasicEnergy()
+    DeckFormat.FREE -> true
+}
+
 data class DeckCardChoice(
     val card: CardData,
     val variant: String,
@@ -30,10 +42,10 @@ data class DeckAnalysis(
 object AdvancedDeckEngine {
     fun autoBuild(
         entries: List<CollectionEntry>,
-        standardOnly: Boolean
+        format: DeckFormat
     ): List<DeckCardChoice> {
         val eligible = entries
-            .filter { !standardOnly || it.card.isStandardPlayable() }
+            .filter { it.card.isPlayableIn(format) }
             .flatMap { entry ->
                 List(entry.quantity.coerceAtMost(if (entry.card.isBasicEnergy()) 20 else 4)) {
                     entry.card to entry.variant
@@ -154,9 +166,12 @@ object AdvancedDeckEngine {
             )
     }
 
+    fun autoBuild(entries: List<CollectionEntry>, standardOnly: Boolean): List<DeckCardChoice> =
+        autoBuild(entries, if (standardOnly) DeckFormat.STANDARD else DeckFormat.FREE)
+
     fun analyze(
         cards: List<DeckCardChoice>,
-        standardOnly: Boolean
+        format: DeckFormat
     ): DeckAnalysis {
         val total = cards.sumOf { it.quantity }
         val pokemon = cards.filter { it.card.isPokemon() }
@@ -187,7 +202,7 @@ object AdvancedDeckEngine {
             }
             .keys
 
-        val legalityIssues = cards.filter { standardOnly && !it.card.isStandardPlayable() }
+        val legalityIssues = cards.filter { !it.card.isPlayableIn(format) }
         val aceSpecCount = cards.filter { it.card.isAceSpec() }.sumOf { it.quantity }
         val radiantCount = cards.filter { it.card.isRadiantPokemon() }.sumOf { it.quantity }
         val pokemonStarCount = cards.filter { it.card.isPokemonStar() }.sumOf { it.quantity }
@@ -249,7 +264,7 @@ object AdvancedDeckEngine {
             if (total != 60) add("Deck hat $total statt exakt 60 Karten.")
             if (basicCount == 0) add("Kein Basis-Pokémon vorhanden.")
             if (nameViolations.isNotEmpty()) add("Viererlimit überschritten: " + nameViolations.joinToString())
-            if (legalityIssues.isNotEmpty()) add("${legalityIssues.size} Karte(n) sind im gewählten Standardformat nicht legal.")
+            if (legalityIssues.isNotEmpty()) add("${legalityIssues.size} Karte(n) sind im gewählten Format ${format.label} nicht legal.")
             if (aceSpecCount > 1) add("ACE-SPEC-Regel verletzt: nur 1 ACE-SPEC-Karte pro Deck.")
             if (radiantCount > 1) add("Regel für Strahlende Pokémon verletzt: nur 1 Strahlendes Pokémon pro Deck.")
             if (pokemonStarCount > 1) add("Pokémon-☆-Regel verletzt: nur 1 Pokémon ☆ pro Deck.")
@@ -293,12 +308,15 @@ object AdvancedDeckEngine {
         )
     }
 
+    fun analyze(cards: List<DeckCardChoice>, standardOnly: Boolean): DeckAnalysis =
+        analyze(cards, if (standardOnly) DeckFormat.STANDARD else DeckFormat.FREE)
+
     fun missingCardSuggestions(
         collection: List<CollectionEntry>,
         deck: List<DeckCardChoice>,
-        standardOnly: Boolean
+        format: DeckFormat
     ): List<String> {
-        val analysis = analyze(deck, standardOnly)
+        val analysis = analyze(deck, format)
         val result = mutableListOf<String>()
         if (analysis.basicPokemonCount < 6) result += "Mehr spielbare Basis-Pokémon aus deiner Sammlung hinzufügen."
         if (analysis.energyCount < 10) result += "Basis-Energien auf etwa 10–14 erhöhen."
@@ -313,7 +331,7 @@ object AdvancedDeckEngine {
         }
 
         val candidateNames = collection
-            .filter { !standardOnly || it.card.isStandardPlayable() }
+            .filter { it.card.isPlayableIn(format) }
             .filter { it.card.isTrainer() }
             .sortedByDescending {
                 EffectAiEvaluator.score(EffectParser.parse(it.card.effect.orEmpty(), EffectSourceKind.TRAINER))
@@ -328,6 +346,16 @@ object AdvancedDeckEngine {
         }
         return result.distinct().take(10)
     }
+
+    fun missingCardSuggestions(
+        collection: List<CollectionEntry>,
+        deck: List<DeckCardChoice>,
+        standardOnly: Boolean
+    ): List<String> = missingCardSuggestions(
+        collection,
+        deck,
+        if (standardOnly) DeckFormat.STANDARD else DeckFormat.FREE
+    )
 
     private fun detectArchetype(cards: List<DeckCardChoice>, focusTypes: List<String>): String {
         val trainers = cards.filter { it.card.isTrainer() }
