@@ -42,10 +42,10 @@ data class FullPokemonView(
     val energyTypes: List<String>,
     val turnsInPlay: Int,
     val status: FullStatus,
-    val toolName: String?
-) {
-    val maxHp: Int get() = card.hp ?: 100
-}
+    val toolName: String?,
+    val maxHp: Int,
+    val effectiveRetreatCost: Int
+)
 
 data class FullSideView(
     val active: FullPokemonView?,
@@ -95,7 +95,8 @@ private data class FullPokemonState(
     var retreatLocked: Boolean = false,
     var tool: CardData? = null
 ) {
-    fun view() = FullPokemonView(card, hp, energy, energyTypes.toList(), turnsInPlay, status, tool?.name)
+    fun view(maxHp: Int, retreatCost: Int) =
+        FullPokemonView(card, hp, energy, energyTypes.toList(), turnsInPlay, status, tool?.name, maxHp, retreatCost)
 }
 
 private data class FullSideState(
@@ -508,7 +509,7 @@ class FullGameEngine(
             log += active.card.name + " kann wegen " + active.status.label + " nicht zurückziehen."
             return snapshot()
         }
-        val cost = active.card.retreatCost
+        val cost = effectiveRetreatCost(active)
         if (active.energy < cost) {
             log += "Rückzug kostet " + cost + " Energie. Es liegen erst " + active.energy + " an."
             return snapshot()
@@ -863,7 +864,7 @@ class FullGameEngine(
         val active = ai.active ?: return
         if (ai.retreated || ai.bench.isEmpty()) return
         if (active.status == FullStatus.ASLEEP || active.status == FullStatus.PARALYZED) return
-        if (active.energy < active.card.retreatCost) return
+        if (active.energy < effectiveRetreatCost(active)) return
         val enemy = player.active
         val current = boardPokemonScore(active, enemy)
         val bestIndex = ai.bench.indices.maxByOrNull { index ->
@@ -873,7 +874,7 @@ class FullGameEngine(
         val danger = active.hp <= (active.card.hp ?: 100) / 3
         val switchThreshold = if (difficulty == AiDifficulty.EXPERT) 8.0 else 24.0
         if (boardPokemonScore(best, enemy) > current + switchThreshold || danger) {
-            removeEnergyUnits(active, active.card.retreatCost)
+            removeEnergyUnits(active, effectiveRetreatCost(active))
             val old = active
             old.status = FullStatus.NONE
             best.status = FullStatus.NONE
@@ -1084,7 +1085,7 @@ class FullGameEngine(
                     val targets = pokemonTargets(side, opponent, sourcePokemon, op.target, aiControlled)
                     targets.forEach { target ->
                         val before = target.hp
-                        target.hp = min(target.card.hp ?: 100, target.hp + op.amount)
+                        target.hp = min(effectiveMaxHp(target), target.hp + op.amount)
                         val healed = target.hp - before
                         if (healed > 0) {
                             log += actor + ": " + target.card.name + " heilt " + healed + " KP."
@@ -1112,6 +1113,10 @@ class FullGameEngine(
                 is ApplyCondition -> {
                     val target = pokemonTargets(side, opponent, sourcePokemon, op.target, aiControlled).firstOrNull()
                     if (target != null) {
+                        if (hasSpecialConditionImmunity(target)) {
+                            log += actor + ": " + target.card.name + " ist durch einen dauerhaften Effekt gegen Sonderzustände geschützt."
+                            return@forEach
+                        }
                         target.status = when (op.status) {
                             EffectStatus.POISONED -> FullStatus.POISONED
                             EffectStatus.BURNED -> FullStatus.BURNED
@@ -1300,6 +1305,11 @@ class FullGameEngine(
                     log += actor + ": " + op.count + " Karte(n) wurden ins Nirgendwo / in die Lost Zone gelegt."
                 }
 
+                is ContinuousHpModifier,
+                is ContinuousRetreatModifier,
+                is ContinuousOutgoingDamageModifier,
+                is ContinuousIncomingDamageModifier,
+                is SpecialConditionImmunity,
                 is DamageBonus,
                 is CoinRule,
                 is UnsupportedEffect -> Unit
@@ -1607,6 +1617,8 @@ class FullGameEngine(
             }
         }
 
+        raw += persistentOps(attacker).filterIsInstance<ContinuousOutgoingDamageModifier>().sumOf { it.amount }
+        raw += persistentOps(defender).filterIsInstance<ContinuousIncomingDamageModifier>().sumOf { it.amount }
         var damage = raw.toInt().coerceAtLeast(0)
         val attackerTypes = attacker.card.types.map { it.lowercase(Locale.ROOT) }
         if (defender.card.weaknesses.any { weak -> attackerTypes.contains(weak.lowercase(Locale.ROOT)) }) {
@@ -1684,6 +1696,56 @@ class FullGameEngine(
         side.active?.let { it.turnsInPlay += 1 }
         side.bench.forEach { it.turnsInPlay += 1 }
     }
+
+    private fun ownerOf(pokemon: FullPokemonState): FullSideState? {
+        if (player.active === pokemon || player.bench.any { it === pokemon }) return player
+        if (ai.active === pokemon || ai.bench.any { it === pokemon }) return ai
+        return null
+    }
+
+    private fun persistentOps(pokemon: FullPokemonState): List<EffectOp> {
+        val ops = mutableListOf<EffectOp>()
+        pokemon.card.abilities
+            .filter { classifyAbilityTiming(it.effect) == AbilityTiming.PASSIVE }
+            .forEach { ability ->
+                ops += EffectParser.parsePersistent(ability.effect, EffectSourceKind.ABILITY).operations
+            }
+        pokemon.tool?.let { tool ->
+            ops += EffectParser.parsePersistent(tool.effect.orEmpty(), EffectSourceKind.TRAINER).operations
+        }
+        pokemon.attachedSpecialEnergy.forEach { energy ->
+            ops += EffectParser.parsePersistent(energy.effect.orEmpty(), EffectSourceKind.TRAINER).operations
+        }
+        val stadium = stadiumCard?.card
+        val owner = ownerOf(pokemon)
+        if (stadium != null && stadiumAppliesTo(stadium, owner)) {
+            ops += EffectParser.parsePersistent(stadium.effect.orEmpty(), EffectSourceKind.TRAINER).operations
+        }
+        return ops
+    }
+
+    private fun stadiumAppliesTo(stadium: CardData, side: FullSideState?): Boolean {
+        val text = stadium.effect.orEmpty().lowercase(Locale.ROOT)
+        val ownerOnly = text.contains("deine pok") || text.contains("your pok")
+        return !ownerOnly || side === stadiumOwner
+    }
+
+    private fun effectiveMaxHp(pokemon: FullPokemonState): Int {
+        val bonus = persistentOps(pokemon)
+            .filterIsInstance<ContinuousHpModifier>()
+            .sumOf { it.amount }
+        return ((pokemon.card.hp ?: 100) + bonus).coerceAtLeast(10)
+    }
+
+    private fun effectiveRetreatCost(pokemon: FullPokemonState): Int {
+        val modifier = persistentOps(pokemon)
+            .filterIsInstance<ContinuousRetreatModifier>()
+            .sumOf { it.amount }
+        return (pokemon.card.retreatCost + modifier).coerceAtLeast(0)
+    }
+
+    private fun hasSpecialConditionImmunity(pokemon: FullPokemonState): Boolean =
+        persistentOps(pokemon).any { it is SpecialConditionImmunity }
 
     private fun normalizeEnergyType(raw: String): String {
         val s = raw.trim().lowercase(Locale.ROOT)
@@ -1888,8 +1950,8 @@ class FullGameEngine(
     }
 
     private fun FullSideState.view(hideHand: Boolean = false) = FullSideView(
-        active = active?.view(),
-        bench = bench.map { it.view() },
+        active = active?.let { it.view(effectiveMaxHp(it), effectiveRetreatCost(it)) },
+        bench = bench.map { it.view(effectiveMaxHp(it), effectiveRetreatCost(it)) },
         hand = if (hideHand) List(hand.size) { FullGameCard(-1 - it, null, false) } else hand.toList(),
         deckCount = deck.size,
         discardCount = discard.size,
