@@ -7,6 +7,7 @@ import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
@@ -119,6 +120,7 @@ fun SmartCameraScanner(
     val lastAnalyzeAt = remember { AtomicLong(0L) }
     val lastSignature = remember { AtomicReference("") }
 
+    @OptIn(ExperimentalGetImage::class)
     fun processImage(proxy: ImageProxy, fromBatch: Boolean) {
         val mediaImage = proxy.image
         if (mediaImage == null) {
