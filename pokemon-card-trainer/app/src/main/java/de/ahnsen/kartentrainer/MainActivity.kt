@@ -235,7 +235,7 @@ private fun KartenCoachApp() {
                 },
                 onReplaceCollection = { replaceCollection(it) }
             )
-            AppScreen.LEARN -> LearnScreen(padding)
+            AppScreen.LEARN -> AdvancedLearnScreen(padding)
             AppScreen.DECK -> AdvancedDeckWorkshopScreen(
                 padding = padding,
                 collection = collection,
@@ -1403,8 +1403,9 @@ private fun PricesScreen(padding: PaddingValues, collection: List<CollectionEntr
                         Text(entry.card.name, fontWeight = FontWeight.Bold)
                         Text(entry.card.setName + " · " + entry.variant, style = MaterialTheme.typography.bodySmall)
                         Text(
-                            entry.card.estimatedPrice(entry.variant)?.let { "ca. " + it.euro() + " je Karte" }
-                                ?: "Kein Marktpreis verfügbar",
+                            entry.adjustedUnitValue()?.let {
+                                "ca. " + it.euro() + " je Karte · " + entry.language + " · " + entry.condition
+                            } ?: "Kein Marktpreis verfügbar",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
