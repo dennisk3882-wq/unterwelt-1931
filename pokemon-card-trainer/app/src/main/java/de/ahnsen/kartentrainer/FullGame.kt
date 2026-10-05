@@ -230,6 +230,7 @@ class FullGameEngine(
     private val difficulty: AiDifficulty,
     standardOnly: Boolean = true,
     startMode: FullStartMode = FullStartMode.COIN_FLIP,
+    private val aiTuning: AiTuning = AiTuning(),
     seed: Int = 12026
 ) {
     private val random = Random(seed)
@@ -256,6 +257,7 @@ class FullGameEngine(
     private var finished = false
     private var winner: String? = null
     private var lastAiReasoning = "Die KI hat noch keinen Zug gemacht."
+    private var lastDeepPlanExplanation = ""
 
     init {
         playerMulligans = setupSide(player, "Du")
@@ -682,6 +684,7 @@ class FullGameEngine(
                 } else {
                     reasons += "Die KI wählt " + chosen.value.name + " wegen des besten Gesamtwerts aus Schaden, Kosten und Gegenangriffsrisiko."
                 }
+                if (lastDeepPlanExplanation.isNotBlank()) reasons += lastDeepPlanExplanation
                 resolveAttack(ai, player, attacker, defender, chosen.value, "KI")
                 resolveKnockOut(player, ai, defenderName = "Du")
             } else {
@@ -947,25 +950,79 @@ class FullGameEngine(
         defender: FullPokemonState,
         ready: List<IndexedValue<CardAttack>>
     ): IndexedValue<CardAttack> {
-        if (difficulty == AiDifficulty.EASY && ready.size > 1) {
-            return ready[random.nextInt(ready.size)]
+        val candidates = ready.map { indexed ->
+            val parsed = EffectParser.parse(indexed.value.effect, EffectSourceKind.ATTACK)
+            AiAttackCandidate(
+                index = indexed.index,
+                attack = indexed.value,
+                expectedDamage = expectedDamage(attacker, defender, indexed.value),
+                effectValue = EffectAiEvaluator.score(parsed),
+                cost = indexed.value.cost.size
+            )
         }
-        return ready.maxByOrNull { indexed ->
-            val attack = indexed.value
-            val damage = expectedDamage(attacker, defender, attack)
-            val cost = max(1, attack.cost.size)
-            val ko = if (damage >= defender.hp) 650.0 else 0.0
-            val efficiency = damage.toDouble() / cost
-            val parsedEffect = EffectParser.parse(attack.effect, EffectSourceKind.ATTACK)
-            val effect = EffectAiEvaluator.score(parsedEffect)
-            val risk = if (difficulty == AiDifficulty.EXPERT) {
-                val response = defender.card.attacks
-                    .filter { canPayAttack(defender, it) }
-                    .maxOfOrNull { expectedDamage(defender, attacker, it) } ?: 0
-                response * 0.18
-            } else 0.0
-            damage * 1.25 + efficiency * 0.5 + ko + effect - risk
-        } ?: ready.first()
+
+        val opponentBestResponse = defender.card.attacks
+            .filter { canPayAttack(defender, it) }
+            .maxOfOrNull { expectedDamage(defender, attacker, it) } ?: 0
+
+        val knownPool = player.deck + player.discard
+        val drawSearchCards = knownPool.count { gameCard ->
+            val card = gameCard.card
+            card?.isTrainer() == true && EffectParser.parse(
+                card.effect.orEmpty(),
+                EffectSourceKind.TRAINER
+            ).operations.any {
+                it is DrawCards || it is DrawUntilHandSize || it is SearchDeck
+            }
+        }
+        val drawSearchDensity = if (knownPool.isEmpty()) 0.0 else drawSearchCards.toDouble() / knownPool.size
+
+        val hiddenThreat = DeepAiPlanner.estimateHiddenThreat(
+            opponentHandCount = player.hand.size,
+            opponentDeckCount = player.deck.size,
+            drawSearchDensity = drawSearchDensity,
+            knownEnergyPressure = (player.active?.energy ?: 0).toDouble()
+        )
+
+        val opponentProfile = AiArchetypeDetector.detect(
+            buildList {
+                player.active?.card?.let(::add)
+                addAll(player.bench.map { it.card })
+                addAll(player.discard.mapNotNull { it.card })
+            }
+        )
+
+        val tuned = aiTuning.copy(
+            aggression = aiTuning.aggression * opponentProfile.aggression,
+            control = aiTuning.control * opponentProfile.control,
+            setup = aiTuning.setup * opponentProfile.setup
+        )
+
+        val context = AiRolloutContext(
+            attackerHp = attacker.hp,
+            attackerMaxHp = effectiveMaxHp(attacker),
+            defenderHp = defender.hp,
+            defenderMaxHp = effectiveMaxHp(defender),
+            aiPrizesLeft = ai.prizes.size,
+            opponentPrizesLeft = player.prizes.size,
+            opponentBestResponseDamage = opponentBestResponse,
+            opponentHiddenThreat = hiddenThreat,
+            aiBenchStrength = ai.bench.sumOf { boardPokemonScore(it, defender) },
+            opponentBenchStrength = player.bench.sumOf { boardPokemonScore(it, attacker) },
+            tuning = tuned
+        )
+
+        val decision = DeepAiPlanner.chooseAttack(
+            candidates = candidates,
+            context = context,
+            difficulty = difficulty,
+            seed = turnNumber * 7919 + attacker.card.id.hashCode()
+        )
+        lastDeepPlanExplanation =
+            decision.explanation + " Gegner-Archetyp: " + opponentProfile.name +
+                ". Planwert: " + decision.score.toInt() + "."
+
+        return ready.firstOrNull { it.index == decision.candidateIndex } ?: ready.first()
     }
 
     private fun resolveAttack(
