@@ -55,7 +55,8 @@ data class ScannerOcrResult(
     val text: String,
     val confidence: Int,
     val blockCount: Int,
-    val guess: OcrGuess
+    val guess: OcrGuess,
+    val guesses: List<OcrGuess>
 )
 
 @Composable
@@ -125,12 +126,19 @@ fun SmartCameraScanner(
                     lastSignature.set(signature)
                     mainHandler.post {
                         status = "Erkannt: " + (guess.name.ifBlank { "Kartentext" }) + " · Sicherheit " + confidence + "%"
+                        val blockGuesses = result.textBlocks
+                            .map { OcrParser.parse(it.text) }
+                            .filter { it.name.isNotBlank() || !it.localId.isNullOrBlank() }
+                            .distinctBy { it.name.lowercase() + "|" + it.localId.orEmpty() }
                         onResult(
                             ScannerOcrResult(
                                 text = text,
                                 confidence = confidence,
                                 blockCount = blocks,
-                                guess = guess
+                                guess = guess,
+                                guesses = (listOf(guess) + blockGuesses)
+                                    .filter { it.name.isNotBlank() || !it.localId.isNullOrBlank() }
+                                    .distinctBy { it.name.lowercase() + "|" + it.localId.orEmpty() }
                             )
                         )
                     }
@@ -209,16 +217,17 @@ fun SmartCameraScanner(
                     .height(390.dp),
                 contentAlignment = Alignment.Center
             ) {
+                val cameraController = controller
                 AndroidView(
                     modifier = Modifier.matchParentSize(),
                     factory = { ctx ->
                         PreviewView(ctx).apply {
                             scaleType = PreviewView.ScaleType.FILL_CENTER
                             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                            controller = this@SmartCameraScanner.controller
+                            this.controller = cameraController
                         }
                     },
-                    update = { it.controller = controller }
+                    update = { it.controller = cameraController }
                 )
                 OutlinedCard(
                     modifier = Modifier
