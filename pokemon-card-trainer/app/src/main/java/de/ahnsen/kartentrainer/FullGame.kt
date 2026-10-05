@@ -59,7 +59,9 @@ data class FullSideView(
     val deckCount: Int,
     val discardCount: Int,
     val lostZoneCount: Int,
-    val prizesLeft: Int
+    val prizesLeft: Int,
+    val gxAttackUsed: Boolean,
+    val vstarPowerUsed: Boolean
 )
 
 data class FullGameSnapshot(
@@ -116,6 +118,8 @@ private data class FullSideState(
     var supporterUsed: Boolean = false,
     var stadiumUsed: Boolean = false,
     var retreated: Boolean = false,
+    var gxAttackUsed: Boolean = false,
+    var vstarPowerUsed: Boolean = false,
     val usedAbilities: MutableSet<String> = mutableSetOf()
 )
 
@@ -548,6 +552,14 @@ class FullGameEngine(
             log += "Diese Fähigkeit ist nicht verfügbar."
             return snapshot()
         }
+        val isVstarPower = pokemon.card.isVStarPokemon() &&
+            (ability.type.lowercase(Locale.ROOT).contains("vstar") ||
+                ability.effect.lowercase(Locale.ROOT).contains("vstar power"))
+        if (isVstarPower && player.vstarPowerUsed) {
+            log += "VSTAR-Power wurde in dieser Partie bereits benutzt."
+            return snapshot()
+        }
+
         val timing = classifyAbilityTiming(ability.effect)
         if (timing != AbilityTiming.ACTIVATED && timing != AbilityTiming.UNKNOWN) {
             log += ability.name + " ist " + timing.label + " und wird nicht als manuelle Zugaktion behandelt."
@@ -569,6 +581,7 @@ class FullGameEngine(
             actor = "Du",
             aiControlled = false
         )
+        if (isVstarPower) player.vstarPowerUsed = true
         log += "Fähigkeit benutzt: " + pokemon.card.name + " – " + ability.name + "."
         logEffectCoverage(ability.name, parsed)
         resolveKnockOut(ai, player, defenderName = "KI")
@@ -621,6 +634,10 @@ class FullGameEngine(
         val defender = ai.active ?: return snapshot()
         val attack = attacker.card.attacks.getOrNull(attackIndex)
         if (attack == null) return snapshot()
+        if (isGxAttack(attacker.card, attack) && player.gxAttackUsed) {
+            log += "GX-Attacke wurde in dieser Partie bereits benutzt."
+            return snapshot()
+        }
         val cost = attack.cost.size
         if (!canPayAttack(attacker, attack)) {
             log += attack.name + " braucht " + formatAttackCost(attack) +
@@ -632,6 +649,7 @@ class FullGameEngine(
             return snapshot()
         }
         resolveAttack(player, ai, attacker, defender, attack, "Du")
+        if (isGxAttack(attacker.card, attack)) player.gxAttackUsed = true
         resolveKnockOut(ai, player, defenderName = "KI")
         if (!finished) endPlayerTurn()
         return snapshot()
@@ -752,6 +770,7 @@ class FullGameEngine(
         if (!opening && attacker != null && defender != null) {
             val ready = attacker.card.attacks.withIndex()
                 .filter { canPayAttack(attacker, it.value) }
+                .filterNot { ai.gxAttackUsed && isGxAttack(attacker.card, it.value) }
             if (ready.isNotEmpty() && canAttack(attacker, "KI")) {
                 val chosen = chooseFullAiAttack(attacker, defender, ready)
                 val damage = expectedDamage(attacker, defender, chosen.value)
@@ -762,6 +781,7 @@ class FullGameEngine(
                 }
                 if (lastDeepPlanExplanation.isNotBlank()) reasons += lastDeepPlanExplanation
                 resolveAttack(ai, player, attacker, defender, chosen.value, "KI")
+                if (isGxAttack(attacker.card, chosen.value)) ai.gxAttackUsed = true
                 resolveKnockOut(player, ai, defenderName = "Du")
             } else {
                 reasons += "Keine bezahlbare Attacke; die KI investiert in den nächsten Zug."
@@ -896,6 +916,10 @@ class FullGameEngine(
             pokemon.card.abilities.mapIndexedNotNull { index, ability ->
                 val timing = classifyAbilityTiming(ability.effect)
                 if (timing != AbilityTiming.ACTIVATED && timing != AbilityTiming.UNKNOWN) return@mapIndexedNotNull null
+                val isVstarPower = pokemon.card.isVStarPokemon() &&
+                    (ability.type.lowercase(Locale.ROOT).contains("vstar") ||
+                        ability.effect.lowercase(Locale.ROOT).contains("vstar power"))
+                if (isVstarPower && ai.vstarPowerUsed) return@mapIndexedNotNull null
                 val key = pokemon.card.id + "#" + ability.name
                 if (ai.usedAbilities.contains(key)) return@mapIndexedNotNull null
                 val parsed = EffectParser.parse(ability.effect, EffectSourceKind.ABILITY)
@@ -913,6 +937,10 @@ class FullGameEngine(
             val key = pokemon.card.id + "#" + ability.name
             if (ai.usedAbilities.add(key)) {
                 executeParsedEffect(ai, player, pokemon, parsed, "KI", true)
+                val isVstarPower = pokemon.card.isVStarPokemon() &&
+                    (ability.type.lowercase(Locale.ROOT).contains("vstar") ||
+                        ability.effect.lowercase(Locale.ROOT).contains("vstar power"))
+                if (isVstarPower) ai.vstarPowerUsed = true
                 reasons += "Die KI nutzt " + pokemon.card.name + " – " + ability.name +
                     " (Effektwert " + EffectAiEvaluator.score(parsed).toInt() + ")."
                 logEffectCoverage(ability.name, parsed)
@@ -1930,6 +1958,16 @@ class FullGameEngine(
         side.bench.forEach { it.turnsInPlay += 1 }
     }
 
+    private fun isGxAttack(card: CardData, attack: CardAttack): Boolean {
+        val name = attack.name.lowercase(Locale.ROOT)
+        return card.isPokemonGX() && (
+            name.endsWith("-gx") ||
+                name.endsWith(" gx") ||
+                attack.effect.lowercase(Locale.ROOT).contains("gx-attack") ||
+                attack.effect.lowercase(Locale.ROOT).contains("gx attack")
+            )
+    }
+
     private fun conditionMet(
         attacker: FullPokemonState,
         defender: FullPokemonState,
@@ -2234,6 +2272,8 @@ class FullGameEngine(
         deckCount = deck.size,
         discardCount = discard.size,
         lostZoneCount = lostZone.size,
-        prizesLeft = prizes.size
+        prizesLeft = prizes.size,
+        gxAttackUsed = gxAttackUsed,
+        vstarPowerUsed = vstarPowerUsed
     )
 }
