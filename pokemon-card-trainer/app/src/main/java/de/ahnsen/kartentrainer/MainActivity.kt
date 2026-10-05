@@ -451,6 +451,8 @@ private fun ScanScreen(
     var selected by remember { mutableStateOf<CardData?>(null) }
     var loading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("Fotografiere möglichst nur eine Karte und fülle den Bildausschnitt gut aus.") }
+    var batchMode by rememberSaveable { mutableStateOf(false) }
+    var lastConfidence by rememberSaveable { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
 
     fun runSearch() {
@@ -485,22 +487,68 @@ private fun ScanScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("1. Karte fotografieren", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Die App liest Namen und Kartennummer. Danach bestätigst du anhand von Bild und Set die richtige Karte.")
-                    Spacer(Modifier.height(12.dp))
-                    CameraOcrButton(
-                        label = "Kamera öffnen",
+                    Text("1. Karten scannen", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Live-Kamera mit Autofokus. Im Batchmodus einfach nacheinander Karten in den Rahmen legen.")
+                    Spacer(Modifier.height(8.dp))
+                    FilterChip(
+                        selected = batchMode,
+                        onClick = { batchMode = !batchMode },
+                        label = { Text(if (batchMode) "Batchmodus aktiv" else "Einzelscan") }
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    SmartCameraScanner(
+                        batchMode = batchMode,
                         modifier = Modifier.fillMaxWidth(),
-                        onText = { text ->
-                            rawOcr = text
-                            val guess = OcrParser.parse(text)
-                            if (guess.name.isNotBlank()) query = guess.name
-                            if (!guess.localId.isNullOrBlank()) localId = guess.localId
-                            message = "Text erkannt. Suche nach " + (guess.name.ifBlank { "Kartennummer" }) + " …"
-                            runSearch()
+                        onResult = { scan ->
+                            rawOcr = scan.text
+                            lastConfidence = scan.confidence
+                            val primary = scan.guess
+                            if (primary.name.isNotBlank()) query = primary.name
+                            if (!primary.localId.isNullOrBlank()) localId = primary.localId
+                            scope.launch {
+                                loading = true
+                                val merged = linkedMapOf<String, CardBrief>()
+                                val guesses = if (batchMode) scan.guesses.take(5) else listOf(primary)
+                                guesses.forEach { guess ->
+                                    runCatching {
+                                        repository.searchCards(
+                                            guess.name,
+                                            guess.localId.takeIf { !it.isNullOrBlank() }
+                                        )
+                                    }.getOrDefault(emptyList()).forEach { brief ->
+                                        merged[brief.id] = brief
+                                    }
+                                }
+                                val candidates = merged.values.toList()
+                                results = candidates
+                                if (batchMode && scan.confidence >= 75 && candidates.size == 1) {
+                                    val card = runCatching { repository.getCard(candidates.first().id) }.getOrNull()
+                                    if (card != null) {
+                                        val variant = card.availableVariants().firstOrNull() ?: "Normal"
+                                        onAdd(card, variant)
+                                        message = card.name + " automatisch hinzugefügt · Sicherheit " + scan.confidence + "%. Nächste Karte einlegen."
+                                        results = emptyList()
+                                    } else {
+                                        message = "Kartendetails konnten nicht geladen werden."
+                                    }
+                                } else {
+                                    message = if (candidates.isEmpty()) {
+                                        "Keine eindeutige Karte gefunden · Sicherheit " + scan.confidence + "%."
+                                    } else {
+                                        candidates.size.toString() + " Treffer · Sicherheit " + scan.confidence + "%. Bitte passende Karte bestätigen."
+                                    }
+                                }
+                                loading = false
+                            }
                         },
                         onError = { message = it }
                     )
+                    if (lastConfidence > 0) {
+                        Text(
+                            "Letzte OCR-Sicherheit: " + lastConfidence + "%",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
         }
