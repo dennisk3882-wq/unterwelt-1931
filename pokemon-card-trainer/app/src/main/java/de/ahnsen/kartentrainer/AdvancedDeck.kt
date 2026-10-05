@@ -80,7 +80,14 @@ object AdvancedDeckEngine {
         val byName = mutableMapOf<String, Int>()
 
         fun add(card: CardData, variant: String): Boolean {
-            val limit = if (card.isBasicEnergy()) 60 else 4
+            if (card.isAceSpec() && chosen.any { it.first.isAceSpec() }) return false
+            if (card.isRadiantPokemon() && chosen.any { it.first.isRadiantPokemon() }) return false
+            if (card.isPokemonStar() && chosen.any { it.first.isPokemonStar() }) return false
+            val limit = when {
+                card.isBasicEnergy() -> 60
+                card.isPrismStar() -> 1
+                else -> 4
+            }
             val used = byName[card.name] ?: 0
             if (used >= limit || chosen.size >= 60) return false
             chosen += card to variant
@@ -181,8 +188,13 @@ object AdvancedDeckEngine {
             .keys
 
         val legalityIssues = cards.filter { standardOnly && !it.card.isStandardPlayable() }
+        val aceSpecCount = cards.filter { it.card.isAceSpec() }.sumOf { it.quantity }
+        val radiantCount = cards.filter { it.card.isRadiantPokemon() }.sumOf { it.quantity }
+        val pokemonStarCount = cards.filter { it.card.isPokemonStar() }.sumOf { it.quantity }
+        val prismViolations = cards.filter { it.card.isPrismStar() && it.quantity > 1 }
         val legality = when {
-            nameViolations.isNotEmpty() || legalityIssues.isNotEmpty() -> 30
+            nameViolations.isNotEmpty() || legalityIssues.isNotEmpty() ||
+                aceSpecCount > 1 || radiantCount > 1 || pokemonStarCount > 1 || prismViolations.isNotEmpty() -> 30
             total != 60 -> 60
             basicCount <= 0 -> 35
             else -> 100
@@ -238,6 +250,10 @@ object AdvancedDeckEngine {
             if (basicCount == 0) add("Kein Basis-Pokémon vorhanden.")
             if (nameViolations.isNotEmpty()) add("Viererlimit überschritten: " + nameViolations.joinToString())
             if (legalityIssues.isNotEmpty()) add("${legalityIssues.size} Karte(n) sind im gewählten Standardformat nicht legal.")
+            if (aceSpecCount > 1) add("ACE-SPEC-Regel verletzt: nur 1 ACE-SPEC-Karte pro Deck.")
+            if (radiantCount > 1) add("Regel für Strahlende Pokémon verletzt: nur 1 Strahlendes Pokémon pro Deck.")
+            if (pokemonStarCount > 1) add("Pokémon-☆-Regel verletzt: nur 1 Pokémon ☆ pro Deck.")
+            if (prismViolations.isNotEmpty()) add("Prisma-Stern-Karten dürfen je Kartenname nur einmal enthalten sein.")
             if (eCount < 8) add("Sehr wenig Energie: nur $eCount Karten.")
             if (eCount > 18) add("Sehr hoher Energieanteil: $eCount Karten.")
             val orphan = pokemon.filter {
