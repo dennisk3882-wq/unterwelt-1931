@@ -543,6 +543,44 @@ private fun ScanScreen(
                         },
                         onError = { message = it }
                     )
+                    Spacer(Modifier.height(8.dp))
+                    PrecisionCardScannerButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onText = { text ->
+                            rawOcr = text
+                            val guess = OcrParser.parse(text)
+                            if (guess.name.isNotBlank()) query = guess.name
+                            if (!guess.localId.isNullOrBlank()) localId = guess.localId
+                            scope.launch {
+                                loading = true
+                                val candidates = runCatching {
+                                    repository.searchCards(
+                                        guess.name,
+                                        guess.localId.takeIf { !it.isNullOrBlank() }
+                                    )
+                                }.getOrDefault(emptyList())
+                                results = candidates
+                                if (candidates.size == 1) {
+                                    val card = runCatching { repository.getCard(candidates.first().id) }.getOrNull()
+                                    if (card != null) {
+                                        onAdd(card, card.availableVariants().firstOrNull() ?: "Normal")
+                                        message = card.name + " aus Präzisionsscan hinzugefügt."
+                                        results = emptyList()
+                                    } else {
+                                        message = "Kartendetails konnten nicht geladen werden."
+                                    }
+                                } else {
+                                    message = if (candidates.isEmpty()) {
+                                        "Präzisionsscan: kein eindeutiger Treffer."
+                                    } else {
+                                        "Präzisionsscan: " + candidates.size + " Treffer – bitte bestätigen."
+                                    }
+                                }
+                                loading = false
+                            }
+                        },
+                        onError = { message = it }
+                    )
                     if (lastConfidence > 0) {
                         Text(
                             "Letzte OCR-Sicherheit: " + lastConfidence + "%",
