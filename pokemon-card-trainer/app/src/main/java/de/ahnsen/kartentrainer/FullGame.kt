@@ -166,7 +166,7 @@ object FullDeckFactory {
         if (chosenPokemon.none { it.isBasicPokemon() }) {
             val fallback = pokemon.firstOrNull { it.isBasicPokemon() }
             if (fallback != null) {
-                if (chosenPokemon.size >= 20) chosenPokemon.removeLast()
+                if (chosenPokemon.size >= 20) chosenPokemon.removeAt(chosenPokemon.lastIndex)
                 chosenPokemon += fallback
             }
         }
@@ -204,7 +204,7 @@ object FullDeckFactory {
         }
 
         if (result.size > 60) {
-            while (result.size > 60) result.removeLast()
+            while (result.size > 60) result.removeAt(result.lastIndex)
         }
 
         return result
