@@ -64,6 +64,26 @@ enum class SearchKind {
 }
 enum class EffectStatus { POISONED, BURNED, ASLEEP, PARALYZED, CONFUSED }
 
+enum class RuleCondition {
+    OPPONENT_IS_EX,
+    OPPONENT_IS_V,
+    OPPONENT_IS_GX,
+    SELF_DAMAGED,
+    OPPONENT_HAS_SPECIAL_CONDITION,
+    OWN_MORE_PRIZES_REMAINING,
+    OWN_FEWER_PRIZES_REMAINING
+}
+
+enum class ScaleMetric {
+    OWN_BENCH,
+    OPPONENT_BENCH,
+    OWN_POKEMON_IN_PLAY,
+    OPPONENT_POKEMON_IN_PLAY,
+    SELF_DAMAGE_COUNTERS,
+    SELF_ENERGY,
+    OPPONENT_ENERGY
+}
+
 sealed interface EffectOp { val description: String }
 
 data class DrawCards(val count: Int) : EffectOp {
@@ -136,6 +156,18 @@ data class DiscardTopDeck(val count: Int, val opponent: Boolean) : EffectOp {
 }
 data class ReturnToHand(val target: EffectTarget) : EffectOp {
     override val description = "Nimm " + targetLabel(target) + " auf die Hand zurück"
+}
+data class ConditionalDamageBonus(
+    val condition: RuleCondition,
+    val amount: Int
+) : EffectOp {
+    override val description = "+" + amount + " Schaden bei Bedingung " + condition.name
+}
+data class ScaledDamage(
+    val amount: Int,
+    val metric: ScaleMetric
+) : EffectOp {
+    override val description = "+" + amount + " Schaden pro " + metric.name
 }
 data class DamageBonus(
     val amount: Int,
@@ -322,6 +354,8 @@ object EffectParser {
         parseContinuousModifiers(s).forEach(ops::add)
         parsePrevent(s)?.let(ops::add)
         parseLock(s)?.let(ops::add)
+        parseConditionalDamage(s)?.let(ops::add)
+        parseScaledDamage(s)?.let(ops::add)
         parseBonusDamage(s)?.let(ops::add)
         parsePrize(s)?.let(ops::add)
         parseLostZone(s)?.let(ops::add)
@@ -637,6 +671,46 @@ object EffectParser {
         return null
     }
 
+    private fun parseConditionalDamage(s: String): EffectOp? {
+        if (!containsAny(s, "mehr schaden", "more damage", "additional damage")) return null
+        val amount = Regex("""(\d+)\s+(?:mehr )?(?:schaden|schadenspunkte|damage)""")
+            .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: return null
+        val condition = when {
+            containsAny(s, "gegnerische aktive pokémon-ex", "opponent's active pokémon ex", "opponent's active pokemon ex") ->
+                RuleCondition.OPPONENT_IS_EX
+            containsAny(s, "gegnerische aktive pokémon-v", "opponent's active pokémon v", "opponent's active pokemon v") ->
+                RuleCondition.OPPONENT_IS_V
+            containsAny(s, "gegnerische aktive pokémon-gx", "opponent's active pokémon-gx", "opponent's active pokemon-gx") ->
+                RuleCondition.OPPONENT_IS_GX
+            containsAny(s, "dieses pokémon hat schadens", "this pokémon has any damage", "this pokemon has any damage") ->
+                RuleCondition.SELF_DAMAGED
+            containsAny(s, "gegnerische aktive pokémon von einem sonderzustand", "opponent's active pokémon is affected by a special condition") ->
+                RuleCondition.OPPONENT_HAS_SPECIAL_CONDITION
+            containsAny(s, "mehr preiskarten übrig", "more prize cards remaining") ->
+                RuleCondition.OWN_MORE_PRIZES_REMAINING
+            containsAny(s, "weniger preiskarten übrig", "fewer prize cards remaining") ->
+                RuleCondition.OWN_FEWER_PRIZES_REMAINING
+            else -> return null
+        }
+        return ConditionalDamageBonus(condition, amount)
+    }
+
+    private fun parseScaledDamage(s: String): EffectOp? {
+        val amount = Regex("""(\d+)\s+(?:schaden|schadenspunkte|damage)""")
+            .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: return null
+        val metric = when {
+            containsAny(s, "für jedes deiner bank", "for each of your benched") -> ScaleMetric.OWN_BENCH
+            containsAny(s, "für jedes bank-pokémon deines gegners", "for each of your opponent's benched") -> ScaleMetric.OPPONENT_BENCH
+            containsAny(s, "für jedes deiner pokémon im spiel", "for each of your pokémon in play") -> ScaleMetric.OWN_POKEMON_IN_PLAY
+            containsAny(s, "für jedes pokémon deines gegners im spiel", "for each of your opponent's pokémon in play") -> ScaleMetric.OPPONENT_POKEMON_IN_PLAY
+            containsAny(s, "für jede schadensmarke auf diesem", "for each damage counter on this") -> ScaleMetric.SELF_DAMAGE_COUNTERS
+            containsAny(s, "für jede an dieses pokémon angelegte energie", "for each energy attached to this") -> ScaleMetric.SELF_ENERGY
+            containsAny(s, "für jede energie am aktiven pokémon deines gegners", "for each energy attached to your opponent's active") -> ScaleMetric.OPPONENT_ENERGY
+            else -> return null
+        }
+        return ScaledDamage(amount, metric)
+    }
+
     private fun parseBonusDamage(s: String): EffectOp? {
         val amount = Regex("""(\d+)\s+(?:mehr )?(?:schaden|damage)""")
             .find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: return null
@@ -690,6 +764,8 @@ object EffectParser {
 
         val supportedConditional = parsed.any {
             it is CoinRule ||
+                it is ConditionalDamageBonus ||
+                it is ScaledDamage ||
                 (it is DamageBonus && (it.onHeads || it.perEnergy || it.perCounter))
         }
         return !supportedConditional
@@ -733,6 +809,8 @@ object EffectAiEvaluator {
                 is ClearSpecialConditions -> 18.0
                 is DiscardTopDeck -> op.count * if (op.opponent) 8.0 else -4.0
                 is ReturnToHand -> if (op.target == EffectTarget.OPPONENT_ACTIVE) 28.0 else 8.0
+                is ConditionalDamageBonus -> op.amount * 0.5
+                is ScaledDamage -> op.amount * 1.2
                 is DamageBonus -> op.amount * 0.75
                 is CoinRule -> if (op.cancelOnTails) -9.0 else op.bonusPerHeads * 0.35
                 is ContinuousHpModifier -> op.amount * 0.25
