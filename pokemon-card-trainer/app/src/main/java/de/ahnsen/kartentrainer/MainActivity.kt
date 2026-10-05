@@ -1499,6 +1499,7 @@ private fun PricesScreen(padding: PaddingValues, collection: List<CollectionEntr
                             } ?: "Kein Marktpreis verfügbar",
                             style = MaterialTheme.typography.bodyMedium
                         )
+                        MarketResearchBlock(entry)
                     }
                     Text(
                         entry.totalEstimatedValue?.euro() ?: "–",
