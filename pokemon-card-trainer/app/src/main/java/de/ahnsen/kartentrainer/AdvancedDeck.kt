@@ -9,7 +9,7 @@ enum class DeckFormat(val label: String) {
     FREE("Freie Partie")
 }
 
-private fun CardData.isPlayableIn(format: DeckFormat): Boolean = when (format) {
+fun CardData.isPlayableIn(format: DeckFormat): Boolean = when (format) {
     DeckFormat.STANDARD -> isStandardPlayable()
     DeckFormat.EXPANDED -> expandedLegal || isBasicEnergy()
     DeckFormat.FREE -> true
