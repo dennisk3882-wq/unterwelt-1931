@@ -38,6 +38,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -335,6 +336,18 @@ fun LocalSettingsScreen(
     val context = LocalContext.current
     var newProfileName by rememberSaveable { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
+    val familyStore = remember { FamilyLocalStore(context.applicationContext) }
+    var familySettings by remember { mutableStateOf(familyStore.settings()) }
+    var parentPin by rememberSaveable { mutableStateOf("") }
+    val aiLearning = remember { LocalAiLearningStore(context.applicationContext) }.load()
+    val achievements = remember(collection, stats, profiles, activeProfileId, aiLearning.gamesLearned) {
+        AchievementEngine.evaluate(
+            collection = collection,
+            stats = stats,
+            savedDecks = store.loadDecks(activeProfileId),
+            learnedAiGames = aiLearning.gamesLearned
+        )
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -444,6 +457,105 @@ fun LocalSettingsScreen(
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Profil anlegen")
+            }
+        }
+
+        item {
+            Text("Kindermodus & Elternbereich", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            OutlinedCard {
+                Column(Modifier.padding(12.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Kindermodus", fontWeight = FontWeight.SemiBold)
+                            Text("Vereinfacht Hinweise und kann Marktwerte hinter dem Eltern-PIN verbergen.", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(
+                            checked = familySettings.childMode,
+                            onCheckedChange = {
+                                familyStore.setChildMode(it)
+                                familySettings = familyStore.settings()
+                            }
+                        )
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Sammlerwert schützen", fontWeight = FontWeight.SemiBold)
+                            Text("Öffnen des Preisbereichs verlangt den Eltern-PIN.", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(
+                            checked = familySettings.priceGateEnabled,
+                            enabled = familySettings.hasPin,
+                            onCheckedChange = {
+                                familyStore.setPriceGate(it)
+                                familySettings = familyStore.settings()
+                            }
+                        )
+                    }
+                    OutlinedTextField(
+                        value = parentPin,
+                        onValueChange = { parentPin = it.filter { ch -> ch.isDigit() }.take(8) },
+                        label = { Text(if (familySettings.hasPin) "Neuen Eltern-PIN setzen" else "Eltern-PIN (4–8 Ziffern)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Button(
+                        onClick = {
+                            if (familyStore.setPin(parentPin)) {
+                                parentPin = ""
+                                familySettings = familyStore.settings()
+                                message = "Eltern-PIN lokal gespeichert."
+                            } else {
+                                message = "PIN muss 4 bis 8 Ziffern haben."
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("PIN speichern")
+                    }
+                    if (familySettings.hasPin) {
+                        OutlinedButton(
+                            onClick = {
+                                familyStore.clearPin()
+                                familySettings = familyStore.settings()
+                                parentPin = ""
+                                message = "Eltern-PIN entfernt."
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("PIN entfernen")
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Text("Erfolge", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+
+        items(achievements, key = { "achievement|" + it.id }) { achievement ->
+            OutlinedCard {
+                Column(Modifier.padding(10.dp)) {
+                    Text(
+                        (if (achievement.unlocked) "✓ " else "○ ") + achievement.title,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(achievement.description, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        achievement.progress.toString() + "/" + achievement.target,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (achievement.unlocked) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
