@@ -143,10 +143,32 @@ data class CardBrief(
 data class CollectionEntry(
     val card: CardData,
     val quantity: Int,
-    val variant: String
+    val variant: String,
+    val language: String = "DE",
+    val condition: String = "NM"
 ) {
+    fun adjustedUnitValue(): Double? {
+        val base = card.estimatedPrice(variant) ?: return null
+        val conditionFactor = when (condition.uppercase(Locale.ROOT)) {
+            "NM" -> 1.00
+            "EX" -> 0.88
+            "GD" -> 0.74
+            "LP" -> 0.60
+            "PL" -> 0.42
+            "PO" -> 0.25
+            else -> 1.00
+        }
+        val languageFactor = when (language.uppercase(Locale.ROOT)) {
+            "DE", "EN" -> 1.00
+            "JP" -> 0.92
+            "FR", "IT", "ES" -> 0.88
+            else -> 0.85
+        }
+        return base * conditionFactor * languageFactor
+    }
+
     val totalEstimatedValue: Double?
-        get() = card.estimatedPrice(variant)?.times(quantity)
+        get() = adjustedUnitValue()?.times(quantity)
 }
 
 data class OcrGuess(
@@ -195,6 +217,8 @@ fun Double.euro(): String = NumberFormat.getCurrencyInstance(Locale.GERMANY).for
 fun CollectionEntry.toJson(): JSONObject = JSONObject().apply {
     put("quantity", quantity)
     put("variant", variant)
+    put("language", language)
+    put("condition", condition)
     put("card", card.toJson())
 }
 
