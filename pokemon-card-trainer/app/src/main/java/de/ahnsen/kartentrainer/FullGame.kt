@@ -11,6 +11,11 @@ enum class FullStartMode(val label: String) {
     COIN_FLIP("Münzwurf")
 }
 
+private enum class ReactiveEvent {
+    DAMAGED,
+    KNOCKED_OUT
+}
+
 enum class FullStatus(val label: String) {
     NONE("Normal"),
     POISONED("Vergiftet"),
@@ -738,6 +743,58 @@ class FullGameEngine(
         }
     }
 
+    private fun triggerReactiveAbilities(
+        side: FullSideState,
+        opponent: FullSideState,
+        pokemon: FullPokemonState,
+        event: ReactiveEvent,
+        actor: String,
+        aiControlled: Boolean
+    ) {
+        pokemon.card.abilities.forEach { ability ->
+            if (classifyAbilityTiming(ability.effect) != AbilityTiming.REACTIVE) return@forEach
+            val lower = ability.effect.lowercase(Locale.ROOT)
+            val matches = when (event) {
+                ReactiveEvent.DAMAGED ->
+                    lower.contains("schaden") || lower.contains("damaged")
+                ReactiveEvent.KNOCKED_OUT ->
+                    lower.contains("kampfunfähig") ||
+                        lower.contains("knocked out") ||
+                        lower.contains("knockout")
+            }
+            if (!matches) return@forEach
+
+            val onceKey = "reactive:" + event.name + ":" + pokemon.card.id + ":" + ability.name + ":" + turnNumber
+            if (!side.usedAbilities.add(onceKey)) return@forEach
+
+            val actionText = reactiveActionText(ability.effect)
+            val parsed = EffectParser.parse(actionText, EffectSourceKind.ABILITY)
+            if (parsed.operations.isNotEmpty()) {
+                executeParsedEffect(
+                    side = side,
+                    opponent = opponent,
+                    sourcePokemon = pokemon,
+                    parsed = parsed,
+                    actor = actor,
+                    aiControlled = aiControlled
+                )
+                log += actor + ": Reaktive Fähigkeit " + ability.name + " wurde ausgelöst."
+                logEffectCoverage(ability.name, parsed)
+            } else {
+                log += actor + ": Reaktive Fähigkeit " + ability.name +
+                    " ausgelöst; Sondertext muss manuell beachtet werden: " + ability.effect
+            }
+        }
+    }
+
+    private fun reactiveActionText(text: String): String {
+        val comma = text.indexOf(',')
+        if (comma >= 0 && comma < text.lastIndex) return text.substring(comma + 1).trim()
+        val period = text.indexOf('.')
+        if (period >= 0 && period < text.lastIndex) return text.substring(period + 1).trim()
+        return text
+    }
+
     private fun triggerOnPlayAbilities(
         side: FullSideState,
         opponent: FullSideState,
@@ -946,6 +1003,16 @@ class FullGameEngine(
         val damage = calculateAttackDamage(attacker, defender, attack, parsed, totalHeads, expected = false)
         defender.hp = max(0, defender.hp - damage)
         log += actor + ": " + attacker.card.name + " setzt " + attack.name + " ein und macht " + damage + " Schaden."
+        if (damage > 0) {
+            triggerReactiveAbilities(
+                side = defendingSide,
+                opponent = attackingSide,
+                pokemon = defender,
+                event = ReactiveEvent.DAMAGED,
+                actor = if (defendingSide === player) "Du" else "KI",
+                aiControlled = defendingSide === ai
+            )
+        }
 
         if (defender.preventAllDamageNext) {
             defender.preventAllDamageNext = false
@@ -981,6 +1048,14 @@ class FullGameEngine(
         if (active.hp > 0) return
         val defeatedCard = active.card
         log += defeatedCard.name + " ist kampfunfähig."
+        triggerReactiveAbilities(
+            side = defending,
+            opponent = attacking,
+            pokemon = active,
+            event = ReactiveEvent.KNOCKED_OUT,
+            actor = defenderName,
+            aiControlled = defending === ai
+        )
         defending.discard += FullGameCard(-200000 - defending.discard.size, defeatedCard, false)
         active.tool?.let {
             defending.discard += FullGameCard(-210000 - defending.discard.size, it, false)
@@ -1098,6 +1173,19 @@ class FullGameEngine(
                     targets.forEach { target ->
                         target.hp = max(0, target.hp - op.amount)
                         log += actor + ": Karteneffekt macht " + op.amount + " Schaden an " + target.card.name + "."
+                        if (op.amount > 0) {
+                            val targetSide = ownerOf(target)
+                            if (targetSide != null) {
+                                triggerReactiveAbilities(
+                                    side = targetSide,
+                                    opponent = if (targetSide === player) ai else player,
+                                    pokemon = target,
+                                    event = ReactiveEvent.DAMAGED,
+                                    actor = if (targetSide === player) "Du" else "KI",
+                                    aiControlled = targetSide === ai
+                                )
+                            }
+                        }
                     }
                     resolveBenchKnockOuts(opponent, side, if (side === player) "KI" else "Du")
                 }
