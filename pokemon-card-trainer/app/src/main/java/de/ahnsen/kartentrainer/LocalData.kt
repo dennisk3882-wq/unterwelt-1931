@@ -20,6 +20,7 @@ data class SavedDeck(
     val id: String,
     val name: String,
     val standardOnly: Boolean,
+    val formatName: String = if (standardOnly) DeckFormat.STANDARD.name else DeckFormat.FREE.name,
     val cards: List<SavedDeckCard>,
     val strength: Int,
     val archetype: String
@@ -121,6 +122,10 @@ class LocalAppStore(context: Context) {
                             id = o.optString("id"),
                             name = o.optString("name"),
                             standardOnly = o.optBoolean("standardOnly", true),
+                            formatName = o.optString(
+                                "formatName",
+                                if (o.optBoolean("standardOnly", true)) DeckFormat.STANDARD.name else DeckFormat.FREE.name
+                            ),
                             cards = buildList {
                                 for (j in 0 until cards.length()) {
                                     val c = cards.optJSONObject(j) ?: continue
@@ -149,6 +154,7 @@ class LocalAppStore(context: Context) {
                 put("id", deck.id)
                 put("name", deck.name)
                 put("standardOnly", deck.standardOnly)
+                put("formatName", deck.formatName)
                 put("strength", deck.strength)
                 put("archetype", deck.archetype)
                 put("cards", JSONArray().apply {
@@ -205,6 +211,7 @@ class LocalAppStore(context: Context) {
                         put("id", deck.id)
                         put("name", deck.name)
                         put("standardOnly", deck.standardOnly)
+                        put("formatName", deck.formatName)
                         put("strength", deck.strength)
                         put("archetype", deck.archetype)
                         put("cards", JSONArray().apply {
