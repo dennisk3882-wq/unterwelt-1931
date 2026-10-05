@@ -134,7 +134,7 @@ private fun KartenCoachApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val legacyStore = remember { CollectionStore(context.applicationContext) }
     val localStore = remember { LocalAppStore(context.applicationContext) }
-    val repository = remember { TcgDexRepository() }
+    val repository = remember { TcgDexRepository(context.applicationContext) }
     var profiles by remember { mutableStateOf(localStore.profiles()) }
     var activeProfileId by rememberSaveable { mutableStateOf(localStore.activeProfileId()) }
 
