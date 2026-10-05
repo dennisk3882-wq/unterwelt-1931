@@ -274,6 +274,9 @@ private fun HomeScreen(
     onOpen: (AppScreen) -> Unit
 ) {
     val cardCount = collection.sumOf { it.quantity }
+    val homeContext = androidx.compose.ui.platform.LocalContext.current
+    val familySettings = remember { FamilyLocalStore(homeContext.applicationContext).settings() }
+    val hideValues = familySettings.childMode && familySettings.priceGateEnabled
     val totalValue = collection.mapNotNull { it.totalEstimatedValue }.sum()
     val standardCount = collection.filter { it.card.isStandardPlayable() }.sumOf { it.quantity }
 
@@ -296,7 +299,7 @@ private fun HomeScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                         Stat("Karten", cardCount.toString())
                         Stat("Standard", standardCount.toString())
-                        Stat("Wert", if (totalValue > 0.0) totalValue.euro() else "–")
+                        Stat("Wert", if (hideValues) "🔒" else if (totalValue > 0.0) totalValue.euro() else "–")
                     }
                 }
             }
@@ -1369,6 +1372,58 @@ private fun PhysicalBattleScreen(collection: List<CollectionEntry>, modifier: Mo
 
 @Composable
 private fun PricesScreen(padding: PaddingValues, collection: List<CollectionEntry>) {
+    val priceContext = androidx.compose.ui.platform.LocalContext.current
+    val familyStore = remember { FamilyLocalStore(priceContext.applicationContext) }
+    val settings = remember { familyStore.settings() }
+    var unlocked by rememberSaveable {
+        mutableStateOf(!(settings.childMode && settings.priceGateEnabled && settings.hasPin))
+    }
+    var pin by rememberSaveable { mutableStateOf("") }
+    var pinError by remember { mutableStateOf("") }
+
+    if (!unlocked) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Elternbereich", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Die Sammlerwerte sind im Kindermodus geschützt.")
+                }
+            }
+            OutlinedTextField(
+                value = pin,
+                onValueChange = { pin = it.filter { ch -> ch.isDigit() }.take(8) },
+                label = { Text("Eltern-PIN") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Button(
+                onClick = {
+                    if (familyStore.verifyPin(pin)) {
+                        unlocked = true
+                        pinError = ""
+                    } else {
+                        pinError = "PIN ist nicht korrekt."
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Sammlerwerte öffnen")
+            }
+            if (pinError.isNotBlank()) Text(pinError, color = MaterialTheme.colorScheme.error)
+        }
+        return
+    }
+
     val sorted = collection.sortedByDescending { it.totalEstimatedValue ?: -1.0 }
     val total = sorted.mapNotNull { it.totalEstimatedValue }.sum()
 
