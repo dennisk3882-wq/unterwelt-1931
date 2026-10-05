@@ -55,12 +55,14 @@ fun FullGameScreen(
     modifier: Modifier = Modifier
 ) {
     var difficultyName by rememberSaveable { mutableStateOf(AiDifficulty.NORMAL.name) }
+    var startModeName by rememberSaveable { mutableStateOf(FullStartMode.COIN_FLIP.name) }
     var standardOnly by rememberSaveable { mutableStateOf(true) }
     var engine by remember { mutableStateOf<FullGameEngine?>(null) }
     var snapshot by remember { mutableStateOf<FullGameSnapshot?>(null) }
     var selectedTarget by rememberSaveable { mutableIntStateOf(0) }
 
     val difficulty = AiDifficulty.valueOf(difficultyName)
+    val startMode = FullStartMode.valueOf(startModeName)
     val basics = collection.filter { it.card.isBasicPokemon() }.sumOf { it.quantity }
 
     LazyColumn(
@@ -135,6 +137,26 @@ fun FullGameScreen(
             }
 
             item {
+                Text("Wer beginnt?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FullStartMode.entries.forEach { mode ->
+                        FilterChip(
+                            selected = startMode == mode,
+                            onClick = { startModeName = mode.name },
+                            label = { Text(mode.label) }
+                        )
+                    }
+                }
+                Text(
+                    "Beim Münzwurf entscheidet die Engine zufällig. Erstzug-Sperren gelten nur für den tatsächlichen Startspieler.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            item {
                 OutlinedCard {
                     Column(Modifier.padding(14.dp)) {
                         Text("Deck-Prüfung", fontWeight = FontWeight.Bold)
@@ -159,7 +181,8 @@ fun FullGameScreen(
                             val newEngine = FullGameEngine(
                                 entries = collection,
                                 difficulty = difficulty,
-                                standardOnly = standardOnly
+                                standardOnly = standardOnly,
+                                startMode = startMode
                             )
                             engine = newEngine
                             snapshot = newEngine.snapshot()
@@ -498,6 +521,11 @@ private fun FullStatusHeader(state: FullGameSnapshot) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Preise: Du " + state.player.prizesLeft + " · KI " + state.ai.prizesLeft)
                     Text(
+                        "Start: " + (if (state.playerStarted) "Du" else "KI") +
+                            " · Mulligans Du " + state.playerMulligans + " / KI " + state.aiMulligans,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
                         "Deck: Du " + state.player.deckCount + " · KI " + state.ai.deckCount,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -512,6 +540,7 @@ private fun FullStatusHeader(state: FullGameSnapshot) {
             )
             Text(
                 "Ablage: Du " + state.player.discardCount + " · KI " + state.ai.discardCount +
+                    " · Lost Zone Du " + state.player.lostZoneCount + " / KI " + state.ai.lostZoneCount +
                     " · KI-Hand " + state.ai.hand.size,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -544,6 +573,13 @@ private fun FullActivePokemon(pokemon: FullPokemonView?, label: String) {
                 Text(label, style = MaterialTheme.typography.labelMedium)
                 Text(pokemon.card.name, fontWeight = FontWeight.Bold)
                 Text("KP " + pokemon.hp + "/" + pokemon.maxHp + " · Energie " + pokemon.energy)
+                if (pokemon.energyTypes.isNotEmpty()) {
+                    Text(
+                        pokemon.energyTypes.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
                 Text(
                     "Rückzug " + pokemon.card.retreatCost + " · Status " + pokemon.status.label,
                     style = MaterialTheme.typography.bodySmall
@@ -586,7 +622,12 @@ private fun FullBench(bench: List<FullPokemonView>, title: String) {
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text("KP " + pokemon.hp + "/" + pokemon.maxHp)
-                            Text("E" + pokemon.energy + " · " + pokemon.status.label, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                "E" + pokemon.energy +
+                                    (if (pokemon.energyTypes.isNotEmpty()) " [" + pokemon.energyTypes.joinToString("/") + "]" else "") +
+                                    " · " + pokemon.status.label,
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                     }
                 }
