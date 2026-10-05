@@ -180,7 +180,9 @@ class CollectionStore(context: Context) {
                         CollectionEntry(
                             card = cardFromJson(cardObj),
                             quantity = o.optInt("quantity", 1).coerceAtLeast(1),
-                            variant = o.optString("variant", "Normal")
+                            variant = o.optString("variant", "Normal"),
+                            language = o.optString("language", "DE"),
+                            condition = o.optString("condition", "NM")
                         )
                     )
                 }
@@ -195,7 +197,9 @@ class CollectionStore(context: Context) {
     }
 
     fun add(entries: List<CollectionEntry>, card: CardData, variant: String): List<CollectionEntry> {
-        val index = entries.indexOfFirst { it.card.id == card.id && it.variant == variant }
+        val index = entries.indexOfFirst {
+            it.card.id == card.id && it.variant == variant && it.language == "DE" && it.condition == "NM"
+        }
         val updated = entries.toMutableList()
         if (index >= 0) {
             val old = updated[index]
@@ -209,7 +213,12 @@ class CollectionStore(context: Context) {
 
     fun changeQuantity(entries: List<CollectionEntry>, target: CollectionEntry, delta: Int): List<CollectionEntry> {
         val updated = entries.toMutableList()
-        val index = updated.indexOfFirst { it.card.id == target.card.id && it.variant == target.variant }
+        val index = updated.indexOfFirst {
+            it.card.id == target.card.id &&
+                it.variant == target.variant &&
+                it.language == target.language &&
+                it.condition == target.condition
+        }
         if (index < 0) return entries
         val next = updated[index].quantity + delta
         if (next <= 0) updated.removeAt(index) else updated[index] = updated[index].copy(quantity = next)
