@@ -34,6 +34,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,10 +62,30 @@ fun FullGameScreen(
     var engine by remember { mutableStateOf<FullGameEngine?>(null) }
     var snapshot by remember { mutableStateOf<FullGameSnapshot?>(null) }
     var selectedTarget by rememberSaveable { mutableIntStateOf(0) }
+    val context = LocalContext.current
+    val learningStore = remember { LocalAiLearningStore(context.applicationContext) }
+    var aiTuning by remember { mutableStateOf(learningStore.load()) }
+    var recordedResultKey by remember { mutableStateOf("") }
 
     val difficulty = AiDifficulty.valueOf(difficultyName)
     val startMode = FullStartMode.valueOf(startModeName)
     val basics = collection.filter { it.card.isBasicPokemon() }.sumOf { it.quantity }
+
+    LaunchedEffect(snapshot?.finished, snapshot?.winner) {
+        val state = snapshot
+        if (state?.finished == true && !state.winner.isNullOrBlank()) {
+            val key = state.winner + "|" + state.turnNumber + "|" + state.player.prizesLeft + "|" + state.ai.prizesLeft
+            if (key != recordedResultKey) {
+                aiTuning = learningStore.recordResult(
+                    aiWon = state.winner == "KI",
+                    turns = state.turnNumber,
+                    aiPrizesLeft = state.ai.prizesLeft,
+                    opponentPrizesLeft = state.player.prizesLeft
+                )
+                recordedResultKey = key
+            }
+        }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -158,6 +180,33 @@ fun FullGameScreen(
 
             item {
                 OutlinedCard {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("Lokales KI-Lernen", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Gelernte Partien: " + aiTuning.gamesLearned +
+                                " · Aggression " + String.format("%.2f", aiTuning.aggression) +
+                                " · Defensive " + String.format("%.2f", aiTuning.survival),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            "Die Gewichte werden nach Partien lokal angepasst und verlassen das Gerät nicht.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                learningStore.reset()
+                                aiTuning = learningStore.load()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("KI-Lernen zurücksetzen")
+                        }
+                    }
+                }
+            }
+
+            item {
+                OutlinedCard {
                     Column(Modifier.padding(14.dp)) {
                         Text("Deck-Prüfung", fontWeight = FontWeight.Bold)
                         Text("Basis-Pokémon in deiner Sammlung: " + basics)
@@ -182,7 +231,8 @@ fun FullGameScreen(
                                 entries = collection,
                                 difficulty = difficulty,
                                 standardOnly = standardOnly,
-                                startMode = startMode
+                                startMode = startMode,
+                                aiTuning = aiTuning
                             )
                             engine = newEngine
                             snapshot = newEngine.snapshot()
