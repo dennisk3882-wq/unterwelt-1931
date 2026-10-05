@@ -69,6 +69,23 @@ fun AdvancedCollectionScreen(
     var refreshing by remember { mutableStateOf(false) }
     var refreshStatus by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val languages = listOf("DE", "EN", "JP", "FR", "IT", "ES", "OTHER")
+    val conditions = listOf("NM", "EX", "GD", "LP", "PL", "PO")
+
+    fun updateMetadata(entry: CollectionEntry, language: String = entry.language, condition: String = entry.condition) {
+        val updated = collection.map {
+            if (it === entry || (
+                    it.card.id == entry.card.id &&
+                        it.variant == entry.variant &&
+                        it.language == entry.language &&
+                        it.condition == entry.condition
+                    )
+            ) {
+                it.copy(language = language, condition = condition)
+            } else it
+        }
+        onReplaceCollection(updated)
+    }
 
     val filtered = remember(collection, query, category, standardOnly, sort) {
         collection.filter { entry ->
@@ -225,7 +242,7 @@ fun AdvancedCollectionScreen(
             )
         }
 
-        items(filtered, key = { it.card.id + "|" + it.variant }) { entry ->
+        items(filtered, key = { it.card.id + "|" + it.variant + "|" + it.language + "|" + it.condition }) { entry ->
             OutlinedCard {
                 Row(
                     Modifier.padding(10.dp),
@@ -250,9 +267,30 @@ fun AdvancedCollectionScreen(
                             style = MaterialTheme.typography.bodySmall
                         )
                         Text(
-                            entry.card.estimatedPrice(entry.variant)?.let { "ca. " + it.euro() } ?: "kein Preis",
+                            entry.adjustedUnitValue()?.let { "ca. " + it.euro() + " je Karte" } ?: "kein Preis",
                             style = MaterialTheme.typography.bodySmall
                         )
+                        Text(
+                            "Sprache " + entry.language + " · Zustand " + entry.condition,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutlinedButton(
+                                onClick = {
+                                    val idx = languages.indexOf(entry.language).let { if (it < 0) 0 else it }
+                                    updateMetadata(entry, language = languages[(idx + 1) % languages.size])
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp)
+                            ) { Text("Sprache") }
+                            OutlinedButton(
+                                onClick = {
+                                    val idx = conditions.indexOf(entry.condition).let { if (it < 0) 0 else it }
+                                    updateMetadata(entry, condition = conditions[(idx + 1) % conditions.size])
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp)
+                            ) { Text("Zustand") }
+                        }
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(entry.quantity.toString() + "×", fontWeight = FontWeight.Bold)
