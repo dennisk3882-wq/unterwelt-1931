@@ -12,6 +12,7 @@ android {
         applicationId = "de.ahnsen.kartentrainer"
         minSdk = 26
         targetSdk = 35
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = 4
         versionName = "1.3.0"
     }
@@ -51,4 +52,9 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2025.02.00"))
 }
