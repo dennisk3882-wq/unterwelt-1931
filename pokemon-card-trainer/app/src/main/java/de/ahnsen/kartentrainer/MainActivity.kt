@@ -244,7 +244,19 @@ private fun KartenCoachApp() {
                 store = localStore,
                 profileId = activeProfileId
             )
-            AppScreen.AI -> AiTrainerScreen(padding, collection)
+            AppScreen.AI -> AiTrainerScreen(
+                padding = padding,
+                collection = collection,
+                onGameFinished = { winner ->
+                    val next = playerStats.copy(
+                        games = playerStats.games + 1,
+                        wins = playerStats.wins + if (winner == "Du") 1 else 0,
+                        losses = playerStats.losses + if (winner == "KI") 1 else 0
+                    )
+                    playerStats = next
+                    localStore.saveStats(activeProfileId, next)
+                }
+            )
             AppScreen.PRICES -> PricesScreen(padding, collection)
             AppScreen.TWO_PLAYER -> TwoPlayerHelperScreen(collection, Modifier.padding(padding))
             AppScreen.SETTINGS -> LocalSettingsScreen(
@@ -1104,7 +1116,11 @@ private fun DeckScreen(padding: PaddingValues, collection: List<CollectionEntry>
 }
 
 @Composable
-private fun AiTrainerScreen(padding: PaddingValues, collection: List<CollectionEntry>) {
+private fun AiTrainerScreen(
+    padding: PaddingValues,
+    collection: List<CollectionEntry>,
+    onGameFinished: (String) -> Unit
+) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     Column(Modifier.fillMaxSize().padding(padding)) {
         TabRow(selectedTabIndex = tab) {
@@ -1128,9 +1144,17 @@ private fun AiTrainerScreen(padding: PaddingValues, collection: List<CollectionE
             )
         }
         when (tab) {
-            0 -> FullGameScreen(collection, Modifier.weight(1f))
+            0 -> FullGameScreen(
+                collection = collection,
+                modifier = Modifier.weight(1f),
+                onGameFinished = onGameFinished
+            )
             1 -> AdvancedDigitalBattleScreen(collection, Modifier.weight(1f))
-            else -> PhysicalFullGameScreen(collection, Modifier.weight(1f))
+            else -> PhysicalFullGameScreen(
+                collection = collection,
+                modifier = Modifier.weight(1f),
+                onGameFinished = onGameFinished
+            )
         }
     }
 }
