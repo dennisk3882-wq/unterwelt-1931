@@ -50,11 +50,12 @@ fun AdvancedDeckWorkshopScreen(
     store: LocalAppStore,
     profileId: String
 ) {
-    var standardOnly by rememberSaveable { mutableStateOf(true) }
+    var formatName by rememberSaveable { mutableStateOf(DeckFormat.STANDARD.name) }
+    val format = DeckFormat.valueOf(formatName)
     var deckName by rememberSaveable { mutableStateOf("Mein Deck") }
     var editorQuery by rememberSaveable { mutableStateOf("") }
-    var deck by remember(collection, standardOnly) {
-        mutableStateOf(AdvancedDeckEngine.autoBuild(collection, standardOnly))
+    var deck by remember(collection, formatName) {
+        mutableStateOf(AdvancedDeckEngine.autoBuild(collection, format))
     }
     var savedDecks by remember(profileId) { mutableStateOf(store.loadDecks(profileId)) }
     var message by remember { mutableStateOf("") }
@@ -94,12 +95,13 @@ fun AdvancedDeckWorkshopScreen(
     }
 
     fun saveCurrent() {
-        val analysis = AdvancedDeckEngine.analyze(deck, standardOnly)
+        val analysis = AdvancedDeckEngine.analyze(deck, format)
         val existingId = savedDecks.firstOrNull { it.name.equals(deckName, true) }?.id
         val saved = SavedDeck(
             id = existingId ?: UUID.randomUUID().toString(),
             name = deckName.trim().ifBlank { "Mein Deck" },
-            standardOnly = standardOnly,
+            standardOnly = format == DeckFormat.STANDARD,
+            formatName = format.name,
             cards = deck.map {
                 SavedDeckCard(
                     cardId = it.card.id,
@@ -129,22 +131,22 @@ fun AdvancedDeckWorkshopScreen(
             }
         }
         deckName = saved.name
-        standardOnly = saved.standardOnly
+        formatName = saved.formatName
         deck = resolved
         message = "Deck '${saved.name}' geladen."
     }
 
-    val analysis = remember(deck, standardOnly) {
-        AdvancedDeckEngine.analyze(deck, standardOnly)
+    val analysis = remember(deck, formatName) {
+        AdvancedDeckEngine.analyze(deck, format)
     }
-    val missing = remember(collection, deck, standardOnly) {
-        AdvancedDeckEngine.missingCardSuggestions(collection, deck, standardOnly)
+    val missing = remember(collection, deck, formatName) {
+        AdvancedDeckEngine.missingCardSuggestions(collection, deck, format)
     }
 
-    val editorCards = remember(collection, editorQuery, standardOnly) {
+    val editorCards = remember(collection, editorQuery, formatName) {
         val q = editorQuery.trim().lowercase()
         collection
-            .filter { !standardOnly || it.card.isStandardPlayable() }
+            .filter { it.card.isPlayableIn(format) }
             .filter {
                 q.isBlank() ||
                     it.card.name.lowercase().contains(q) ||
@@ -189,27 +191,21 @@ fun AdvancedDeckWorkshopScreen(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilterChip(
-                    selected = standardOnly,
-                    onClick = {
-                        standardOnly = true
-                        deck = AdvancedDeckEngine.autoBuild(collection, true)
-                    },
-                    label = { Text("Standard") }
-                )
-                FilterChip(
-                    selected = !standardOnly,
-                    onClick = {
-                        standardOnly = false
-                        deck = AdvancedDeckEngine.autoBuild(collection, false)
-                    },
-                    label = { Text("Freie Partie") }
-                )
+                DeckFormat.entries.forEach { option ->
+                    FilterChip(
+                        selected = format == option,
+                        onClick = {
+                            formatName = option.name
+                            deck = AdvancedDeckEngine.autoBuild(collection, option)
+                        },
+                        label = { Text(option.label) }
+                    )
+                }
             }
             Spacer(Modifier.height(6.dp))
             Button(
                 onClick = {
-                    deck = AdvancedDeckEngine.autoBuild(collection, standardOnly)
+                    deck = AdvancedDeckEngine.autoBuild(collection, format)
                     message = "Deck automatisch neu optimiert."
                 },
                 modifier = Modifier.fillMaxWidth()
