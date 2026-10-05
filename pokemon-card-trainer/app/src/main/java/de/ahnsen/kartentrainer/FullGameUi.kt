@@ -54,7 +54,8 @@ import kotlin.math.max
 @Composable
 fun FullGameScreen(
     collection: List<CollectionEntry>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onGameFinished: (String) -> Unit = {}
 ) {
     var difficultyName by rememberSaveable { mutableStateOf(AiDifficulty.NORMAL.name) }
     var startModeName by rememberSaveable { mutableStateOf(FullStartMode.COIN_FLIP.name) }
@@ -82,6 +83,7 @@ fun FullGameScreen(
                     aiPrizesLeft = state.ai.prizesLeft,
                     opponentPrizesLeft = state.player.prizesLeft
                 )
+                onGameFinished(state.winner.orEmpty())
                 recordedResultKey = key
             }
         }
