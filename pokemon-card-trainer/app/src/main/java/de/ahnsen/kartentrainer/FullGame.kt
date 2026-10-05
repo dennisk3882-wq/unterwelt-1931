@@ -17,10 +17,11 @@ enum class FullStatus(val label: String) {
 data class FullGameCard(
     val uid: Int,
     val card: CardData?,
-    val virtualEnergy: Boolean = false
+    val virtualEnergy: Boolean = false,
+    val virtualEnergyType: String? = null
 ) {
     val name: String
-        get() = card?.name ?: "Basis-Energie (Training)"
+        get() = card?.name ?: ((virtualEnergyType ?: "Farblos") + "-Energie (Training)")
 
     fun isPokemon(): Boolean = card?.isPokemon() == true
     fun isTrainer(): Boolean = card?.isTrainer() == true
@@ -32,6 +33,7 @@ data class FullPokemonView(
     val card: CardData,
     val hp: Int,
     val energy: Int,
+    val energyTypes: List<String>,
     val turnsInPlay: Int,
     val status: FullStatus,
     val toolName: String?
@@ -73,6 +75,8 @@ private data class FullPokemonState(
     var card: CardData,
     var hp: Int = card.hp ?: 100,
     var energy: Int = 0,
+    val energyTypes: MutableList<String> = mutableListOf(),
+    val attachedSpecialEnergy: MutableList<CardData> = mutableListOf(),
     var turnsInPlay: Int = 0,
     var status: FullStatus = FullStatus.NONE,
     var preventAllDamageNext: Boolean = false,
@@ -81,7 +85,7 @@ private data class FullPokemonState(
     var retreatLocked: Boolean = false,
     var tool: CardData? = null
 ) {
-    fun view() = FullPokemonView(card, hp, energy, turnsInPlay, status, tool?.name)
+    fun view() = FullPokemonView(card, hp, energy, energyTypes.toList(), turnsInPlay, status, tool?.name)
 }
 
 private data class FullSideState(
@@ -162,8 +166,16 @@ object FullDeckFactory {
         chosenTrainers.forEach(::addCard)
         chosenEnergies.forEach(::addCard)
 
+        val preferredEnergyType = chosenPokemon
+            .flatMap { it.types }
+            .groupingBy { it }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key
+            ?: "Colorless"
+
         while (result.size < 60) {
-            result += FullGameCard(uid++, null, true)
+            result += FullGameCard(uid++, null, true, preferredEnergyType)
         }
 
         if (result.size > 60) {
