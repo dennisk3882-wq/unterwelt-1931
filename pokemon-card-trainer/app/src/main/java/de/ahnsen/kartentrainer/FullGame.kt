@@ -310,6 +310,78 @@ class FullGameEngine(
         log = log.toList()
     )
 
+    fun setPhysicalActive(card: CardData): FullGameSnapshot {
+        if (finished) return snapshot()
+        if (!card.isBasicPokemon()) {
+            log += "Für den physischen Start muss ein Basis-Pokémon gescannt werden."
+            return snapshot()
+        }
+        removeOneCardFromHiddenZones(player, card.id)
+        val old = player.active
+        if (old != null && old.card.id != card.id) {
+            player.deck += FullGameCard(-800000 - player.deck.size, old.card, false)
+            player.deck.shuffle(random)
+        }
+        player.active = FullPokemonState(card)
+        log += "Physischer Tisch synchronisiert: " + card.name + " ist dein aktives Pokémon."
+        return snapshot()
+    }
+
+    fun synchronizePhysicalCard(card: CardData, targetIndex: Int = 0): FullGameSnapshot {
+        if (finished) return snapshot()
+        val handIndex = ensurePhysicalHandCard(card)
+        return when {
+            card.isEnergy() -> attachEnergyFromHand(handIndex, targetIndex)
+            card.isTrainer() -> playTrainerFromHand(handIndex, targetIndex)
+            card.isPokemon() && card.isBasicPokemon() -> playBasicFromHand(handIndex)
+            card.isPokemon() -> evolveFromHand(handIndex, targetIndex)
+            else -> {
+                log += "Physische Karte erkannt, aber für diese Kartenkategorie gibt es noch keine Zugaktion."
+                snapshot()
+            }
+        }
+    }
+
+    private fun ensurePhysicalHandCard(card: CardData): Int {
+        val inHand = player.hand.indexOfFirst { it.card?.id == card.id }
+        if (inHand >= 0) return inHand
+
+        val inDeck = player.deck.indexOfFirst { it.card?.id == card.id }
+        if (inDeck >= 0) {
+            player.hand += player.deck.removeAt(inDeck)
+            return player.hand.lastIndex
+        }
+
+        val inPrizes = player.prizes.indexOfFirst { it.card?.id == card.id }
+        if (inPrizes >= 0) {
+            player.hand += player.prizes.removeAt(inPrizes)
+            log += "Physischer Abgleich: Karte lag im simulierten Preisstapel und wurde an die reale Hand angepasst."
+            return player.hand.lastIndex
+        }
+
+        val inDiscard = player.discard.indexOfFirst { it.card?.id == card.id }
+        if (inDiscard >= 0) {
+            player.hand += player.discard.removeAt(inDiscard)
+            log += "Physischer Abgleich: Karte aus simulierter Ablage an realen Tischzustand angepasst."
+            return player.hand.lastIndex
+        }
+
+        player.hand += FullGameCard(-900000 - player.hand.size, card, false)
+        log += "Physischer Abgleich: " + card.name + " wurde als reale Handkarte ergänzt."
+        return player.hand.lastIndex
+    }
+
+    private fun removeOneCardFromHiddenZones(side: FullSideState, cardId: String) {
+        val zones = listOf(side.hand, side.deck, side.prizes, side.discard)
+        zones.forEach { zone ->
+            val index = zone.indexOfFirst { it.card?.id == cardId }
+            if (index >= 0) {
+                zone.removeAt(index)
+                return
+            }
+        }
+    }
+
     fun playBasicFromHand(handIndex: Int): FullGameSnapshot {
         if (finished) return snapshot()
         if (player.bench.size >= 5) {
