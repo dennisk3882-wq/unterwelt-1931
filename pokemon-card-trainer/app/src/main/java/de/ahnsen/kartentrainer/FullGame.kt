@@ -177,6 +177,10 @@ object FullDeckFactory {
         val result = mutableListOf<FullGameCard>()
         var uid = 1
         fun addCard(card: CardData) {
+            if (card.isAceSpec() && result.any { it.card?.isAceSpec() == true }) return
+            if (card.isRadiantPokemon() && result.any { it.card?.isRadiantPokemon() == true }) return
+            if (card.isPokemonStar() && result.any { it.card?.isPokemonStar() == true }) return
+            if (card.isPrismStar() && result.any { it.card?.name == card.name }) return
             result += FullGameCard(uid++, card, false)
         }
         chosenPokemon.forEach(::addCard)
