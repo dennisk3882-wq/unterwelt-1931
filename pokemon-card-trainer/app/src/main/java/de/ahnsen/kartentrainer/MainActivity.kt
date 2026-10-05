@@ -1115,7 +1115,7 @@ private fun AiTrainerScreen(padding: PaddingValues, collection: List<CollectionE
         when (tab) {
             0 -> FullGameScreen(collection, Modifier.weight(1f))
             1 -> AdvancedDigitalBattleScreen(collection, Modifier.weight(1f))
-            else -> PhysicalBattleScreen(collection, Modifier.weight(1f))
+            else -> PhysicalFullGameScreen(collection, Modifier.weight(1f))
         }
     }
 }
