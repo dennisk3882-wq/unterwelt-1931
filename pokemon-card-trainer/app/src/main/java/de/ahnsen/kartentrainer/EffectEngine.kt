@@ -226,6 +226,26 @@ data class ParsedEffect(
 object EffectParser {
     private val numberRegex = Regex("""\d+""")
 
+    fun parsePersistent(text: String, sourceKind: EffectSourceKind): ParsedEffect {
+        if (text.isBlank()) return ParsedEffect(text, sourceKind, emptyList(), emptyList(), 100)
+        val normalized = text.replace("\n", " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+        val sentences = normalized
+            .split(Regex("""(?<=[.!?])\s+|;\s*"""))
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        val operations = mutableListOf<EffectOp>()
+        val unsupported = mutableListOf<String>()
+        sentences.forEach { sentence ->
+            val parsed = parseSentence(sentence)
+            if (parsed.isEmpty()) unsupported += sentence else operations += parsed
+        }
+        val total = operations.size + unsupported.size
+        val coverage = if (total == 0) 100 else (operations.size * 100 / total).coerceIn(0, 100)
+        return ParsedEffect(text, sourceKind, operations, unsupported, coverage)
+    }
+
     fun parse(text: String, sourceKind: EffectSourceKind): ParsedEffect {
         if (text.isBlank()) return ParsedEffect(text, sourceKind, emptyList(), emptyList(), 100)
 
