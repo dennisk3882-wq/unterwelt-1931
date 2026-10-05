@@ -19,7 +19,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,9 +47,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build APK
+      - name: Unit, rule and corpus tests
         working-directory: pokemon-card-trainer
-        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+
+      - name: Compose instrumentation smoke tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: cd pokemon-card-trainer && gradle --no-daemon :app:connectedDebugAndroidTest
 
       - name: Apply stable development signature
         shell: bash
@@ -81,16 +90,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp pokemon-card-trainer/app/build/outputs/apk/debug/app-debug.apk dist/TCG-Karten-Coach-1.3.0.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose dist/TCG-Karten-Coach-1.3.0.apk
-          sha256sum dist/TCG-Karten-Coach-1.3.0.apk | tee dist/TCG-Karten-Coach-1.3.0.sha256
+          cp pokemon-card-trainer/app/build/outputs/apk/debug/app-debug.apk dist/TCG-Karten-Coach-2.0.0.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose dist/TCG-Karten-Coach-2.0.0.apk
+          sha256sum dist/TCG-Karten-Coach-2.0.0.apk | tee dist/TCG-Karten-Coach-2.0.0.sha256
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TCG-Karten-Coach-1.3.0
+          name: TCG-Karten-Coach-2.0.0
           path: |
-            dist/TCG-Karten-Coach-1.3.0.apk
-            dist/TCG-Karten-Coach-1.3.0.sha256
+            dist/TCG-Karten-Coach-2.0.0.apk
+            dist/TCG-Karten-Coach-2.0.0.sha256
           if-no-files-found: error
           retention-days: 14
