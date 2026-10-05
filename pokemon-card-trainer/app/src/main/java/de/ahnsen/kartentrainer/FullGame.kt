@@ -295,10 +295,10 @@ class FullGameEngine(
             return snapshot()
         }
         player.hand.removeAt(handIndex)
-        target.energy += 1
+        attachEnergyCard(target, handCard)
         player.energyAttached = true
-        player.discard.remove(handCard)
-        log += "Du legst Energie an " + target.card.name + ". Energie dort: " + target.energy + "."
+        log += "Du legst " + handCard.name + " an " + target.card.name +
+            ". Energie dort: " + target.energy + " (" + target.energyTypes.joinToString() + ")."
         return snapshot()
     }
 
@@ -469,8 +469,8 @@ class FullGameEngine(
             log += "Rückzug kostet " + cost + " Energie. Es liegen erst " + active.energy + " an."
             return snapshot()
         }
-        active.energy -= cost
-        repeat(cost) {
+        val removedForRetreat = removeEnergyUnits(active, cost)
+        repeat(removedForRetreat) {
             player.discard += FullGameCard(-100000 - player.discard.size, null, true)
         }
         val oldActive = active
@@ -493,9 +493,10 @@ class FullGameEngine(
         val defender = ai.active ?: return snapshot()
         val attack = attacker.card.attacks.getOrNull(attackIndex)
         if (attack == null) return snapshot()
-        val cost = max(1, attack.cost.size)
-        if (attacker.energy < cost) {
-            log += attack.name + " braucht " + cost + " Energie."
+        val cost = attack.cost.size
+        if (!canPayAttack(attacker, attack)) {
+            log += attack.name + " braucht " + formatAttackCost(attack) +
+                ". Angelegt: " + attacker.energyTypes.joinToString().ifBlank { "keine Energie" } + "."
             return snapshot()
         }
         if (!canAttack(attacker, "Du")) {
@@ -523,7 +524,7 @@ class FullGameEngine(
 
         val koAttack = if (!firstPlayerTurn && enemy != null) {
             active.card.attacks.withIndex()
-                .filter { active.energy >= max(1, it.value.cost.size) }
+                .filter { canPayAttack(active, it.value) }
                 .firstOrNull { expectedDamage(active, enemy, it.value) >= enemy.hp }
         } else null
         if (koAttack != null) {
@@ -622,7 +623,7 @@ class FullGameEngine(
         val defender = player.active
         if (attacker != null && defender != null) {
             val ready = attacker.card.attacks.withIndex()
-                .filter { attacker.energy >= max(1, it.value.cost.size) }
+                .filter { canPayAttack(attacker, it.value) }
             if (ready.isNotEmpty() && canAttack(attacker, "KI")) {
                 val chosen = chooseFullAiAttack(attacker, defender, ready)
                 val damage = expectedDamage(attacker, defender, chosen.value)
@@ -800,13 +801,18 @@ class FullGameEngine(
 
     private fun aiAttachEnergy(reasons: MutableList<String>) {
         if (ai.energyAttached) return
-        val energyIndex = ai.hand.indexOfFirst { it.isEnergy() }
-        if (energyIndex < 0) return
-        val target = allPokemon(ai).maxByOrNull { energyNeedScore(it) } ?: return
-        ai.hand.removeAt(energyIndex)
-        target.energy += 1
+        val energyChoices = ai.hand.withIndex().filter { it.value.isEnergy() }
+        if (energyChoices.isEmpty()) return
+        val pair = energyChoices.maxByOrNull { indexed ->
+            allPokemon(ai).maxOfOrNull { p -> energyNeedScore(p, indexed.value) } ?: 0.0
+        } ?: return
+        val energyCard = pair.value
+        val target = allPokemon(ai).maxByOrNull { energyNeedScore(it, energyCard) } ?: return
+        ai.hand.removeAt(pair.index)
+        attachEnergyCard(target, energyCard)
         ai.energyAttached = true
-        reasons += "Energie geht an " + target.card.name + ", weil sie dort den größten zusätzlichen Angriffswert erzeugt."
+        reasons += energyCard.name + " geht an " + target.card.name +
+            ", weil sie dort die beste neue Angriffsmöglichkeit freischaltet."
     }
 
     private fun aiMaybeRetreat(reasons: MutableList<String>) {
@@ -823,7 +829,7 @@ class FullGameEngine(
         val danger = active.hp <= (active.card.hp ?: 100) / 3
         val switchThreshold = if (difficulty == AiDifficulty.EXPERT) 8.0 else 24.0
         if (boardPokemonScore(best, enemy) > current + switchThreshold || danger) {
-            active.energy -= active.card.retreatCost
+            removeEnergyUnits(active, active.card.retreatCost)
             val old = active
             old.status = FullStatus.NONE
             best.status = FullStatus.NONE
@@ -852,7 +858,7 @@ class FullGameEngine(
             val effect = EffectAiEvaluator.score(parsedEffect)
             val risk = if (difficulty == AiDifficulty.EXPERT) {
                 val response = defender.card.attacks
-                    .filter { defender.energy >= max(1, it.cost.size) }
+                    .filter { canPayAttack(defender, it) }
                     .maxOfOrNull { expectedDamage(defender, attacker, it) } ?: 0
                 response * 0.18
             } else 0.0
@@ -1106,8 +1112,8 @@ class FullGameEngine(
                         if (energyCard != null) {
                             val target = pokemonTargets(side, opponent, sourcePokemon, op.target, aiControlled).firstOrNull()
                             if (target != null) {
-                                target.energy += 1
-                                log += actor + ": Zusätzliche Energie an " + target.card.name + "."
+                                attachEnergyCard(target, energyCard)
+                                log += actor + ": " + energyCard.name + " zusätzlich an " + target.card.name + "."
                             } else {
                                 side.hand += energyCard
                             }
@@ -1126,8 +1132,7 @@ class FullGameEngine(
                             EffectTarget.ALL_OPPONENT_BENCH -> opponent
                             else -> side
                         }
-                        val removed = min(op.count, target.energy)
-                        target.energy -= removed
+                        val removed = removeEnergyUnits(target, op.count)
                         repeat(removed) {
                             targetSide.discard += FullGameCard(-500000 - targetSide.discard.size, null, true)
                         }
@@ -1612,6 +1617,115 @@ class FullGameEngine(
     private fun ageInPlay(side: FullSideState) {
         side.active?.let { it.turnsInPlay += 1 }
         side.bench.forEach { it.turnsInPlay += 1 }
+    }
+
+    private fun normalizeEnergyType(raw: String): String {
+        val s = raw.trim().lowercase(Locale.ROOT)
+        return when {
+            s.contains("fire") || s.contains("feuer") -> "Fire"
+            s.contains("water") || s.contains("wasser") -> "Water"
+            s.contains("grass") || s.contains("pflanze") -> "Grass"
+            s.contains("lightning") || s.contains("elektro") -> "Lightning"
+            s.contains("psychic") || s.contains("psycho") -> "Psychic"
+            s.contains("fighting") || s.contains("kampf") -> "Fighting"
+            s.contains("dark") || s.contains("finstern") -> "Darkness"
+            s.contains("metal") || s.contains("stahl") -> "Metal"
+            s.contains("fairy") || s.contains("fee") -> "Fairy"
+            s.contains("dragon") || s.contains("drache") -> "Dragon"
+            s.contains("colorless") || s.contains("farblos") -> "Colorless"
+            s.contains("any") || s.contains("beliebig") || s.contains("jeden energietyp") -> "Any"
+            else -> raw.ifBlank { "Colorless" }
+        }
+    }
+
+    private fun energyUnits(card: FullGameCard): List<String> {
+        if (card.virtualEnergy) {
+            return listOf(normalizeEnergyType(card.virtualEnergyType ?: "Colorless"))
+        }
+        val data = card.card ?: return listOf("Colorless")
+        val effect = data.effect.orEmpty().lowercase(Locale.ROOT)
+        val anyType = effect.contains("jeden energietyp") ||
+            effect.contains("beliebigen energietyp") ||
+            effect.contains("every type of energy") ||
+            effect.contains("any type of energy")
+        val baseType = if (anyType) {
+            "Any"
+        } else {
+            normalizeEnergyType(
+                data.energyType
+                    ?: data.types.firstOrNull()
+                    ?: data.name
+            )
+        }
+        val providesTwo = effect.contains("2 energie") ||
+            effect.contains("2 energy") ||
+            effect.contains("provides 2") ||
+            effect.contains("liefert 2")
+        return if (providesTwo) listOf(baseType, baseType) else listOf(baseType)
+    }
+
+    private fun attachEnergyCard(target: FullPokemonState, gameCard: FullGameCard) {
+        val units = energyUnits(gameCard)
+        target.energy += units.size
+        target.energyTypes += units
+        val data = gameCard.card
+        if (data != null && data.isEnergy() && !data.isBasicEnergy()) {
+            target.attachedSpecialEnergy += data
+        }
+    }
+
+    private fun removeEnergyUnits(target: FullPokemonState, count: Int): Int {
+        val actual = min(count, target.energy)
+        repeat(actual) {
+            target.energy = max(0, target.energy - 1)
+            if (target.energyTypes.isNotEmpty()) target.energyTypes.removeAt(target.energyTypes.lastIndex)
+        }
+        while (target.attachedSpecialEnergy.size > target.energy) {
+            target.attachedSpecialEnergy.removeAt(target.attachedSpecialEnergy.lastIndex)
+        }
+        return actual
+    }
+
+    private fun canPayAttack(pokemon: FullPokemonState, attack: CardAttack): Boolean {
+        if (attack.cost.isEmpty()) return true
+        val pool = pokemon.energyTypes.toMutableList().ifEmpty {
+            MutableList(pokemon.energy) { "Colorless" }
+        }
+        val normalizedCost = attack.cost.map(::normalizeEnergyType)
+
+        normalizedCost.filter { it != "Colorless" }.forEach { need ->
+            val exact = pool.indexOfFirst { it == need }
+            val any = pool.indexOfFirst { it == "Any" }
+            val index = if (exact >= 0) exact else any
+            if (index < 0) return false
+            pool.removeAt(index)
+        }
+
+        val colorless = normalizedCost.count { it == "Colorless" }
+        return pool.size >= colorless
+    }
+
+    private fun canPayAttackWithExtra(
+        pokemon: FullPokemonState,
+        attack: CardAttack,
+        extra: FullGameCard
+    ): Boolean {
+        val originalEnergy = pokemon.energy
+        val originalTypes = pokemon.energyTypes.toList()
+        val originalSpecial = pokemon.attachedSpecialEnergy.toList()
+        attachEnergyCard(pokemon, extra)
+        val result = canPayAttack(pokemon, attack)
+        pokemon.energy = originalEnergy
+        pokemon.energyTypes.clear()
+        pokemon.energyTypes += originalTypes
+        pokemon.attachedSpecialEnergy.clear()
+        pokemon.attachedSpecialEnergy += originalSpecial
+        return result
+    }
+
+    private fun formatAttackCost(attack: CardAttack): String {
+        if (attack.cost.isEmpty()) return "keine Energie"
+        return attack.cost.joinToString(" + ") { normalizeEnergyType(it) }
     }
 
     private fun targetPokemon(side: FullSideState, targetIndex: Int): FullPokemonState? {
