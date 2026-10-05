@@ -47,6 +47,7 @@ data class FullSideView(
     val hand: List<FullGameCard>,
     val deckCount: Int,
     val discardCount: Int,
+    val lostZoneCount: Int,
     val prizesLeft: Int
 )
 
@@ -93,6 +94,7 @@ private data class FullSideState(
     val hand: MutableList<FullGameCard> = mutableListOf(),
     val prizes: MutableList<FullGameCard> = mutableListOf(),
     val discard: MutableList<FullGameCard> = mutableListOf(),
+    val lostZone: MutableList<FullGameCard> = mutableListOf(),
     var active: FullPokemonState? = null,
     val bench: MutableList<FullPokemonState> = mutableListOf(),
     var energyAttached: Boolean = false,
@@ -1237,6 +1239,25 @@ class FullGameEngine(
                     if (side.prizes.isEmpty()) finish(if (side === player) "Du" else "KI")
                 }
 
+                is SendToLostZone -> {
+                    val targetSide = if (op.opponent) opponent else side
+                    repeat(op.count) {
+                        val moved = when {
+                            op.fromDiscard && targetSide.discard.isNotEmpty() ->
+                                targetSide.discard.removeAt(targetSide.discard.lastIndex)
+                            op.fromDeckTop && targetSide.deck.isNotEmpty() ->
+                                targetSide.deck.removeAt(0)
+                            targetSide.hand.isNotEmpty() ->
+                                targetSide.hand.removeAt(targetSide.hand.lastIndex)
+                            targetSide.deck.isNotEmpty() ->
+                                targetSide.deck.removeAt(0)
+                            else -> null
+                        }
+                        if (moved != null) targetSide.lostZone += moved
+                    }
+                    log += actor + ": " + op.count + " Karte(n) wurden ins Nirgendwo / in die Lost Zone gelegt."
+                }
+
                 is DamageBonus,
                 is CoinRule,
                 is UnsupportedEffect -> Unit
@@ -1827,6 +1848,7 @@ class FullGameEngine(
         hand = if (hideHand) List(hand.size) { FullGameCard(-1 - it, null, false) } else hand.toList(),
         deckCount = deck.size,
         discardCount = discard.size,
+        lostZoneCount = lostZone.size,
         prizesLeft = prizes.size
     )
 }
