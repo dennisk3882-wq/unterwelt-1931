@@ -27,6 +27,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +41,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun PhysicalFullGameScreen(
     collection: List<CollectionEntry>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onGameFinished: (String) -> Unit = {}
 ) {
     var difficultyName by rememberSaveable { mutableStateOf(AiDifficulty.NORMAL.name) }
     var startModeName by rememberSaveable { mutableStateOf(FullStartMode.COIN_FLIP.name) }
@@ -50,6 +52,15 @@ fun PhysicalFullGameScreen(
     var activeSynced by rememberSaveable { mutableStateOf(false) }
     var status by remember { mutableStateOf("Partie konfigurieren und starten.") }
     var batchMode by rememberSaveable { mutableStateOf(true) }
+    var reportedResult by remember { mutableStateOf("") }
+
+    LaunchedEffect(snapshot?.finished, snapshot?.winner) {
+        val state = snapshot
+        if (state?.finished == true && !state.winner.isNullOrBlank() && reportedResult != state.winner) {
+            onGameFinished(state.winner.orEmpty())
+            reportedResult = state.winner.orEmpty()
+        }
+    }
 
     val difficulty = AiDifficulty.valueOf(difficultyName)
     val startMode = FullStartMode.valueOf(startModeName)
