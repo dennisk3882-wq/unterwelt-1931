@@ -10,8 +10,9 @@ import java.net.URLEncoder
 import java.net.URL
 import java.nio.charset.StandardCharsets
 
-class TcgDexRepository {
+class TcgDexRepository(context: Context? = null) {
     private val baseUrl = "https://api.tcgdex.net/v2/de"
+    private val cache = context?.getSharedPreferences("tcg_card_cache_v2", Context.MODE_PRIVATE)
 
     suspend fun searchCards(name: String, localId: String? = null): List<CardBrief> = withContext(Dispatchers.IO) {
         if (name.isBlank() && localId.isNullOrBlank()) return@withContext emptyList()
@@ -39,7 +40,19 @@ class TcgDexRepository {
     }
 
     suspend fun getCard(id: String): CardData = withContext(Dispatchers.IO) {
-        parseCard(JSONObject(request("$baseUrl/cards/" + encodePath(id))))
+        val key = "card_" + id
+        val online = runCatching {
+            request("$baseUrl/cards/" + encodePath(id))
+        }.getOrNull()
+
+        if (!online.isNullOrBlank()) {
+            cache?.edit()?.putString(key, online)?.apply()
+            return@withContext parseCard(JSONObject(online))
+        }
+
+        val cached = cache?.getString(key, null)
+            ?: error("Kartendienst nicht erreichbar und keine lokale Kopie für $id vorhanden.")
+        parseCard(JSONObject(cached))
     }
 
     private fun parseCard(o: JSONObject): CardData {
