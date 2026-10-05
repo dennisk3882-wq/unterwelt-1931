@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.SportsEsports
@@ -108,6 +109,7 @@ private enum class AppScreen(val title: String) {
     DECK("Deck-Werkstatt"),
     AI("KI-Trainer"),
     PRICES("Sammlerwert"),
+    TWO_PLAYER("2-Spieler-Helfer"),
     SETTINGS("Profile & Backup")
 }
 
@@ -244,6 +246,7 @@ private fun KartenCoachApp() {
             )
             AppScreen.AI -> AiTrainerScreen(padding, collection)
             AppScreen.PRICES -> PricesScreen(padding, collection)
+            AppScreen.TWO_PLAYER -> TwoPlayerHelperScreen(collection, Modifier.padding(padding))
             AppScreen.SETTINGS -> LocalSettingsScreen(
                 padding = padding,
                 store = localStore,
@@ -351,6 +354,15 @@ private fun HomeScreen(
                 title = "Sammlerwert",
                 subtitle = "Cardmarket-Schätzwerte nach Normal, Reverse und Holo im Überblick.",
                 onClick = { onOpen(AppScreen.PRICES) }
+            )
+        }
+
+        item {
+            HomeTile(
+                icon = Icons.Default.Groups,
+                title = "2-Spieler-Tischhelfer",
+                subtitle = "Zwei echte Spieler: Live-Scan, KP, Energie, Bank, Preise und Zugwechsel lokal verfolgen.",
+                onClick = { onOpen(AppScreen.TWO_PLAYER) }
             )
         }
 
