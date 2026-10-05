@@ -236,6 +236,11 @@ fun PhysicalFullGameScreen(
                     batchMode = batchMode,
                     modifier = Modifier.fillMaxWidth(),
                     onResult = { scan ->
+                        val spatial = scan.trackedObjects
+                            .groupingBy { it.zone }
+                            .eachCount()
+                            .entries
+                            .joinToString { it.key + " " + it.value }
                         val card = bestCollectionMatch(scan.text, collection)
                         if (card == null) {
                             status = "Karte nicht eindeutig in deiner Sammlung gefunden. Sicherheit " + scan.confidence + "%."
@@ -247,13 +252,15 @@ fun PhysicalFullGameScreen(
                                 if (card.isBasicPokemon()) {
                                     snapshot = current.setPhysicalActive(card)
                                     activeSynced = true
-                                    status = card.name + " als reales aktives Pokémon synchronisiert."
+                                    status = card.name + " als reales aktives Pokémon synchronisiert." +
+                                        if (spatial.isNotBlank()) " · Kamera: " + spatial else ""
                                 } else {
                                     status = "Für den Start brauche ich dein reales Basis-Pokémon. Erkannt: " + card.name
                                 }
                             } else {
                                 snapshot = current.synchronizePhysicalCard(card, selectedTarget)
-                                status = card.name + " wurde in den Vollspiel-Zustand übernommen."
+                                status = card.name + " wurde in den Vollspiel-Zustand übernommen." +
+                                    if (spatial.isNotBlank()) " · Kamera: " + spatial else ""
                             }
                         }
                     },
