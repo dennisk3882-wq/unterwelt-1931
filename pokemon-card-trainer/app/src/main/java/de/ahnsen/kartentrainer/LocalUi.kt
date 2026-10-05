@@ -161,6 +161,10 @@ fun AdvancedCollectionScreen(
         }
 
         item {
+            CollectionCharts(collection)
+        }
+
+        item {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
