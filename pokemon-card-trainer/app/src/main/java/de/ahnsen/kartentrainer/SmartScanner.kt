@@ -16,6 +16,7 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -323,7 +324,7 @@ fun SmartCameraScanner(
                     shape = RoundedCornerShape(18.dp),
                     border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
                 ) {
-                    Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Default.CenterFocusStrong,
                             contentDescription = null,
