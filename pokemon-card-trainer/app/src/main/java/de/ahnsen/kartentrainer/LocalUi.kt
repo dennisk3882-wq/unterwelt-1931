@@ -70,6 +70,13 @@ fun AdvancedCollectionScreen(
     var refreshing by remember { mutableStateOf(false) }
     var refreshStatus by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val collectionContext = LocalContext.current
+    val collectionFamilySettings = remember {
+        FamilyLocalStore(collectionContext.applicationContext).settings()
+    }
+    val hideValues = collectionFamilySettings.childMode &&
+        collectionFamilySettings.priceGateEnabled &&
+        collectionFamilySettings.hasPin
     val languages = listOf("DE", "EN", "JP", "FR", "IT", "ES", "OTHER")
     val conditions = listOf("NM", "EX", "GD", "LP", "PL", "PO")
 
@@ -142,7 +149,7 @@ fun AdvancedCollectionScreen(
                         MiniStat("Karten", totalCards.toString())
                         MiniStat("Einzigartig", uniqueCards.toString())
                         MiniStat("Sets", sets.toString())
-                        MiniStat("Wert", if (totalValue > 0) totalValue.euro() else "–")
+                        MiniStat("Wert", if (hideValues) "🔒" else if (totalValue > 0) totalValue.euro() else "–")
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
@@ -268,7 +275,8 @@ fun AdvancedCollectionScreen(
                             style = MaterialTheme.typography.bodySmall
                         )
                         Text(
-                            entry.adjustedUnitValue()?.let { "ca. " + it.euro() + " je Karte" } ?: "kein Preis",
+                            if (hideValues) "Wert geschützt 🔒"
+                            else entry.adjustedUnitValue()?.let { "ca. " + it.euro() + " je Karte" } ?: "kein Preis",
                             style = MaterialTheme.typography.bodySmall
                         )
                         Text(
