@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.SportsEsports
@@ -106,7 +107,8 @@ private enum class AppScreen(val title: String) {
     LEARN("Pokémon TCG lernen"),
     DECK("Deck-Werkstatt"),
     AI("KI-Trainer"),
-    PRICES("Sammlerwert")
+    PRICES("Sammlerwert"),
+    SETTINGS("Profile & Backup")
 }
 
 @Composable
@@ -128,11 +130,45 @@ private fun KartenCoachTheme(content: @Composable () -> Unit) {
 @Composable
 private fun KartenCoachApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val store = remember { CollectionStore(context.applicationContext) }
+    val legacyStore = remember { CollectionStore(context.applicationContext) }
+    val localStore = remember { LocalAppStore(context.applicationContext) }
     val repository = remember { TcgDexRepository() }
-    var collection by remember { mutableStateOf(store.load()) }
+    var profiles by remember { mutableStateOf(localStore.profiles()) }
+    var activeProfileId by rememberSaveable { mutableStateOf(localStore.activeProfileId()) }
+
+    fun loadCollectionForProfile(id: String): List<CollectionEntry> {
+        val saved = localStore.loadCollection(id)
+        if (saved.isNotEmpty()) return saved
+        if (id == "default") {
+            val legacy = legacyStore.load()
+            if (legacy.isNotEmpty()) {
+                localStore.saveCollection(id, legacy)
+                return legacy
+            }
+        }
+        return emptyList()
+    }
+
+    var collection by remember(activeProfileId) {
+        mutableStateOf(loadCollectionForProfile(activeProfileId))
+    }
+    var playerStats by remember(activeProfileId) {
+        mutableStateOf(localStore.stats(activeProfileId))
+    }
     var screenName by rememberSaveable { mutableStateOf(AppScreen.HOME.name) }
     val screen = AppScreen.valueOf(screenName)
+
+    fun replaceCollection(entries: List<CollectionEntry>) {
+        collection = entries
+        localStore.saveCollection(activeProfileId, entries)
+    }
+
+    fun changeProfile(id: String) {
+        localStore.setActiveProfile(id)
+        activeProfileId = id
+        collection = loadCollectionForProfile(id)
+        playerStats = localStore.stats(id)
+    }
 
     Scaffold(
         topBar = {
@@ -161,20 +197,72 @@ private fun KartenCoachApp() {
                 padding = padding,
                 repository = repository,
                 onAdd = { card, variant ->
-                    collection = store.add(collection, card, variant)
+                    val index = collection.indexOfFirst {
+                        it.card.id == card.id &&
+                            it.variant == variant &&
+                            it.language == "DE" &&
+                            it.condition == "NM"
+                    }
+                    val updated = collection.toMutableList()
+                    if (index >= 0) {
+                        updated[index] = updated[index].copy(quantity = updated[index].quantity + 1)
+                    } else {
+                        updated += CollectionEntry(card, 1, variant, "DE", "NM")
+                    }
+                    replaceCollection(updated)
+                    playerStats = playerStats.copy(scannedCards = playerStats.scannedCards + 1)
+                    localStore.saveStats(activeProfileId, playerStats)
                 }
             )
-            AppScreen.COLLECTION -> CollectionScreen(
+            AppScreen.COLLECTION -> AdvancedCollectionScreen(
                 padding = padding,
                 collection = collection,
+                repository = repository,
                 onChangeQuantity = { entry, delta ->
-                    collection = store.changeQuantity(collection, entry, delta)
-                }
+                    val updated = collection.toMutableList()
+                    val index = updated.indexOfFirst {
+                        it.card.id == entry.card.id &&
+                            it.variant == entry.variant &&
+                            it.language == entry.language &&
+                            it.condition == entry.condition
+                    }
+                    if (index >= 0) {
+                        val next = updated[index].quantity + delta
+                        if (next <= 0) updated.removeAt(index)
+                        else updated[index] = updated[index].copy(quantity = next)
+                    }
+                    replaceCollection(updated)
+                },
+                onReplaceCollection = { replaceCollection(it) }
             )
             AppScreen.LEARN -> LearnScreen(padding)
-            AppScreen.DECK -> DeckScreen(padding, collection)
+            AppScreen.DECK -> AdvancedDeckWorkshopScreen(
+                padding = padding,
+                collection = collection,
+                store = localStore,
+                profileId = activeProfileId
+            )
             AppScreen.AI -> AiTrainerScreen(padding, collection)
             AppScreen.PRICES -> PricesScreen(padding, collection)
+            AppScreen.SETTINGS -> LocalSettingsScreen(
+                padding = padding,
+                store = localStore,
+                profiles = profiles,
+                activeProfileId = activeProfileId,
+                collection = collection,
+                stats = playerStats,
+                onProfilesChanged = {
+                    profiles = localStore.profiles()
+                },
+                onActiveProfileChanged = { id ->
+                    profiles = localStore.profiles()
+                    changeProfile(id)
+                },
+                onImported = {
+                    collection = loadCollectionForProfile(activeProfileId)
+                    playerStats = localStore.stats(activeProfileId)
+                }
+            )
         }
     }
 }
@@ -260,6 +348,15 @@ private fun HomeScreen(
                 title = "Sammlerwert",
                 subtitle = "Cardmarket-Schätzwerte nach Normal, Reverse und Holo im Überblick.",
                 onClick = { onOpen(AppScreen.PRICES) }
+            )
+        }
+
+        item {
+            HomeTile(
+                icon = Icons.Default.Settings,
+                title = "Profile & lokales Backup",
+                subtitle = "Mehrere Spielerprofile, Statistiken sowie JSON-Export und Restore – ohne Cloud.",
+                onClick = { onOpen(AppScreen.SETTINGS) }
             )
         }
 
