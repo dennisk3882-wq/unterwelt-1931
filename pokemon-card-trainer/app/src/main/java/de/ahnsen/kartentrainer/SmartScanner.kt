@@ -1,3 +1,5 @@
+@file:OptIn(androidx.camera.core.ExperimentalGetImage::class)
+
 package de.ahnsen.kartentrainer
 
 import android.Manifest
