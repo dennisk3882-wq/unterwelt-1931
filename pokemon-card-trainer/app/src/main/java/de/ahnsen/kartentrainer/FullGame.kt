@@ -1527,6 +1527,8 @@ class FullGameEngine(
                 is ContinuousOutgoingDamageModifier,
                 is ContinuousIncomingDamageModifier,
                 is SpecialConditionImmunity,
+                is ConditionalDamageBonus,
+                is ScaledDamage,
                 is DamageBonus,
                 is CoinRule,
                 is UnsupportedEffect -> Unit
@@ -1802,6 +1804,16 @@ class FullGameEngine(
         val coinRules = parsed.operations.filterIsInstance<CoinRule>()
         val hasCoinBonus = coinRules.any { it.bonusPerHeads > 0 }
 
+        parsed.operations.filterIsInstance<ConditionalDamageBonus>().forEach { bonus ->
+            if (conditionMet(attacker, defender, bonus.condition)) {
+                raw += bonus.amount
+            }
+        }
+
+        parsed.operations.filterIsInstance<ScaledDamage>().forEach { scaled ->
+            raw += scaled.amount * scaleValue(attacker, defender, scaled.metric)
+        }
+
         parsed.operations.filterIsInstance<DamageBonus>().forEach { bonus ->
             when {
                 bonus.perEnergy -> raw += bonus.amount * attacker.energy
@@ -1912,6 +1924,51 @@ class FullGameEngine(
     private fun ageInPlay(side: FullSideState) {
         side.active?.let { it.turnsInPlay += 1 }
         side.bench.forEach { it.turnsInPlay += 1 }
+    }
+
+    private fun conditionMet(
+        attacker: FullPokemonState,
+        defender: FullPokemonState,
+        condition: RuleCondition
+    ): Boolean {
+        val attackerSide = ownerOf(attacker)
+        val defenderSide = ownerOf(defender)
+        val defenderName = defender.card.name.lowercase(Locale.ROOT)
+        return when (condition) {
+            RuleCondition.OPPONENT_IS_EX ->
+                Regex("""(^|\s)ex($|\s|-)""", RegexOption.IGNORE_CASE).containsMatchIn(defender.card.name)
+            RuleCondition.OPPONENT_IS_V ->
+                Regex("""(^|\s)v($|\s|-)""", RegexOption.IGNORE_CASE).containsMatchIn(defender.card.name) ||
+                    "vmax" in defenderName || "vstar" in defenderName
+            RuleCondition.OPPONENT_IS_GX -> "gx" in defenderName
+            RuleCondition.SELF_DAMAGED -> attacker.hp < effectiveMaxHp(attacker)
+            RuleCondition.OPPONENT_HAS_SPECIAL_CONDITION -> defender.status != FullStatus.NONE
+            RuleCondition.OWN_MORE_PRIZES_REMAINING ->
+                attackerSide != null && defenderSide != null && attackerSide.prizes.size > defenderSide.prizes.size
+            RuleCondition.OWN_FEWER_PRIZES_REMAINING ->
+                attackerSide != null && defenderSide != null && attackerSide.prizes.size < defenderSide.prizes.size
+        }
+    }
+
+    private fun scaleValue(
+        attacker: FullPokemonState,
+        defender: FullPokemonState,
+        metric: ScaleMetric
+    ): Int {
+        val attackerSide = ownerOf(attacker)
+        val defenderSide = ownerOf(defender)
+        return when (metric) {
+            ScaleMetric.OWN_BENCH -> attackerSide?.bench?.size ?: 0
+            ScaleMetric.OPPONENT_BENCH -> defenderSide?.bench?.size ?: 0
+            ScaleMetric.OWN_POKEMON_IN_PLAY ->
+                (if (attackerSide?.active != null) 1 else 0) + (attackerSide?.bench?.size ?: 0)
+            ScaleMetric.OPPONENT_POKEMON_IN_PLAY ->
+                (if (defenderSide?.active != null) 1 else 0) + (defenderSide?.bench?.size ?: 0)
+            ScaleMetric.SELF_DAMAGE_COUNTERS ->
+                max(0, effectiveMaxHp(attacker) - attacker.hp) / 10
+            ScaleMetric.SELF_ENERGY -> attacker.energy
+            ScaleMetric.OPPONENT_ENERGY -> defender.energy
+        }
     }
 
     private fun ownerOf(pokemon: FullPokemonState): FullSideState? {
