@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.objects.ObjectDetection
+import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.Executors
@@ -52,12 +54,22 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
+data class TrackedBoardObject(
+    val trackingId: Int?,
+    val left: Int,
+    val top: Int,
+    val right: Int,
+    val bottom: Int,
+    val zone: String
+)
+
 data class ScannerOcrResult(
     val text: String,
     val confidence: Int,
     val blockCount: Int,
     val guess: OcrGuess,
-    val guesses: List<OcrGuess>
+    val guesses: List<OcrGuess>,
+    val trackedObjects: List<TrackedBoardObject>
 )
 
 @Composable
@@ -72,6 +84,14 @@ fun SmartCameraScanner(
     val executor = remember { Executors.newSingleThreadExecutor() }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     val recognizer = remember { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
+    val objectDetector = remember {
+        ObjectDetection.getClient(
+            ObjectDetectorOptions.Builder()
+                .setDetectorMode(ObjectDetectorOptions.STREAM_MODE)
+                .enableMultipleObjects()
+                .build()
+        )
+    }
     val controller = remember {
         LifecycleCameraController(context).apply {
             cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -106,55 +126,120 @@ fun SmartCameraScanner(
             return
         }
         val input = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
-        recognizer.process(input)
-            .addOnSuccessListener { result ->
-                val text = result.text
-                if (text.isBlank()) {
-                    if (!fromBatch) mainHandler.post { onError("Kein lesbarer Kartentext erkannt.") }
-                    return@addOnSuccessListener
+        val frameWidth = proxy.width
+        val frameHeight = proxy.height
+
+        objectDetector.process(input)
+            .addOnSuccessListener { objects ->
+                val tracked = objects.map { detected ->
+                    val box = detected.boundingBox
+                    val cx = (box.left + box.right) / 2f
+                    val cy = (box.top + box.bottom) / 2f
+                    val zone = when {
+                        cy < frameHeight * 0.34f -> "Gegnerbereich"
+                        cy > frameHeight * 0.68f -> "Eigener Bereich"
+                        cx < frameWidth * 0.38f -> "Linke Spielfeldzone"
+                        cx > frameWidth * 0.62f -> "Rechte Spielfeldzone"
+                        else -> "Aktiv-/Mittelzone"
+                    }
+                    TrackedBoardObject(
+                        trackingId = detected.trackingId,
+                        left = box.left,
+                        top = box.top,
+                        right = box.right,
+                        bottom = box.bottom,
+                        zone = zone
+                    )
                 }
-                val guess = OcrParser.parse(text)
-                val collectorFound = !guess.localId.isNullOrBlank()
-                val nameFound = guess.name.length >= 3
-                val blocks = result.textBlocks.size
-                val confidence = (
-                    (if (collectorFound) 45 else 0) +
-                        (if (nameFound) 35 else 0) +
-                        (blocks.coerceAtMost(5) * 4)
-                    ).coerceIn(0, 100)
-                val signature = guess.name.lowercase() + "|" + guess.localId.orEmpty().lowercase()
-                if (!fromBatch || (confidence >= 45 && signature.isNotBlank() && signature != lastSignature.get())) {
-                    lastSignature.set(signature)
-                    mainHandler.post {
-                        status = "Erkannt: " + (guess.name.ifBlank { "Kartentext" }) + " · Sicherheit " + confidence + "%"
-                        val blockGuesses = result.textBlocks
-                            .map { OcrParser.parse(it.text) }
-                            .filter { it.name.isNotBlank() || !it.localId.isNullOrBlank() }
-                            .distinctBy { it.name.lowercase() + "|" + it.localId.orEmpty() }
-                        onResult(
-                            ScannerOcrResult(
-                                text = text,
-                                confidence = confidence,
-                                blockCount = blocks,
-                                guess = guess,
-                                guesses = (listOf(guess) + blockGuesses)
+
+                recognizer.process(input)
+                    .addOnSuccessListener { result ->
+                        val text = result.text
+                        if (text.isBlank()) {
+                            if (!fromBatch) mainHandler.post { onError("Kein lesbarer Kartentext erkannt.") }
+                            return@addOnSuccessListener
+                        }
+                        val guess = OcrParser.parse(text)
+                        val collectorFound = !guess.localId.isNullOrBlank()
+                        val nameFound = guess.name.length >= 3
+                        val blocks = result.textBlocks.size
+                        val objectBonus = if (tracked.isNotEmpty()) 5 else 0
+                        val confidence = (
+                            (if (collectorFound) 45 else 0) +
+                                (if (nameFound) 35 else 0) +
+                                (blocks.coerceAtMost(4) * 4) +
+                                objectBonus
+                            ).coerceIn(0, 100)
+                        val signature = guess.name.lowercase() + "|" + guess.localId.orEmpty().lowercase()
+                        if (!fromBatch || (confidence >= 45 && signature.isNotBlank() && signature != lastSignature.get())) {
+                            lastSignature.set(signature)
+                            mainHandler.post {
+                                status = "Erkannt: " + (guess.name.ifBlank { "Kartentext" }) +
+                                    " · Sicherheit " + confidence + "% · Objekte " + tracked.size
+                                val blockGuesses = result.textBlocks
+                                    .map { OcrParser.parse(it.text) }
                                     .filter { it.name.isNotBlank() || !it.localId.isNullOrBlank() }
                                     .distinctBy { it.name.lowercase() + "|" + it.localId.orEmpty() }
-                            )
-                        )
+                                onResult(
+                                    ScannerOcrResult(
+                                        text = text,
+                                        confidence = confidence,
+                                        blockCount = blocks,
+                                        guess = guess,
+                                        guesses = (listOf(guess) + blockGuesses)
+                                            .filter { it.name.isNotBlank() || !it.localId.isNullOrBlank() }
+                                            .distinctBy { it.name.lowercase() + "|" + it.localId.orEmpty() },
+                                        trackedObjects = tracked
+                                    )
+                                )
+                            }
+                        }
                     }
-                }
-            }
-            .addOnFailureListener { error ->
-                if (!fromBatch) {
-                    mainHandler.post {
-                        onError("Texterkennung fehlgeschlagen: " + (error.message ?: "unbekannter Fehler"))
+                    .addOnFailureListener { error ->
+                        if (!fromBatch) {
+                            mainHandler.post {
+                                onError("Texterkennung fehlgeschlagen: " + (error.message ?: "unbekannter Fehler"))
+                            }
+                        }
                     }
-                }
+                    .addOnCompleteListener {
+                        proxy.close()
+                        processing.set(false)
+                    }
             }
-            .addOnCompleteListener {
-                proxy.close()
-                processing.set(false)
+            .addOnFailureListener {
+                // OCR bleibt nutzbar, auch wenn die Objektlokalisierung ein einzelnes Bild nicht erkennt.
+                recognizer.process(input)
+                    .addOnSuccessListener { result ->
+                        val text = result.text
+                        if (text.isBlank()) return@addOnSuccessListener
+                        val guess = OcrParser.parse(text)
+                        val confidence = (
+                            (if (!guess.localId.isNullOrBlank()) 45 else 0) +
+                                (if (guess.name.length >= 3) 35 else 0) +
+                                result.textBlocks.size.coerceAtMost(5) * 4
+                            ).coerceIn(0, 100)
+                        val signature = guess.name.lowercase() + "|" + guess.localId.orEmpty().lowercase()
+                        if (!fromBatch || (confidence >= 45 && signature != lastSignature.get())) {
+                            lastSignature.set(signature)
+                            mainHandler.post {
+                                onResult(
+                                    ScannerOcrResult(
+                                        text = text,
+                                        confidence = confidence,
+                                        blockCount = result.textBlocks.size,
+                                        guess = guess,
+                                        guesses = listOf(guess),
+                                        trackedObjects = emptyList()
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    .addOnCompleteListener {
+                        proxy.close()
+                        processing.set(false)
+                    }
             }
     }
 
@@ -188,6 +273,7 @@ fun SmartCameraScanner(
         onDispose {
             controller.unbind()
             recognizer.close()
+            objectDetector.close()
             executor.shutdown()
         }
     }
