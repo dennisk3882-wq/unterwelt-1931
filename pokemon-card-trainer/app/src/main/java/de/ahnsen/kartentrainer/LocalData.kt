@@ -282,7 +282,9 @@ class LocalAppStore(context: Context) {
                     CollectionEntry(
                         card = cardFromJson(card),
                         quantity = o.optInt("quantity", 1).coerceAtLeast(1),
-                        variant = o.optString("variant", "Normal")
+                        variant = o.optString("variant", "Normal"),
+                        language = o.optString("language", "DE"),
+                        condition = o.optString("condition", "NM")
                     )
                 )
             }
