@@ -19,22 +19,12 @@ class MainActivitySmokeTest {
         composeRule.onNodeWithText("Mit echten Karten lernen und spielen").assertIsDisplayed()
         composeRule.onNodeWithText("Karten scannen").assertIsDisplayed()
         composeRule.onNodeWithText("Meine Karten").assertIsDisplayed()
-        composeRule.onNodeWithText("Deck-Werkstatt").assertIsDisplayed()
-        composeRule.onNodeWithText("KI-Trainer").assertIsDisplayed()
-        composeRule.onNodeWithText("2-Spieler-Tischhelfer").assertIsDisplayed()
-        composeRule.onNodeWithText("Profile & lokales Backup").assertIsDisplayed()
     }
 
     @Test
-    fun learningNavigationOpensGuidedArea() {
-        composeRule.onNodeWithText("Spielen lernen").performClick()
-        composeRule.onNodeWithText("Regelkurs").assertIsDisplayed()
-        composeRule.onNodeWithText("Geführtes Erstspiel").assertIsDisplayed()
-    }
-
-    @Test
-    fun deckNavigationOpensWorkshop() {
-        composeRule.onNodeWithText("Deck-Werkstatt").performClick()
-        composeRule.onNodeWithText("Deck-Werkstatt 2.0").assertIsDisplayed()
+    fun scannerNavigationOpensLiveScannerArea() {
+        composeRule.onNodeWithText("Karten scannen").performClick()
+        composeRule.onNodeWithText("1. Karten scannen").assertIsDisplayed()
+        composeRule.onNodeWithText("Einzelscan").assertIsDisplayed()
     }
 }
