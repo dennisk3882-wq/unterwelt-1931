@@ -1737,24 +1737,44 @@ class FullGameEngine(
         addAll(side.bench)
     }
 
-    private fun energyNeedScore(pokemon: FullPokemonState): Double {
+    private fun energyNeedScore(
+        pokemon: FullPokemonState,
+        candidateEnergy: FullGameCard? = null
+    ): Double {
         val attacks = pokemon.card.attacks
         if (attacks.isEmpty()) return 0.0
         val before = attacks.maxOfOrNull { attack ->
-            if (pokemon.energy >= max(1, attack.cost.size)) estimatedAttackDamage(attack, pokemon.energy).toDouble() else 0.0
+            if (canPayAttack(pokemon, attack)) {
+                estimatedAttackDamage(attack, pokemon.energy).toDouble()
+            } else 0.0
         } ?: 0.0
-        val afterEnergy = pokemon.energy + 1
-        val after = attacks.maxOfOrNull { attack ->
-            if (afterEnergy >= max(1, attack.cost.size)) estimatedAttackDamage(attack, afterEnergy).toDouble() else 0.0
-        } ?: 0.0
-        val unlockBonus = if (after > before) 55.0 else 0.0
-        return (after - before) + unlockBonus + boardCardScore(pokemon.card) * 0.08
+
+        val after = if (candidateEnergy != null) {
+            attacks.maxOfOrNull { attack ->
+                if (canPayAttackWithExtra(pokemon, attack, candidateEnergy)) {
+                    estimatedAttackDamage(attack, pokemon.energy + energyUnits(candidateEnergy).size).toDouble()
+                } else 0.0
+            } ?: 0.0
+        } else {
+            before
+        }
+
+        val unlockBonus = if (after > before) 65.0 else 0.0
+        val missingColorPenalty = attacks.minOfOrNull { attack ->
+            attack.cost.count { cost ->
+                val need = normalizeEnergyType(cost)
+                need != "Colorless" &&
+                    pokemon.energyTypes.none { it == need || it == "Any" }
+            }
+        } ?: 0
+        return (after - before) + unlockBonus - missingColorPenalty * 8 +
+            boardCardScore(pokemon.card) * 0.08
     }
 
     private fun boardPokemonScore(pokemon: FullPokemonState, enemy: FullPokemonState?): Double {
         val healthRatio = pokemon.hp.toDouble() / max(1, pokemon.card.hp ?: 100)
         val bestReady = pokemon.card.attacks
-            .filter { pokemon.energy >= max(1, it.cost.size) }
+            .filter { canPayAttack(pokemon, it) }
             .maxOfOrNull { attack ->
                 if (enemy == null) estimatedAttackDamage(attack, pokemon.energy)
                 else expectedDamage(pokemon, enemy, attack)
