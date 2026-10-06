@@ -1,5 +1,3 @@
-@file:OptIn(androidx.camera.core.ExperimentalGetImage::class)
-
 package de.ahnsen.kartentrainer
 
 import android.Manifest
@@ -122,7 +120,7 @@ fun SmartCameraScanner(
     val lastAnalyzeAt = remember { AtomicLong(0L) }
     val lastSignature = remember { AtomicReference("") }
 
-    @OptIn(ExperimentalGetImage::class)
+    @ExperimentalGetImage
     fun processImage(proxy: ImageProxy, fromBatch: Boolean) {
         val mediaImage = proxy.image
         if (mediaImage == null) {
