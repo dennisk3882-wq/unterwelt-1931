@@ -120,7 +120,7 @@ fun SmartCameraScanner(
     val lastAnalyzeAt = remember { AtomicLong(0L) }
     val lastSignature = remember { AtomicReference("") }
 
-    @ExperimentalGetImage
+    @androidx.annotation.OptIn(markerClass = ExperimentalGetImage::class)
     fun processImage(proxy: ImageProxy, fromBatch: Boolean) {
         val mediaImage = proxy.image
         if (mediaImage == null) {
