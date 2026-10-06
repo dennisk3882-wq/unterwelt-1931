@@ -51,6 +51,16 @@ jobs:
         working-directory: pokemon-card-trainer
         run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 
+      - name: Enable KVM group perms
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm
+          ls -l /dev/kvm
+
       - name: Compose instrumentation smoke tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -58,6 +68,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
+          emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: cd pokemon-card-trainer && gradle --no-daemon :app:connectedDebugAndroidTest
 
       - name: Apply stable development signature
