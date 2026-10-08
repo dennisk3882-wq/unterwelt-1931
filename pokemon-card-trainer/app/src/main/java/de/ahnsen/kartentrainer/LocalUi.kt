@@ -136,11 +136,16 @@ fun AdvancedCollectionScreen(
         item {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = KidPalette.SoftPurple
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Sammlungsanalyse", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        "✨ Meine Sammlung",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = KidPalette.Purple
+                    )
                     Spacer(Modifier.height(8.dp))
                     Row(
                         Modifier.fillMaxWidth(),
