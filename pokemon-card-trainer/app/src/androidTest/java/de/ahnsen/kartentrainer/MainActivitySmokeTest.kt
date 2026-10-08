@@ -16,7 +16,7 @@ class MainActivitySmokeTest {
 
     @Test
     fun homeScreenShowsCoreNavigation() {
-        composeRule.onNodeWithText("Mit echten Karten lernen und spielen").assertIsDisplayed()
+        composeRule.onNodeWithText("Dein Karten-Abenteuer").assertIsDisplayed()
         composeRule.onNodeWithText("Karten scannen").assertIsDisplayed()
         composeRule.onNodeWithText("Meine Karten").assertIsDisplayed()
     }
