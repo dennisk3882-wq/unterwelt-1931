@@ -1,13 +1,28 @@
 package de.ahnsen.kartentrainer
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -51,10 +66,100 @@ fun kidBackgroundBrush(): Brush = Brush.verticalGradient(
 
 @Composable
 fun KidScreenBackground(content: @Composable BoxScope.() -> Unit) {
+    Box(Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(R.drawable.cardworld_bg),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            alpha = 0.34f
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xDDF3FAFF),
+                            Color(0xDDF7F2FF),
+                            Color(0xE8FFF7EE)
+                        )
+                    )
+                )
+        )
+        content()
+    }
+}
+
+@Composable
+fun KidHeroBanner(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    accent: Color = KidPalette.Ocean
+) {
     Box(
-        Modifier
-            .fillMaxSize()
-            .background(kidBackgroundBrush()),
-        content = content
-    )
+        modifier = modifier
+            .fillMaxWidth()
+            .height(154.dp)
+            .clip(RoundedCornerShape(28.dp))
+    ) {
+        Image(
+            painter = painterResource(R.drawable.cardworld_bg),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            accent.copy(alpha = 0.88f),
+                            accent.copy(alpha = 0.48f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(18.dp)
+                .fillMaxWidth(0.76f)
+        ) {
+            Text(
+                title,
+                color = Color.White,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                subtitle,
+                color = Color.White.copy(alpha = 0.95f),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+fun KidTipCard(
+    title: String,
+    text: String,
+    modifier: Modifier = Modifier,
+    container: Color = Color.White.copy(alpha = 0.90f)
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = container)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text(title, fontWeight = FontWeight.ExtraBold, color = KidPalette.Ink)
+            Spacer(Modifier.height(3.dp))
+            Text(text, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
 }
