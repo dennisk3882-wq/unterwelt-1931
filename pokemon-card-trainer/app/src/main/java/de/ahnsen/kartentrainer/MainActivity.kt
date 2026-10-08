@@ -666,11 +666,24 @@ private fun ScanScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            KidHeroBanner(
+                title = "📸 Zeig mir deine Karte!",
+                subtitle = "Lege eine echte Karte in den Rahmen. Ich erkenne sie und mache daraus eine schöne digitale Karte.",
+                modifier = Modifier.fillMaxWidth(),
+                accent = KidPalette.Ocean
+            )
+            Spacer(Modifier.height(10.dp))
+            KidTipCard(
+                title = "So klappt es am besten",
+                text = "1. Karte flach hinlegen  •  2. Gute Beleuchtung  •  3. Ganze Karte in den Rahmen  •  4. Kurz stillhalten"
+            )
+            Spacer(Modifier.height(10.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.90f))
+            ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("1. Karten scannen", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Live-Kamera mit Autofokus. Im Batchmodus einfach nacheinander Karten in den Rahmen legen.")
-                    Spacer(Modifier.height(8.dp))
+                    Text("Scan-Modus", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.height(4.dp))
                     FilterChip(
                         selected = batchMode,
                         onClick = { batchMode = !batchMode },
@@ -784,7 +797,7 @@ private fun ScanScreen(
         }
 
         item {
-            Text("Oder manuell nachschlagen", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("🔎 Karte nur nachschlagen", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(
                 value = query,
