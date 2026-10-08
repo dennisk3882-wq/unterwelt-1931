@@ -73,7 +73,7 @@ fun PhysicalFullGameScreen(
         item {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = KidPalette.SoftGreen
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
@@ -81,9 +81,10 @@ fun PhysicalFullGameScreen(
                         Icon(Icons.Default.CameraAlt, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            "Echte Karten · Vollspiel 2.0",
+                            "📸 Deine echten Karten im Duell",
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.ExtraBold,
+                            color = KidPalette.Leaf
                         )
                     }
                     Text(
@@ -198,7 +199,7 @@ fun PhysicalFullGameScreen(
                     if (advice != null) {
                         Card(
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                                containerColor = KidPalette.SoftYellow
                             )
                         ) {
                             Column(Modifier.padding(12.dp)) {
@@ -344,7 +345,7 @@ fun PhysicalFullGameScreen(
                 item {
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                            containerColor = KidPalette.SoftYellow
                         )
                     ) {
                         Column(Modifier.padding(16.dp)) {
