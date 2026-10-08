@@ -223,14 +223,19 @@ fun TwoPlayerHelperScreen(
         item {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = KidPalette.SoftBlue
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Row {
                         Icon(Icons.Default.Groups, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("2-Spieler-Tischhelfer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            "🎮 2-Spieler-Abenteuer",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = KidPalette.Ocean
+                        )
                     }
                     Text("Lokaler Schiedsrichter für zwei echte Spieler: Karten scannen, KP, Energie, Bank, Preise und Züge verfolgen.")
                 }
