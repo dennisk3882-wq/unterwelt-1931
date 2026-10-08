@@ -101,16 +101,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp pokemon-card-trainer/app/build/outputs/apk/debug/app-debug.apk dist/TCG-Karten-Coach-2.2.0.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose dist/TCG-Karten-Coach-2.2.0.apk
-          sha256sum dist/TCG-Karten-Coach-2.2.0.apk | tee dist/TCG-Karten-Coach-2.2.0.sha256
+          cp pokemon-card-trainer/app/build/outputs/apk/debug/app-debug.apk dist/TCG-Karten-Coach-2.3.0.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose dist/TCG-Karten-Coach-2.3.0.apk
+          sha256sum dist/TCG-Karten-Coach-2.3.0.apk | tee dist/TCG-Karten-Coach-2.3.0.sha256
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TCG-Karten-Coach-2.2.0
+          name: TCG-Karten-Coach-2.3.0
           path: |
-            dist/TCG-Karten-Coach-2.2.0.apk
-            dist/TCG-Karten-Coach-2.2.0.sha256
+            dist/TCG-Karten-Coach-2.3.0.apk
+            dist/TCG-Karten-Coach-2.3.0.sha256
           if-no-files-found: error
           retention-days: 14
