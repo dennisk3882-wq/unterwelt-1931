@@ -71,9 +71,17 @@ fun PhysicalFullGameScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
+            KidHeroBanner(
+                title = "📸 Echte Karten – echtes Duell",
+                subtitle = "Lege deine Karten auf den Tisch. Die Kamera erkennt sie und die App hilft beim Spielen.",
+                accent = KidPalette.Leaf
+            )
+        }
+
+        item {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = KidPalette.SoftGreen
+                    containerColor = KidPalette.SoftGreen.copy(alpha = 0.90f)
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
