@@ -198,7 +198,7 @@ private fun KartenCoachApp() {
             AppScreen.SCAN -> ScanScreen(
                 padding = padding,
                 repository = repository,
-                onAdd = { card, variant ->
+                onAdd = { card, variant, scannedAt ->
                     val index = collection.indexOfFirst {
                         it.card.id == card.id &&
                             it.variant == variant &&
@@ -207,9 +207,21 @@ private fun KartenCoachApp() {
                     }
                     val updated = collection.toMutableList()
                     if (index >= 0) {
-                        updated[index] = updated[index].copy(quantity = updated[index].quantity + 1)
+                        updated[index] = updated[index].copy(
+                            quantity = updated[index].quantity + 1,
+                            scanVerified = true,
+                            lastScannedAt = scannedAt
+                        )
                     } else {
-                        updated += CollectionEntry(card, 1, variant, "DE", "NM")
+                        updated += CollectionEntry(
+                            card = card,
+                            quantity = 1,
+                            variant = variant,
+                            language = "DE",
+                            condition = "NM",
+                            scanVerified = true,
+                            lastScannedAt = scannedAt
+                        )
                     }
                     replaceCollection(updated)
                     playerStats = playerStats.copy(scannedCards = playerStats.scannedCards + 1)
@@ -469,7 +481,7 @@ private fun CameraOcrButton(
 private fun ScanScreen(
     padding: PaddingValues,
     repository: TcgDexRepository,
-    onAdd: (CardData, String) -> Unit
+    onAdd: (CardData, String, Long) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var localId by rememberSaveable { mutableStateOf("") }
@@ -480,9 +492,14 @@ private fun ScanScreen(
     var message by remember { mutableStateOf("Fotografiere möglichst nur eine Karte und fülle den Bildausschnitt gut aus.") }
     var batchMode by rememberSaveable { mutableStateOf(false) }
     var lastConfidence by rememberSaveable { mutableIntStateOf(0) }
+    var cameraCandidateIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var lastOwnershipScanAt by rememberSaveable { mutableStateOf<Long?>(null) }
     val scope = rememberCoroutineScope()
+    val scanContext = androidx.compose.ui.platform.LocalContext.current
 
     fun runSearch() {
+        cameraCandidateIds = emptySet()
+        lastOwnershipScanAt = null
         if (query.isBlank() && localId.isBlank()) {
             message = "Gib einen Kartennamen ein oder scanne eine Karte."
             return
@@ -548,12 +565,16 @@ private fun ScanScreen(
                                 }
                                 val candidates = merged.values.toList()
                                 results = candidates
+                                cameraCandidateIds = candidates.map { it.id }.toSet()
+                                lastOwnershipScanAt = System.currentTimeMillis()
                                 if (batchMode && scan.confidence >= 75 && candidates.size == 1) {
                                     val card = runCatching { repository.getCard(candidates.first().id) }.getOrNull()
                                     if (card != null) {
                                         val variant = card.availableVariants().firstOrNull() ?: "Normal"
-                                        onAdd(card, variant)
-                                        message = card.name + " automatisch hinzugefügt · Sicherheit " + scan.confidence + "%. Nächste Karte einlegen."
+                                        CardImageCache.prefetch(scanContext, card)
+                                        onAdd(card, variant, lastOwnershipScanAt ?: System.currentTimeMillis())
+                                        message = card.name + " automatisch als eigene Karte bestätigt · Sicherheit " + scan.confidence +
+                                            "%. Originalbild wurde für Sammlung und Spiel vorgeladen. Nächste Karte einlegen."
                                         results = emptyList()
                                     } else {
                                         message = "Kartendetails konnten nicht geladen werden."
@@ -587,11 +608,18 @@ private fun ScanScreen(
                                     )
                                 }.getOrDefault(emptyList())
                                 results = candidates
+                                cameraCandidateIds = candidates.map { it.id }.toSet()
+                                lastOwnershipScanAt = System.currentTimeMillis()
                                 if (candidates.size == 1) {
                                     val card = runCatching { repository.getCard(candidates.first().id) }.getOrNull()
                                     if (card != null) {
-                                        onAdd(card, card.availableVariants().firstOrNull() ?: "Normal")
-                                        message = card.name + " aus Präzisionsscan hinzugefügt."
+                                        CardImageCache.prefetch(scanContext, card)
+                                        onAdd(
+                                            card,
+                                            card.availableVariants().firstOrNull() ?: "Normal",
+                                            lastOwnershipScanAt ?: System.currentTimeMillis()
+                                        )
+                                        message = card.name + " aus Präzisionsscan als eigene Karte bestätigt; Originalbild vorgeladen."
                                         results = emptyList()
                                     } else {
                                         message = "Kartendetails konnten nicht geladen werden."
@@ -619,7 +647,7 @@ private fun ScanScreen(
         }
 
         item {
-            Text("Oder manuell suchen", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Oder manuell nachschlagen", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(
                 value = query,
@@ -640,7 +668,7 @@ private fun ScanScreen(
             OutlinedButton(onClick = { runSearch() }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Search, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Karte suchen")
+                Text("Karte nur nachschlagen")
             }
         }
 
@@ -696,13 +724,19 @@ private fun ScanScreen(
     }
 
     selected?.let { card ->
+        val scanVerified = card.id in cameraCandidateIds && lastOwnershipScanAt != null
         CardDetailDialog(
             card = card,
+            canAddToCollection = scanVerified,
             onDismiss = { selected = null },
             onAdd = { variant ->
-                onAdd(card, variant)
-                message = card.name + " (" + variant + ") wurde zur Sammlung hinzugefügt."
-                selected = null
+                val scannedAt = lastOwnershipScanAt ?: return@CardDetailDialog
+                scope.launch {
+                    CardImageCache.prefetch(scanContext, card)
+                    onAdd(card, variant, scannedAt)
+                    message = card.name + " (" + variant + ") wurde als gescannte eigene Karte zur Sammlung hinzugefügt."
+                    selected = null
+                }
             }
         )
     }
@@ -718,6 +752,7 @@ private fun InfoCard(text: String) {
 @Composable
 private fun CardDetailDialog(
     card: CardData,
+    canAddToCollection: Boolean,
     onDismiss: () -> Unit,
     onAdd: (String) -> Unit
 ) {
@@ -834,6 +869,15 @@ private fun CardDetailDialog(
                 card.priceLow?.let { Text("Niedriger Cardmarket-Preis: " + it.euro(), style = MaterialTheme.typography.bodySmall) }
                 card.priceTrend?.let { Text("Cardmarket-Trend: " + it.euro(), style = MaterialTheme.typography.bodySmall) }
                 Text(
+                    if (canAddToCollection) {
+                        "✓ Besitz durch Kamerascan bestätigt. Für die App wird das saubere Originalkartenbild verwendet."
+                    } else {
+                        "Nur nachgeschlagen: Zum Hinzufügen muss diese Karte zuerst mit der Handykamera gescannt werden."
+                    },
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (canAddToCollection) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary
+                )
+                Text(
                     "Preis ist eine Markt-Schätzung und kein garantierter Verkaufswert. Zustand, Sprache, Auflage und Variante können den echten Wert stark verändern.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -841,10 +885,13 @@ private fun CardDetailDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onAdd(variant) }) {
+            Button(
+                enabled = canAddToCollection,
+                onClick = { onAdd(variant) }
+            ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
-                Text("Zur Sammlung")
+                Text(if (canAddToCollection) "Gescannt → zur Sammlung" else "Erst scannen")
             }
         },
         dismissButton = {
