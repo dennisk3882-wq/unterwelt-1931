@@ -69,6 +69,12 @@ fun AdvancedLearnScreen(padding: PaddingValues) {
             .fillMaxSize()
             .padding(padding)
     ) {
+        KidHeroBanner(
+            title = "🎓 Karten-Abenteuer lernen",
+            subtitle = "Kurze Schritte, große Buttons und Vorlesen. Du musst nichts auswendig können!",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            accent = KidPalette.Purple
+        )
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
