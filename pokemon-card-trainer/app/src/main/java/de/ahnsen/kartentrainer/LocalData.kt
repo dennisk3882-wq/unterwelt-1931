@@ -291,7 +291,11 @@ class LocalAppStore(context: Context) {
                         quantity = o.optInt("quantity", 1).coerceAtLeast(1),
                         variant = o.optString("variant", "Normal"),
                         language = o.optString("language", "DE"),
-                        condition = o.optString("condition", "NM")
+                        condition = o.optString("condition", "NM"),
+                        scanVerified = o.optBoolean("scanVerified", true),
+                        lastScannedAt = if (o.has("lastScannedAt") && !o.isNull("lastScannedAt")) {
+                            o.optLong("lastScannedAt")
+                        } else null
                     )
                 )
             }
