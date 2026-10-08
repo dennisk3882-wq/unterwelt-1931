@@ -24,7 +24,7 @@ class MainActivitySmokeTest {
     @Test
     fun scannerNavigationOpensLiveScannerArea() {
         composeRule.onNodeWithText("Karten scannen").performClick()
-        composeRule.onNodeWithText("1. Karten scannen").assertIsDisplayed()
+        composeRule.onNodeWithText("📸 Zeig mir deine Karte!").assertIsDisplayed()
         composeRule.onNodeWithText("Einzelscan").assertIsDisplayed()
     }
 }
