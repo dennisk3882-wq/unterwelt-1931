@@ -173,14 +173,19 @@ fun AdvancedDeckWorkshopScreen(
         item {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = KidPalette.SoftPink
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Style, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Deck-Werkstatt 2.0", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            "🧩 Deck-Werkstatt",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = KidPalette.Pink
+                        )
                     }
                     Text("Automatisch optimieren, manuell bearbeiten, analysieren und mehrere Decks lokal speichern.")
                 }
@@ -391,9 +396,9 @@ private fun AnalysisCard(analysis: DeckAnalysis) {
     Card(
         colors = CardDefaults.cardColors(
             containerColor = if (analysis.legality >= 100 && analysis.totalCards == 60) {
-                MaterialTheme.colorScheme.tertiaryContainer
+                KidPalette.SoftGreen
             } else {
-                MaterialTheme.colorScheme.secondaryContainer
+                KidPalette.SoftYellow
             }
         )
     ) {
