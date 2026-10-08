@@ -134,9 +134,17 @@ fun AdvancedCollectionScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
+            KidHeroBanner(
+                title = "✨ Deine Kartenwelt",
+                subtitle = "Hier siehst du nur Karten, die du wirklich gescannt hast. Sammle Sets, entdecke Lieblingskarten und baue Decks.",
+                accent = KidPalette.Purple
+            )
+        }
+
+        item {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = KidPalette.SoftPurple
+                    containerColor = KidPalette.SoftPurple.copy(alpha = 0.90f)
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
