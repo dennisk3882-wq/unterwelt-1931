@@ -221,9 +221,17 @@ fun TwoPlayerHelperScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
+            KidHeroBanner(
+                title = "🎮 Zwei Spieler – ein Tisch!",
+                subtitle = "Die App zählt Preise, KP und Energie. Ihr konzentriert euch einfach aufs Spielen.",
+                accent = KidPalette.Ocean
+            )
+        }
+
+        item {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = KidPalette.SoftBlue
+                    containerColor = KidPalette.SoftBlue.copy(alpha = 0.90f)
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
