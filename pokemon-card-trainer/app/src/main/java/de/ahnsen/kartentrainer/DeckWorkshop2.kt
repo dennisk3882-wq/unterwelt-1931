@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import java.util.UUID
 
 @Composable
@@ -252,6 +253,12 @@ fun AdvancedDeckWorkshopScreen(
                     Modifier.padding(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    AsyncImage(
+                        model = choice.card.imageUrl,
+                        contentDescription = choice.card.name,
+                        modifier = Modifier.width(54.dp).height(76.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
                     Text(choice.quantity.toString() + "×", fontWeight = FontWeight.Bold, modifier = Modifier.width(34.dp))
                     Column(Modifier.weight(1f)) {
                         Text(choice.card.name, fontWeight = FontWeight.SemiBold)
@@ -295,6 +302,12 @@ fun AdvancedDeckWorkshopScreen(
                     Modifier.padding(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    AsyncImage(
+                        model = entry.card.imageUrl,
+                        contentDescription = entry.card.name,
+                        modifier = Modifier.width(48.dp).height(68.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
                         Text(entry.card.name, fontWeight = FontWeight.SemiBold)
                         Text(
