@@ -349,21 +349,68 @@ private fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(30.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(KidPalette.HeroA, KidPalette.HeroB, KidPalette.HeroC)
+                        )
+                    )
+                    .padding(22.dp)
             ) {
-                Column(Modifier.padding(18.dp)) {
-                    Text("Mit echten Karten lernen und spielen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(6.dp))
-                    Text("Scanne eure echten Karten mit der Handykamera. Nur gescannte Karten zählen als eigener Besitz; danach nutzt die App automatisch das saubere Originalkartenbild für Sammlung, Deck und Spiel.")
-                    Spacer(Modifier.height(14.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                        Stat("Karten", cardCount.toString())
-                        Stat("Standard", standardCount.toString())
-                        Stat("Wert", if (hideValues) "🔒" else if (totalValue > 0.0) totalValue.euro() else "–")
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.20f)
+                        ) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.padding(12.dp).size(30.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                "Dein Karten-Abenteuer",
+                                color = Color.White,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Text(
+                                "Scannen · Sammeln · Lernen · Spielen",
+                                color = Color.White.copy(alpha = 0.90f),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Nur deine wirklich gescannten Karten kommen ins Spiel. Danach zeigt die App automatisch das saubere Originalkartenbild.",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FunStat("🃏", "Karten", cardCount.toString(), Modifier.weight(1f))
+                        FunStat("⚡", "Standard", standardCount.toString(), Modifier.weight(1f))
+                        FunStat("⭐", "Wert", if (hideValues) "🔒" else if (totalValue > 0.0) totalValue.euro() else "–", Modifier.weight(1f))
                     }
                 }
             }
+        }
+
+        item {
+            Text(
+                "Was möchtest du machen?",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = KidPalette.Ink
+            )
         }
 
         item {
@@ -371,6 +418,7 @@ private fun HomeScreen(
                 icon = Icons.Default.CameraAlt,
                 title = "Karten scannen",
                 subtitle = "Foto aufnehmen, Karte erkennen, Variante wählen und Sammlung aufbauen.",
+                accent = KidPalette.Ocean,
                 onClick = { onOpen(AppScreen.SCAN) }
             )
         }
@@ -379,6 +427,7 @@ private fun HomeScreen(
                 icon = Icons.Default.Collections,
                 title = "Meine Karten",
                 subtitle = "Alle Karten, Sets, Mengen, Spielbarkeit und Einzelwerte ansehen.",
+                accent = KidPalette.Purple,
                 onClick = { onOpen(AppScreen.COLLECTION) }
             )
         }
@@ -387,6 +436,7 @@ private fun HomeScreen(
                 icon = Icons.Default.School,
                 title = "Spielen lernen",
                 subtitle = "Kindgerechter Kurs von der ersten Hand bis zu Preisen und Sieg.",
+                accent = KidPalette.Sun,
                 onClick = { onOpen(AppScreen.LEARN) }
             )
         }
@@ -395,6 +445,7 @@ private fun HomeScreen(
                 icon = Icons.Default.Style,
                 title = "Deck-Werkstatt",
                 subtitle = "Prüft gemischte Sets, 60-Karten-Regel, Viererlimit und aktuelle Zulässigkeit.",
+                accent = KidPalette.Pink,
                 onClick = { onOpen(AppScreen.DECK) }
             )
         }
@@ -403,6 +454,7 @@ private fun HomeScreen(
                 icon = Icons.Default.SmartToy,
                 title = "KI-Trainer",
                 subtitle = "60-Karten-Vollspiel, strategische Arena, vier KI-Stufen, Zugerklärung, KI-Coach und echte Karten mit Kamera.",
+                accent = KidPalette.Fire,
                 onClick = { onOpen(AppScreen.AI) }
             )
         }
@@ -411,6 +463,7 @@ private fun HomeScreen(
                 icon = Icons.Default.Euro,
                 title = "Sammlerwert",
                 subtitle = "Cardmarket-Schätzwerte nach Normal, Reverse und Holo im Überblick.",
+                accent = KidPalette.Leaf,
                 onClick = { onOpen(AppScreen.PRICES) }
             )
         }
@@ -420,6 +473,7 @@ private fun HomeScreen(
                 icon = Icons.Default.Groups,
                 title = "2-Spieler-Tischhelfer",
                 subtitle = "Zwei echte Spieler: Live-Scan, KP, Energie, Bank, Preise und Zugwechsel lokal verfolgen.",
+                accent = Color(0xFF28B6C8),
                 onClick = { onOpen(AppScreen.TWO_PLAYER) }
             )
         }
@@ -429,6 +483,7 @@ private fun HomeScreen(
                 icon = Icons.Default.Settings,
                 title = "Profile & lokales Backup",
                 subtitle = "Mehrere Spielerprofile, Statistiken sowie JSON-Export und Restore – ohne Cloud.",
+                accent = Color(0xFF67748D),
                 onClick = { onOpen(AppScreen.SETTINGS) }
             )
         }
@@ -453,22 +508,70 @@ private fun Stat(label: String, value: String) {
 }
 
 @Composable
-private fun HomeTile(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
-    OutlinedCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+private fun FunStat(emoji: String, label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White.copy(alpha = 0.18f)
+    ) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 10.dp)) {
+            Text(emoji, style = MaterialTheme.typography.titleMedium)
+            Text(value, color = Color.White, fontWeight = FontWeight.ExtraBold)
+            Text(label, color = Color.White.copy(alpha = 0.86f), style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+@Composable
+private fun HomeTile(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    accent: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.94f)),
+        border = BorderStroke(2.dp, accent.copy(alpha = 0.35f))
+    ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+                shape = RoundedCornerShape(20.dp),
+                color = accent
             ) {
-                Icon(icon, contentDescription = null, modifier = Modifier.padding(12.dp).size(28.dp))
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.padding(14.dp).size(30.dp)
+                )
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = KidPalette.Ink
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(shape = CircleShape, color = accent.copy(alpha = 0.12f)) {
+                Icon(
+                    Icons.Default.ArrowForward,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.padding(8.dp).size(20.dp)
+                )
             }
         }
     }
