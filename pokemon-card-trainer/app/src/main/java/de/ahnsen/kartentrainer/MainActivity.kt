@@ -68,6 +68,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -156,6 +157,10 @@ private fun KartenCoachApp() {
     }
     var playerStats by remember(activeProfileId) {
         mutableStateOf(localStore.stats(activeProfileId))
+    }
+
+    LaunchedEffect(activeProfileId, collection.map { it.card.id }) {
+        CardImageCache.prefetch(context.applicationContext, collection.map { it.card })
     }
     var screenName by rememberSaveable { mutableStateOf(AppScreen.HOME.name) }
     val screen = AppScreen.valueOf(screenName)
@@ -321,7 +326,7 @@ private fun HomeScreen(
                 Column(Modifier.padding(18.dp)) {
                     Text("Mit echten Karten lernen und spielen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
-                    Text("Scanne eure Karten, erfahre Set, Regeln und Marktwert, baue daraus ein Deck und trainiere gegen die KI.")
+                    Text("Scanne eure echten Karten mit der Handykamera. Nur gescannte Karten zählen als eigener Besitz; danach nutzt die App automatisch das saubere Originalkartenbild für Sammlung, Deck und Spiel.")
                     Spacer(Modifier.height(14.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                         Stat("Karten", cardCount.toString())
@@ -730,12 +735,16 @@ private fun ScanScreen(
             canAddToCollection = scanVerified,
             onDismiss = { selected = null },
             onAdd = { variant ->
-                val scannedAt = lastOwnershipScanAt ?: return@CardDetailDialog
-                scope.launch {
-                    CardImageCache.prefetch(scanContext, card)
-                    onAdd(card, variant, scannedAt)
-                    message = card.name + " (" + variant + ") wurde als gescannte eigene Karte zur Sammlung hinzugefügt."
-                    selected = null
+                val scannedAt = lastOwnershipScanAt
+                if (scannedAt == null) {
+                    message = "Diese Karte muss zuerst mit der Handykamera gescannt werden."
+                } else {
+                    scope.launch {
+                        CardImageCache.prefetch(scanContext, card)
+                        onAdd(card, variant, scannedAt)
+                        message = card.name + " (" + variant + ") wurde als gescannte eigene Karte zur Sammlung hinzugefügt."
+                        selected = null
+                    }
                 }
             }
         )
