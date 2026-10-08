@@ -24,11 +24,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
@@ -42,6 +44,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Style
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -78,7 +81,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -117,16 +122,31 @@ private enum class AppScreen(val title: String) {
 @Composable
 private fun KartenCoachTheme(content: @Composable () -> Unit) {
     val scheme = lightColorScheme(
-        primary = Color(0xFF2C5F8A),
+        primary = KidPalette.Ocean,
         onPrimary = Color.White,
-        secondary = Color(0xFFB7791F),
-        tertiary = Color(0xFF2F855A),
-        background = Color(0xFFF7F8FC),
-        surface = Color.White,
-        surfaceVariant = Color(0xFFE9EEF5),
-        error = Color(0xFFB3261E)
+        primaryContainer = KidPalette.SoftBlue,
+        onPrimaryContainer = KidPalette.Ink,
+        secondary = KidPalette.Purple,
+        onSecondary = Color.White,
+        secondaryContainer = KidPalette.SoftPurple,
+        onSecondaryContainer = KidPalette.Ink,
+        tertiary = KidPalette.Leaf,
+        onTertiary = Color.White,
+        tertiaryContainer = KidPalette.SoftGreen,
+        onTertiaryContainer = KidPalette.Ink,
+        background = Color.Transparent,
+        onBackground = KidPalette.Ink,
+        surface = Color(0xFFFDFDFF),
+        onSurface = KidPalette.Ink,
+        surfaceVariant = Color(0xFFF0F3FA),
+        onSurfaceVariant = Color(0xFF4D5870),
+        error = Color(0xFFD73A49)
     )
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(
+        colorScheme = scheme,
+        shapes = KidShapes,
+        content = content
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -177,24 +197,32 @@ private fun KartenCoachApp() {
         playerStats = localStore.stats(id)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(screen.title, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    if (screen != AppScreen.HOME) {
-                        IconButton(onClick = { screenName = AppScreen.HOME.name }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+    KidScreenBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            screen.title,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = KidPalette.Ink
+                        )
+                    },
+                    navigationIcon = {
+                        if (screen != AppScreen.HOME) {
+                            IconButton(onClick = { screenName = AppScreen.HOME.name }) {
+                                Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                            }
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent
+                    )
                 )
-            )
-        }
-    ) { padding ->
-        when (screen) {
+            }
+        ) { padding ->
+            when (screen) {
             AppScreen.HOME -> HomeScreen(
                 padding = padding,
                 collection = collection,
@@ -295,6 +323,7 @@ private fun KartenCoachApp() {
                     playerStats = localStore.stats(activeProfileId)
                 }
             )
+            }
         }
     }
 }
