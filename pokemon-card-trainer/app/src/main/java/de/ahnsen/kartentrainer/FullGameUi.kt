@@ -95,9 +95,17 @@ fun FullGameScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
+            KidHeroBanner(
+                title = "⚔️ Dein Karten-Duell",
+                subtitle = "Wähle deine Stärke, starte die Partie und die App führt dich Schritt für Schritt durch deinen Zug.",
+                accent = KidPalette.Fire
+            )
+        }
+
+        item {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = KidPalette.SoftBlue
+                    containerColor = KidPalette.SoftBlue.copy(alpha = 0.90f)
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
