@@ -667,6 +667,14 @@ fun FullBench(bench: List<FullPokemonView>, title: String) {
                 bench.forEach { pokemon ->
                     OutlinedCard(modifier = Modifier.width(160.dp)) {
                         Column(Modifier.padding(8.dp)) {
+                            AsyncImage(
+                                model = pokemon.card.imageUrl,
+                                contentDescription = pokemon.card.name,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp)
+                            )
+                            Spacer(Modifier.height(6.dp))
                             Text(
                                 pokemon.card.name,
                                 maxLines = 1,
@@ -701,14 +709,23 @@ private fun HandCardRow(
     OutlinedCard {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    when {
-                        gameCard.isEnergy() -> Icons.Default.Bolt
-                        gameCard.isTrainer() -> Icons.Default.Style
-                        else -> Icons.Default.Layers
-                    },
-                    contentDescription = null
-                )
+                val art = gameCard.card?.imageUrl
+                if (!art.isNullOrBlank()) {
+                    AsyncImage(
+                        model = art,
+                        contentDescription = gameCard.name,
+                        modifier = Modifier.size(width = 58.dp, height = 82.dp)
+                    )
+                } else {
+                    Icon(
+                        when {
+                            gameCard.isEnergy() -> Icons.Default.Bolt
+                            gameCard.isTrainer() -> Icons.Default.Style
+                            else -> Icons.Default.Layers
+                        },
+                        contentDescription = null
+                    )
+                }
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Text(gameCard.name, fontWeight = FontWeight.Bold)
