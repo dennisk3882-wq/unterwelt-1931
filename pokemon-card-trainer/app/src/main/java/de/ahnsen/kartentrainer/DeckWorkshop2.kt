@@ -171,9 +171,17 @@ fun AdvancedDeckWorkshopScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
+            KidHeroBanner(
+                title = "🧩 Bau dein Traum-Deck",
+                subtitle = "Nimm deine gescannten Karten, probiere Kombinationen aus und lass dir zeigen, was noch besser zusammenpasst.",
+                accent = KidPalette.Pink
+            )
+        }
+
+        item {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = KidPalette.SoftPink
+                    containerColor = KidPalette.SoftPink.copy(alpha = 0.90f)
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
