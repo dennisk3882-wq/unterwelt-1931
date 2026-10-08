@@ -40,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -285,7 +286,7 @@ fun SmartCameraScanner(
         if (!permissionGranted) {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    containerColor = KidPalette.SoftYellow
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
@@ -304,7 +305,8 @@ fun SmartCameraScanner(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(390.dp),
+                    .height(390.dp)
+                    .clip(RoundedCornerShape(28.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 val cameraController = controller
@@ -323,14 +325,14 @@ fun SmartCameraScanner(
                     modifier = Modifier
                         .fillMaxWidth(0.72f)
                         .height(315.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(4.dp, KidPalette.Sun)
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Default.CenterFocusStrong,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = KidPalette.Sun
                         )
                     }
                 }
