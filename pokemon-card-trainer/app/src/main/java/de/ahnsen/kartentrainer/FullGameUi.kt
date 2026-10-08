@@ -97,7 +97,7 @@ fun FullGameScreen(
         item {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = KidPalette.SoftBlue
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
@@ -106,9 +106,10 @@ fun FullGameScreen(
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text(
-                                "Vollspiel-Training",
+                                "⚔️ Karten-Duell",
                                 style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.ExtraBold,
+                                color = KidPalette.Ocean
                             )
                             Text(
                                 "60 Karten, 7er-Starthand, 6 Preiskarten, Hand, Deck, Ablage, Bank, Entwicklung, Trainer, Rückzug, Sonderzustände und eine planende KI."
@@ -275,7 +276,7 @@ fun FullGameScreen(
                     if (advice != null) {
                         Card(
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                                containerColor = KidPalette.SoftGreen
                             )
                         ) {
                             Column(Modifier.padding(14.dp)) {
