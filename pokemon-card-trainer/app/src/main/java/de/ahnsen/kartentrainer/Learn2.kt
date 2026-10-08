@@ -161,6 +161,14 @@ private fun RuleCourse(modifier: Modifier = Modifier) {
     }
     var index by rememberSaveable { mutableIntStateOf(0) }
     val lesson = lessons[index]
+    val lessonColors = listOf(
+        KidPalette.SoftPurple,
+        KidPalette.SoftBlue,
+        KidPalette.SoftGreen,
+        KidPalette.SoftYellow,
+        KidPalette.SoftPink
+    )
+    val lessonColor = lessonColors[index % lessonColors.size]
 
     var ttsReady by remember { mutableStateOf(false) }
     val tts = remember {
@@ -187,7 +195,7 @@ private fun RuleCourse(modifier: Modifier = Modifier) {
         Card(
             modifier = Modifier.fillMaxWidth().weight(1f),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
+                containerColor = lessonColor
             )
         ) {
             Column(
@@ -195,9 +203,24 @@ private fun RuleCourse(modifier: Modifier = Modifier) {
                     .padding(20.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                Icon(Icons.Default.School, contentDescription = null)
+                Surface(
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = KidPalette.Purple
+                ) {
+                    Icon(
+                        Icons.Default.School,
+                        contentDescription = null,
+                        tint = androidx.compose.ui.graphics.Color.White,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
                 Spacer(Modifier.height(10.dp))
-                Text(lesson.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    lesson.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = KidPalette.Ink
+                )
                 Spacer(Modifier.height(12.dp))
                 Text(lesson.text, style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(18.dp))
@@ -347,7 +370,7 @@ private fun GuidedFirstGame(modifier: Modifier = Modifier) {
         item {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    containerColor = KidPalette.SoftGreen
                 )
             ) {
                 Column(Modifier.padding(16.dp)) {
