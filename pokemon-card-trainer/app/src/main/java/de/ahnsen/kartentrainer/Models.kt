@@ -169,7 +169,9 @@ data class CollectionEntry(
     val quantity: Int,
     val variant: String,
     val language: String = "DE",
-    val condition: String = "NM"
+    val condition: String = "NM",
+    val scanVerified: Boolean = true,
+    val lastScannedAt: Long? = null
 ) {
     fun adjustedUnitValue(): Double? {
         val base = card.estimatedPrice(variant) ?: return null
@@ -243,6 +245,8 @@ fun CollectionEntry.toJson(): JSONObject = JSONObject().apply {
     put("variant", variant)
     put("language", language)
     put("condition", condition)
+    put("scanVerified", scanVerified)
+    put("lastScannedAt", lastScannedAt)
     put("card", card.toJson())
 }
 
