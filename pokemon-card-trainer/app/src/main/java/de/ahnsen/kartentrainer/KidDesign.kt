@@ -1,6 +1,6 @@
 package de.ahnsen.kartentrainer
 
-import androidx.compose.foundation.Image
+import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -21,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -67,8 +66,8 @@ fun kidBackgroundBrush(): Brush = Brush.verticalGradient(
 @Composable
 fun KidScreenBackground(content: @Composable BoxScope.() -> Unit) {
     Box(Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(R.drawable.cardworld_bg),
+        AsyncImage(
+            model = R.drawable.cardworld_bg,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
@@ -104,8 +103,8 @@ fun KidHeroBanner(
             .height(154.dp)
             .clip(RoundedCornerShape(28.dp))
     ) {
-        Image(
-            painter = painterResource(R.drawable.cardworld_bg),
+        AsyncImage(
+            model = R.drawable.cardworld_bg,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
