@@ -288,6 +288,15 @@ fun AdvancedCollectionScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.tertiary
                         )
+                        Text(
+                            if (entry.scanVerified) "✓ Besitz per Kamera bestätigt" else "Nicht per Kamera bestätigt",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (entry.scanVerified) {
+                                MaterialTheme.colorScheme.tertiary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            }
+                        )
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             OutlinedButton(
                                 onClick = {
