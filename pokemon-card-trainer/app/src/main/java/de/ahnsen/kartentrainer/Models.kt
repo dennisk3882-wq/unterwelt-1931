@@ -209,6 +209,8 @@ object OcrParser {
     private val typeOrHeaderWords = listOf(
         "trainer", "unterstützer", "unterstuetzer", "supporter", "item",
         "stadion", "stadium", "ausrüstung", "ausruestung", "tool",
+        "pokémon-ausrüstung", "pokemon-ausrüstung", "pokémon-ausruestung", "pokemon-ausruestung",
+        "pokémon tool", "pokemon tool",
         "energie", "energy", "basis", "basic", "stufe", "stage",
         "illustration", "schwäche", "weakness", "resistenz", "retreat", "rückzug",
         "pokemon", "pokémon", "kp", "hp"
