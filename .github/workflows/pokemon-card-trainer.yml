@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pokemon-card-trainer-android
@@ -114,3 +114,31 @@ jobs:
             dist/TCG-Karten-Coach-2.4.0.sha256
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish downloadable APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="tcg-karten-coach-v2.4.0"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/TCG-Karten-Coach-2.4.0.apk dist/TCG-Karten-Coach-2.4.0.sha256 --clobber
+          else
+            gh release create "$tag" dist/TCG-Karten-Coach-2.4.0.apk dist/TCG-Karten-Coach-2.4.0.sha256 --target "$GITHUB_SHA" --title "TCG Karten-Coach 2.4.0 – Mehrkarten-Scanner" --notes "Mehrere Karten in einem Foto erfassen, OCR pro Karte, TCGdex-Abgleich und kontrollierte Übernahme in Meine Karten. Paketname und Signatur entsprechen der Vorversion."
+          fi
+
+      - name: Record successful build
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build-status
+          echo "Version: 2.4.0" > build-status/pokemon-card-trainer.txt
+          echo "Commit: $GITHUB_SHA" >> build-status/pokemon-card-trainer.txt
+          sha256sum dist/TCG-Karten-Coach-2.4.0.apk >> build-status/pokemon-card-trainer.txt
+          echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/tcg-karten-coach-v2.4.0" >> build-status/pokemon-card-trainer.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add build-status/pokemon-card-trainer.txt
+          git commit -m "Record tested TCG Karten-Coach 2.4.0 build"
+          git push origin HEAD:pokemon-card-trainer-android
