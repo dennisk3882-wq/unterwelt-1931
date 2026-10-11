@@ -24,6 +24,9 @@ internal fun AdvancedMarketScreen(
     onReplaceCollection: (List<CollectionEntry>) -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val apiContext = androidx.compose.ui.platform.LocalContext.current
+    val liveApi = remember(apiContext) { CardmarketLiveApi(apiContext.applicationContext) }
+    var hasLiveKey by remember { mutableStateOf(liveApi.hasKey()) }
     val valuations = collection.map { it to MarketValueEngine.estimate(it) }
     val priced = valuations.filter { it.second.unitPrice != null }
     val knownSum = priced.sumOf { (entry, valuation) -> (valuation.unitPrice ?: 0.0) * entry.quantity }
@@ -98,13 +101,20 @@ internal fun AdvancedMarketScreen(
                 }
             }
         }
+        item {
+            CardmarketKeyPanel(
+                api = liveApi,
+                hasKey = hasLiveKey,
+                onKeyChange = { hasLiveKey = it }
+            )
+        }
         if (collection.isEmpty()) item {
             KidTipCard("Noch keine Karten", "Scanne Karten, dann erscheinen die Bewertungen hier.")
         }
         items(sorted, key = { (entry, _) ->
             entry.card.id + "|" + entry.variant + "|" + entry.language + "|" + entry.condition
         }) { (entry, valuation) ->
-            MarketCardPanel(entry, valuation) { replacement ->
+            MarketCardPanel(entry, valuation, liveApi, hasLiveKey) { replacement ->
                 onReplaceCollection(collection.map {
                     if (it.card.id == entry.card.id && it.variant == entry.variant &&
                         it.language == entry.language && it.condition == entry.condition)
@@ -119,6 +129,8 @@ internal fun AdvancedMarketScreen(
 private fun MarketCardPanel(
     entry: CollectionEntry,
     valuation: MarketValuation,
+    api: CardmarketLiveApi,
+    hasKey: Boolean,
     onChange: (CollectionEntry) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -166,6 +178,7 @@ private fun MarketCardPanel(
                     Text("Vergleichsspanne der EU-Kennzahlen: " + valuation.rangeLow.euro() +
                         " bis " + valuation.rangeHigh.euro(), style = MaterialTheme.typography.bodySmall)
                 MarketTimeline(card, entry.variant)
+                CardmarketPricePanel(entry, hasKey, api, onChange)
                 val usd = when (entry.variant) {
                     "Holo" -> card.usMarketHolo
                     "Reverse" -> card.usMarketReverse
