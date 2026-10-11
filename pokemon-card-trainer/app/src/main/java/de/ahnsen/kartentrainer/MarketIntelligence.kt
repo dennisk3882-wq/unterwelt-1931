@@ -60,12 +60,8 @@ fun CollectionEntry.marketSignal(): MarketSignal {
             append(spreadPercent)
             append("%")
         }
-        val adjusted = adjustedUnitValue()
-        if (adjusted != null) {
-            if (isNotEmpty()) append(" · ")
-            append("Zustand/Sprache berücksichtigt: ")
-            append(adjusted.euro())
-        }
+        if (isNotEmpty()) append(" · ")
+        append("Marktdaten sind nicht automatisch nach Deutsch/Zustand gefiltert")
     }.ifBlank { "Keine ausreichenden Preisfelder für eine belastbare lokale Trendanalyse." }
 
     return MarketSignal(label, detail, spreadPercent, trendPercent)
@@ -81,7 +77,8 @@ fun MarketResearchBlock(
     val query = listOf(
         entry.card.name,
         entry.card.setName,
-        entry.card.localId
+        entry.card.localId,
+        if (entry.language == "DE") "deutsch" else if (entry.language == "EN") "english" else entry.language
     ).filter { it.isNotBlank() }.joinToString(" ")
 
     Column(modifier = modifier.fillMaxWidth()) {
