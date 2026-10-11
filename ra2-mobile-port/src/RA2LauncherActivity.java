@@ -170,7 +170,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.36 · XWIS-Downloadreparatur");
+        version.setText("v0.37 · RA2 VM ohne Wine");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
@@ -269,6 +269,16 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         root.addView(playXwisYuri, matchWrap(dp(7)));
         playXwisRa2.setOnClickListener(v -> launchCommunityGame(false));
         playXwisYuri.setOnClickListener(v -> launchCommunityGame(true));
+
+        TextView vmTitle = label(20, Color.rgb(180, 235, 210));
+        vmTitle.setText("NEUE SPIELENGINE – RA2 + YURI OHNE WINE");
+        root.addView(vmTitle, matchWrap(dp(18)));
+        TextView vmHint = label(13, Color.LTGRAY);
+        vmHint.setText("Experimenteller GPL-Client RA2 VM: nutzt Original-EXEs mit einer eigenen x86-/Win32-Laufzeit. Kampagnen noch nicht vollständig geprüft. Originaldateien bleiben erhalten.");
+        root.addView(vmHint, matchWrap(dp(7)));
+        Button vmLaunch = accentButton("RA2 / YURI MIT NEUER ENGINE TESTEN");
+        root.addView(vmLaunch, matchWrap(dp(12)));
+        vmLaunch.setOnClickListener(v -> startActivity(new Intent(this, RA2VmActivity.class)));
 
         TextView touchInfo = label(13, Color.LTGRAY);
         touchInfo.setTag("touchInfo");

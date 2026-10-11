@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.36-xwis-download-manager
+# build-version: 0.37-ra2vm-offline-experimental
 
 on:
   push:
@@ -72,6 +72,56 @@ jobs:
           cp cd-compatibility/VersionInjector.exe cd-compatibility/version.dll upstream/app/src/main/assets/safedisc/
           cp cd-compatibility/SafeDiscLoader2-* upstream/app/src/main/assets/licenses/
 
+      - name: Checkout pinned GPL RA2 VM engine
+        uses: actions/checkout@v4
+        with:
+          repository: ra2-games/ra2
+          ref: a10ac9899c258b01be1edd80492397e9de225ba5
+          path: ra2vm-upstream
+
+      - name: Set up Node 24 for RA2 VM
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Build the offline RA2/Yuri VM engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global pnpm@11.24.0
+          cd ra2vm-upstream
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("src/ui/pages/game/components/GameSourcePickerView.tsx")
+          s=p.read_text()
+          original='{import.meta.env.DEV && ('
+          new="{(import.meta.env.DEV || window.location.hostname === 'ra2.android.local') && ("
+          assert s.count(original)==1, 'Could not enable offline local game picker'
+          s=s.replace(original,new)
+          original="{t('开发测试')}"
+          new="{window.location.hostname === 'ra2.android.local' ? 'Installierte RA2-/Yuri-Dateien laden' : t('开发测试')}"
+          assert s.count(original)==1, 'Could not label offline local game picker'
+          s=s.replace(original,new)
+          p.write_text(s)
+          # The Android offline origin should not register an independent
+          # service worker that could cache stale user files.
+          p=Path("src/main.ts")
+          s=p.read_text()
+          s=s.replace("if (import.meta.env.PROD && 'serviceWorker' in navigator) {",
+            "if (import.meta.env.PROD && window.location.hostname !== 'ra2.android.local' && 'serviceWorker' in navigator) {")
+          p.write_text(s)
+          PY
+          pnpm install --frozen-lockfile
+          pnpm run build
+          cd ..
+          test -s ra2vm-upstream/dist/index.html
+          test -d ra2vm-upstream/dist/assets
+          mkdir -p upstream/app/src/main/assets/ra2vm
+          cp -a ra2vm-upstream/dist/. upstream/app/src/main/assets/ra2vm/
+          mkdir -p upstream/app/src/main/assets/licenses
+          cp ra2vm-upstream/LICENSE upstream/app/src/main/assets/licenses/RA2VM-GPL-3.0.txt
+          du -sh upstream/app/src/main/assets/ra2vm
+
       - name: Restore Winlator 7.1 runtime asset
         shell: bash
         run: |
@@ -118,6 +168,9 @@ jobs:
           grep -q 'exec_dos_path' upstream/app/src/main/java/com/winlator/XServerDisplayActivity.java
           grep -q 'SUPPORTED_32_BIT_ABIS' upstream/app/src/main/java/com/winlator/RA2LauncherActivity.java
           grep -q 'RA2DiagnosticsActivity' upstream/app/src/main/AndroidManifest.xml
+          grep -q 'RA2VmActivity' upstream/app/src/main/AndroidManifest.xml
+          test -s upstream/app/src/main/assets/ra2vm/index.html
+          test -s upstream/app/src/main/java/com/winlator/RA2VmFiles.java
           test -s upstream/app/src/main/java/com/winlator/RA2DiagnosticsActivity.java
 
       - name: Set up Java 17
