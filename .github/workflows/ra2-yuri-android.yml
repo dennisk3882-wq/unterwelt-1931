@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.27-original-keys
+# build-version: 0.28-original-launcher-probe
 
 on:
   push:

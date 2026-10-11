@@ -155,7 +155,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.27 · Originalschlüssel & Registry-Test");
+        version.setText("v0.28 · Originalstart-Vergleich");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
@@ -213,6 +213,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         playYuriButton = button("");
         root.addView(playRa2Button, matchWrap(dp(18)));
         root.addView(playYuriButton, matchWrap(dp(7)));
+        Button originalStartProbe = button("");
+        originalStartProbe.setTag("originalStartProbeButton");
+        root.addView(originalStartProbe, matchWrap(dp(7)));
+        originalStartProbe.setOnClickListener(v -> launchGame(false, true));
         playRa2Button.setOnClickListener(v -> launchGame(false));
         playYuriButton.setOnClickListener(v -> launchGame(true));
 
@@ -284,6 +288,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         }
         Button diagnostics = root.findViewWithTag("diagnosticsButton");
         if (diagnostics != null) diagnostics.setText(de ? "🩺 Diagnose" : "🩺 Diagnostics");
+        Button originalProbe = root.findViewWithTag("originalStartProbeButton");
+        if (originalProbe != null) originalProbe.setText(de ? "🧪 RA2.EXE-Originalstart testen" : "🧪 Test original RA2.EXE launcher");
         refreshGameState();
     }
 
@@ -1317,15 +1323,17 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-    private void launchGame(boolean yuri) {
+    private void launchGame(boolean yuri) { launchGame(yuri, false); }
+
+    private void launchGame(boolean yuri, boolean originalLauncherProbe) {
         if (container == null) return;
         if (installationBusy || !isInstalled(yuri)) {
             message(isGerman() ? "Spieldateien fehlen. Bitte zuerst Einrichtung abschließen." : "Game files are missing. Complete setup first.");
             return;
         }
 
-        File exe = findIgnoreCase(gameDir(), yuri ? "gamemd.exe" : "game.exe", 2);
-        if (exe == null) {
+        File exe = findIgnoreCase(gameDir(), originalLauncherProbe ? "ra2.exe" : (yuri ? "gamemd.exe" : "game.exe"), 2);
+        if (exe == null && !originalLauncherProbe) {
             exe = findIgnoreCase(gameDir(), yuri ? "ra2md.exe" : "ra2.exe", 2);
         }
         if (exe == null || !exe.isFile()) {
@@ -1336,7 +1344,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
         prefs.edit()
             .putString(yuri ? KEY_YURI_EXE : KEY_RA2_EXE, exe.getAbsolutePath())
-            .putString(KEY_LAST_GAME_LAUNCH, yuri ? "Yuri’s Rache" : "Alarmstufe Rot 2")
+            .putString(KEY_LAST_GAME_LAUNCH, originalLauncherProbe ? "RA2.EXE Originalstart-Test" : (yuri ? "Yuri’s Rache" : "Alarmstufe Rot 2"))
             .putLong(KEY_LAST_GAME_LAUNCH_AT, System.currentTimeMillis())
             .remove("last_launcher_exit_code")
             .remove(KEY_LAST_EXIT_CODE)
@@ -1345,7 +1353,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             .apply();
 
         targetNormalServicesBeforeLaunch();
-        writeLaunchSeed(exe, yuri);
+        writeLaunchSeed(exe, yuri, originalLauncherProbe);
         activateMedia(yuri);
         writeWestwoodRegistry(yuri);
         tuneCncDdraw();
@@ -1356,6 +1364,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         intent.putExtra("exec_path", exe.getAbsolutePath());
         intent.putExtra("ra2_mode", true);
         intent.putExtra("ra2_game_launch", true);
+        intent.putExtra("ra2_launcher_probe", originalLauncherProbe);
         intent.putExtra("ra2_language", isGerman() ? "de" : "en");
         startActivity(intent);
     }
@@ -1370,7 +1379,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         repairRa2Services(container);
     }
 
-    private void writeLaunchSeed(File exe, boolean yuri) {
+    private void writeLaunchSeed(File exe, boolean yuri, boolean originalLauncherProbe) {
         if (container == null) return;
         File log = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/last-start.log");
         File parent = log.getParentFile();
@@ -1382,6 +1391,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
 
         StringBuilder seed = new StringBuilder();
         seed.append("stage=launch-requested\n");
+        seed.append("launchMode=").append(originalLauncherProbe ? "original-launcher-probe" : "direct-engine").append("\n");
         seed.append("title=").append(yuri ? "Yuri's Revenge" : "Red Alert 2").append("\n");
         seed.append("exe=").append(exe.getAbsolutePath()).append("\n");
         seed.append("exeSize=").append(exe.length()).append("\n");

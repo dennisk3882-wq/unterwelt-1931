@@ -1,7 +1,7 @@
 import com.winlator.RA2LaunchBatch;
 public class RA2LaunchBatchTest {
     public static void main(String[] args) throws Exception {
-        for (String target : new String[]{"GAME.EXE", "gamemd.exe"}) {
+        for (String target : new String[]{"GAME.EXE", "gamemd.exe", "ra2.exe", "ra2md.exe"}) {
             String path = "C:\\Westwood\\RA2\\" + target;
             String batch = RA2LaunchBatch.create(path);
             if (!batch.contains("start /wait \"\" \"" + path + "\"\r\n")) throw new AssertionError("GUI child must be awaited");

@@ -661,6 +661,7 @@ def patch_xserver(root: Path) -> None:
     private void startRa2Watchdog() {
         if (!getIntent().getBooleanExtra("ra2_mode", false)) return;
         final boolean gameLaunch = getIntent().getBooleanExtra("ra2_game_launch", false);
+        final boolean launcherProbe = getIntent().getBooleanExtra("ra2_launcher_probe", false);
         final String helperStage = getIntent().getStringExtra("ra2_helper_stage");
         final File liveLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/ra2-live.log");
 
@@ -674,7 +675,22 @@ def patch_xserver(root: Path) -> None:
                 if (gameLaunch) {
                     File result = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/game-exit.txt");
                     Integer code = RA2LaunchBatch.readGameExit(result);
-                    if (code != null) {
+                    if (code != null && launcherProbe) {
+                        // The original RA2.EXE can hand off to GAME.EXE and exit early.
+                        // Do not kill Wine just because the wrapper process has ended.
+                        if (stable == 0) {
+                            stable = 1;
+                            appendRa2Log(liveLog, "stage=original-launcher-returned\\nlauncherProbeExit=" + code + "\\n");
+                        }
+                        if (!ra2GameWindowMapped && System.currentTimeMillis() - started >= 60000L) {
+                            appendRa2Log(liveLog, "stage=original-launcher-probe-timeout\\n");
+                            getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
+                                .putString("last_diag_clue", "RA2.EXE-Originalstart: Innerhalb 60 s kein Spielfenster erkannt.").commit();
+                            requestRa2Exit();
+                            return;
+                        }
+                    }
+                    else if (code != null) {
                             appendRa2Log(liveLog, "stage=game-exited\\ngameExit=" + code + "\\n");
                             getSharedPreferences("ra2_mobile", MODE_PRIVATE).edit()
                                 .putInt("last_exit_code", code)
@@ -843,7 +859,8 @@ def patch_xserver(root: Path) -> None:
         try {
             metadata.put("runId", java.util.UUID.randomUUID().toString());
             metadata.put("startedAt", System.currentTimeMillis());
-            metadata.put("appVersion", "0.27");
+            metadata.put("appVersion", "0.28");
+            metadata.put("launchMode", getIntent().getBooleanExtra("ra2_launcher_probe", false) ? "original-launcher-probe" : "direct-engine");
             metadata.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
             metadata.put("android", android.os.Build.VERSION.RELEASE);
             metadata.put("abis", java.util.Arrays.toString(android.os.Build.SUPPORTED_ABIS));

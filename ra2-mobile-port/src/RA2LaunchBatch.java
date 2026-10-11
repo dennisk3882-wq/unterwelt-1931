@@ -57,11 +57,11 @@ public final class RA2LaunchBatch {
     public static String create(String exe) { return create(exe, false); }
 
     public static String create(String exe, boolean cdCompatibility) {
-        if (exe == null || !exe.matches("(?i)C:\\\\Westwood\\\\RA2\\\\(?:game|gamemd)\\.exe")) {
+        if (exe == null || !exe.matches("(?i)C:\\\\Westwood\\\\RA2\\\\(?:game|gamemd|ra2|ra2md)\\.exe")) {
             throw new IllegalArgumentException("Unexpected game path: " + exe);
         }
         String command = cdCompatibility ? "\"C:\\RA2Mobile\\SafeDisc\\VersionInjector.exe\" \"" + exe + "\"" : "\"" + exe + "\"";
-        String product = exe.toLowerCase(java.util.Locale.ROOT).endsWith("gamemd.exe") ? "Yuri's Revenge" : "Red Alert 2";
+        String product = (exe.toLowerCase(java.util.Locale.ROOT).endsWith("gamemd.exe") || exe.toLowerCase(java.util.Locale.ROOT).endsWith("ra2md.exe")) ? "Yuri's Revenge" : "Red Alert 2";
         String registryKey = "HKLM\\Software\\Westwood\\" + product;
         String batch = "@echo off\r\n"
             + "set RA2_REG_EXE=C:\\windows\\system32\\reg.exe\r\n"
