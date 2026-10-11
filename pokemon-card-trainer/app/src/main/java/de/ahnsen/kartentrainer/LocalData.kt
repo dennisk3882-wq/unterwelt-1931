@@ -298,7 +298,15 @@ class LocalAppStore(context: Context) {
                         } else null,
                         referenceSalePriceEur = if (o.has("referenceSalePriceEur") && !o.isNull("referenceSalePriceEur")) o.optDouble("referenceSalePriceEur") else null,
                         referenceSaleSource = o.optString("referenceSaleSource").takeIf { it.isNotBlank() },
-                        referenceSaleAt = if (o.has("referenceSaleAt") && !o.isNull("referenceSaleAt")) o.optLong("referenceSaleAt") else null
+                        referenceSaleAt = if (o.has("referenceSaleAt") && !o.isNull("referenceSaleAt")) o.optLong("referenceSaleAt") else null,
+                        apiLivePriceEur = if (o.has("apiLivePriceEur") && !o.isNull("apiLivePriceEur")) o.optDouble("apiLivePriceEur") else null,
+                        apiLiveProductId = o.optString("apiLiveProductId").takeIf { it.isNotBlank() },
+                        apiLiveLanguage = o.optString("apiLiveLanguage").takeIf { it.isNotBlank() },
+                        apiLiveCondition = o.optString("apiLiveCondition").takeIf { it.isNotBlank() },
+                        apiLiveVariant = o.optString("apiLiveVariant").takeIf { it.isNotBlank() },
+                        apiLiveUpdatedAt = if (o.has("apiLiveUpdatedAt") && !o.isNull("apiLiveUpdatedAt")) o.optLong("apiLiveUpdatedAt") else null,
+                        apiLiveExactGrade = o.optBoolean("apiLiveExactGrade", false),
+                        apiLiveOffers = o.optInt("apiLiveOffers", 0)
                     )
                 )
             }
