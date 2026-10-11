@@ -98,7 +98,7 @@ fun PrecisionCardScannerButton(
         }
     ) {
         Icon(Icons.Default.DocumentScanner, contentDescription = null)
-        Text(" " + buttonLabel)
+        Text(buttonLabel)
     }
 }
 
