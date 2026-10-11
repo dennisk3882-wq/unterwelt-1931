@@ -1010,8 +1010,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             inputs[i].setHint(de?"Neuer Schlüssel (optional)":"New key (optional)");
             form.addView(inputs[i],matchWrap(0));
         }
+        ScrollView keyScroll=new ScrollView(this);
+        keyScroll.addView(form);
         android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this)
-            .setTitle(de?"Original-CD-Schlüssel":"Original CD keys").setView(form)
+            .setTitle(de?"Original-CD-Schlüssel":"Original CD keys").setView(keyScroll)
             .setNegativeButton(de?"Abbrechen":"Cancel",null).setPositiveButton(de?"Speichern":"Save",null).create();
         dialog.setOnShowListener(v -> {
             dialog.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
