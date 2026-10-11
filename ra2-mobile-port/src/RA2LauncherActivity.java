@@ -990,6 +990,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         }
         boolean de=isGerman();
         LinearLayout form = new LinearLayout(this);
+        form.setBackgroundColor(Color.rgb(24,29,34));
         form.setOrientation(LinearLayout.VERTICAL);
         form.setPadding(dp(20),dp(10),dp(20),dp(8));
         TextView hint=label(14,Color.WHITE);
@@ -1011,6 +1012,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             form.addView(inputs[i],matchWrap(0));
         }
         ScrollView keyScroll=new ScrollView(this);
+        keyScroll.setBackgroundColor(Color.rgb(24,29,34));
         keyScroll.addView(form);
         android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this)
             .setTitle(de?"Original-CD-Schlüssel":"Original CD keys").setView(keyScroll)
