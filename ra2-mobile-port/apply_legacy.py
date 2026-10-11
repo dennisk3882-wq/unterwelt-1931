@@ -16,7 +16,7 @@ APP_ID = "com.winlator"
 def copy_sources_legacy(root: Path) -> None:
     dst = root / "app/src/main/java/com/winlator"
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java", "RA2DiagnosticEvidence.java", "RA2CdForensics.java", "RA2ZipExport.java", "RA2SerialPolicy.java"]:
+    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java", "RA2DiagnosticEvidence.java", "RA2CdForensics.java", "RA2ZipExport.java", "RA2XwisClient.java", "RA2SerialPolicy.java"]:
         require(SRC / name)
         text = read(SRC / name)
 
@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 234")
-    s = s.replace('versionName "7.1"', 'versionName "0.34.0-ra2-native-dll"')
+    s = s.replace("versionCode 16", "versionCode 235")
+    s = s.replace('versionName "7.1"', 'versionName "0.35.0-ra2-xwis-client"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -884,8 +884,8 @@ def patch_xserver(root: Path) -> None:
         try {
             metadata.put("runId", java.util.UUID.randomUUID().toString());
             metadata.put("startedAt", System.currentTimeMillis());
-            metadata.put("appVersion", "0.34");
-            metadata.put("launchMode", getIntent().getBooleanExtra("ra2_launcher_probe", false) ? "original-launcher-probe" : "direct-engine");
+            metadata.put("appVersion", "0.35");
+            metadata.put("launchMode", getIntent().getBooleanExtra("ra2_community_client", false) ? "xwis-community-client" : (getIntent().getBooleanExtra("ra2_launcher_probe", false) ? "original-launcher-probe" : "direct-engine"));
             metadata.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
             metadata.put("android", android.os.Build.VERSION.RELEASE);
             metadata.put("abis", java.util.Arrays.toString(android.os.Build.SUPPORTED_ABIS));
@@ -915,7 +915,7 @@ def patch_xserver(root: Path) -> None:
         FileUtils.writeString(new File(session, "ra2-live.log"), "stage=runtime-wrapper-ready\\n");
         FileUtils.delete(new File(session, "safedisc.log"));
         FileUtils.delete(new File(session, "safedisc-injector.log"));
-        boolean cdCompatibility = RA2LaunchBatch.isSafeDisc(new File(execPath));
+        boolean cdCompatibility = !getIntent().getBooleanExtra("ra2_community_client", false) && RA2LaunchBatch.isSafeDisc(new File(execPath));
         if (cdCompatibility) {
             File helper = new File(session, "SafeDisc");
             helper.mkdirs();

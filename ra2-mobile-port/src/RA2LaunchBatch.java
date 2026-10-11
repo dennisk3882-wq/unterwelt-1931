@@ -57,11 +57,13 @@ public final class RA2LaunchBatch {
     public static String create(String exe) { return create(exe, false); }
 
     public static String create(String exe, boolean cdCompatibility) {
-        if (exe == null || !exe.matches("(?i)C:\\\\Westwood\\\\RA2\\\\(?:game|gamemd|ra2|ra2md)\\.exe")) {
+        if (exe == null || !exe.matches("(?i)C:\\\\(?:Westwood\\\\RA2|RA2Mobile\\\\XWISClient)\\\\(?:game|gamemd|ra2|ra2md|Red Alert 2|Yuri's Revenge)\\.exe")) {
             throw new IllegalArgumentException("Unexpected game path: " + exe);
         }
+        String workingDir = exe.toLowerCase(java.util.Locale.ROOT).contains("\\ra2mobile\\xwisclient\\")
+            ? "C:\\RA2Mobile\\XWISClient" : "C:\\Westwood\\RA2";
         String command = cdCompatibility ? "\"C:\\RA2Mobile\\SafeDisc\\VersionInjector.exe\" \"" + exe + "\"" : "\"" + exe + "\"";
-        String product = (exe.toLowerCase(java.util.Locale.ROOT).endsWith("gamemd.exe") || exe.toLowerCase(java.util.Locale.ROOT).endsWith("ra2md.exe")) ? "Yuri's Revenge" : "Red Alert 2";
+        String product = (exe.toLowerCase(java.util.Locale.ROOT).endsWith("gamemd.exe") || exe.toLowerCase(java.util.Locale.ROOT).endsWith("ra2md.exe") || exe.toLowerCase(java.util.Locale.ROOT).endsWith("yuri's revenge.exe")) ? "Yuri's Revenge" : "Red Alert 2";
         String registryKey = "HKLM\\Software\\Westwood\\" + product;
         String batch = "@echo off\r\n"
             + "set RA2_REG_EXE=C:\\windows\\system32\\reg.exe\r\n"
@@ -89,7 +91,7 @@ public final class RA2LaunchBatch {
             + "%RA2_REG_EXE% query \"HKCU\\Software\\Wine\\AppDefaults\\RA2.EXE\\DllOverrides\" /v version >C:\\RA2Mobile\\wine-dll-override.txt 2>&1\r\n"
             + "echo policyQueryExit=%ERRORLEVEL%>>C:\\RA2Mobile\\wine-dll-override.txt\r\n"
             + "echo stage=game-command-started>>C:\\RA2Mobile\\ra2-live.log\r\n"
-            + "cd /d C:\\Westwood\\RA2\r\n"
+            + "cd /d " + workingDir + "\r\n"
             + "start /wait \"\" " + command + "\r\n"
             + "set RA2_GAME_EXIT=%ERRORLEVEL%\r\n"
             + "echo stage=game-command-ended>>C:\\RA2Mobile\\ra2-live.log\r\n"

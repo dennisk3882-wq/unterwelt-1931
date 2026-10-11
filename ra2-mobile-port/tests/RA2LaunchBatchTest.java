@@ -13,6 +13,14 @@ public class RA2LaunchBatchTest {
             try { RA2LaunchBatch.create(invalid); throw new AssertionError("Unsafe path accepted"); }
             catch (IllegalArgumentException expected) {}
         }
+        String xwis = RA2LaunchBatch.create("C:\\RA2Mobile\\XWISClient\\game.exe");
+        if (!xwis.contains("cd /d C:\\RA2Mobile\\XWISClient"))
+            throw new AssertionError("XWIS working directory not honored");
+        if (xwis.contains("VersionInjector.exe"))
+            throw new AssertionError("XWIS client must not use old SafeDisc injector");
+        String yuriClient = RA2LaunchBatch.create("C:\\RA2Mobile\\XWISClient\\Yuri's Revenge.exe");
+        if (!yuriClient.contains("product=Yuri's Revenge"))
+            throw new AssertionError("Community Yuri product not detected");
         String mirrored = RA2LaunchBatch.create("C:\\Westwood\\RA2\\GAME.EXE");
         if (!mirrored.contains("echo stage=game-command-started>>C:\\RA2Mobile\\ra2-evidence.log") ||
             !mirrored.contains("echo stage=game-command-ended>>C:\\RA2Mobile\\events.log")) throw new AssertionError("Batch stages lost from evidence/export");

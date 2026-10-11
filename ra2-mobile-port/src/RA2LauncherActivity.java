@@ -73,6 +73,9 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private static final int PICK_ALLIED = 4101;
     private static final int PICK_SOVIET = 4102;
     private static final int PICK_YURI = 4103;
+    private static final int PICK_XWIS_RA2 = 4111;
+    private static final int PICK_XWIS_YURI = 4112;
+    private static final String KEY_XWIS_PENDING = "xwis_installer_pending";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
@@ -97,6 +100,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private Button installYuriButton;
     private Button playRa2Button;
     private Button playYuriButton;
+    private Button playXwisRa2;
+    private Button playXwisYuri;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,6 +117,13 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         super.onResume();
         if (prefs == null) return;
         if (prefs.getBoolean(KEY_RUNTIME_OUTSTANDING, false) && !runtimeStarting) {
+            String pendingXwis = prefs.getString(KEY_XWIS_PENDING, "");
+            if (!pendingXwis.isEmpty()) {
+                prefs.edit().putBoolean(KEY_RUNTIME_OUTSTANDING, false).remove(KEY_XWIS_PENDING).apply();
+                finishCommunityInstallation("yuri".equals(pendingXwis));
+                refreshGameState();
+                return;
+            }
             prefs.edit().putBoolean(KEY_RUNTIME_OUTSTANDING, false).apply();
             continuePipeline(prefs.getString(KEY_STAGE, STAGE_NONE));
         }
@@ -155,7 +167,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.30 · CD-Schutz-Kompatibilität");
+        version.setText("v0.35 · XWIS-Kompatibilitätsclient");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
@@ -220,6 +232,35 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         playRa2Button.setOnClickListener(v -> launchGame(false));
         playYuriButton.setOnClickListener(v -> launchGame(true));
 
+        TextView communityHeading = label(20, Color.rgb(235, 211, 162));
+        communityHeading.setText("XWIS – kompatibler Start ohne Original-CD-Launcher");
+        root.addView(communityHeading, matchWrap(dp(20)));
+        TextView communityInfo = label(13, Color.LTGRAY);
+        communityInfo.setText("Separater Spielclient. Original-ISOs, Kampagnen, Videos und bisherige Installation bleiben erhalten.");
+        root.addView(communityInfo, matchWrap(dp(5)));
+        LinearLayout communityDownloads = horizontal();
+        Button downloadXwisRa2 = accentButton("XWIS RA2 herunterladen");
+        Button downloadXwisYuri = accentButton("XWIS Yuri herunterladen");
+        communityDownloads.addView(downloadXwisRa2, weighted());
+        communityDownloads.addView(downloadXwisYuri, weighted());
+        root.addView(communityDownloads, matchWrap(dp(7)));
+        downloadXwisRa2.setOnClickListener(v -> downloadCommunityInstaller(false, false));
+        downloadXwisYuri.setOnClickListener(v -> downloadCommunityInstaller(true, false));
+        LinearLayout communityImports = horizontal();
+        Button importXwisRa2 = button("RA2-Installer auswählen");
+        Button importXwisYuri = button("Yuri-Installer auswählen");
+        communityImports.addView(importXwisRa2, weighted());
+        communityImports.addView(importXwisYuri, weighted());
+        root.addView(communityImports, matchWrap(dp(7)));
+        importXwisRa2.setOnClickListener(v -> pickCommunityInstaller(false));
+        importXwisYuri.setOnClickListener(v -> pickCommunityInstaller(true));
+        playXwisRa2 = button("RA2 – XWIS-Client starten");
+        playXwisYuri = button("Yuri – XWIS-Client starten");
+        root.addView(playXwisRa2, matchWrap(dp(7)));
+        root.addView(playXwisYuri, matchWrap(dp(7)));
+        playXwisRa2.setOnClickListener(v -> launchCommunityGame(false));
+        playXwisYuri.setOnClickListener(v -> launchCommunityGame(true));
+
         TextView touchInfo = label(13, Color.LTGRAY);
         touchInfo.setTag("touchInfo");
         touchInfo.setPadding(dp(4), dp(18), dp(4), dp(84));
@@ -275,7 +316,9 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         installRa2Button.setText(de ? "Alarmstufe Rot 2 einrichten" : "Set up Red Alert 2");
         installYuriButton.setText(de ? "Yuri’s Rache einrichten" : "Set up Yuri’s Revenge");
         playRa2Button.setText(de ? "ALARMSTUFE ROT 2 STARTEN" : "START RED ALERT 2");
-        playYuriButton.setText(de ? "YURI’S RACHE STARTEN" : "START YURI’S REVENGE");
+        playYuriButton.setText(de ? "YURI’S RACHE STARTEN (ORIGINAL)" : "START YURI’S REVENGE (ORIGINAL)");
+        if (playXwisRa2 != null) playXwisRa2.setText(de ? "RA2 – XWIS-Client starten" : "Launch RA2 XWIS client");
+        if (playXwisYuri != null) playXwisYuri.setText(de ? "Yuri – XWIS-Client starten" : "Launch Yuri XWIS client");
 
         View root = title.getRootView();
         TextView mediaHeading = root.findViewWithTag("mediaHeading");
@@ -319,6 +362,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         catch (Exception ignored) {}
 
         String key;
+        if (requestCode == PICK_XWIS_RA2 || requestCode == PICK_XWIS_YURI) {
+            importCommunityInstaller(uri, requestCode == PICK_XWIS_YURI);
+            return;
+        }
         if (requestCode == PICK_ALLIED) key = KEY_ALLIED;
         else if (requestCode == PICK_SOVIET) key = KEY_SOVIET;
         else if (requestCode == PICK_YURI) key = KEY_YURI;
@@ -1324,6 +1371,201 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         intent.putExtra("ra2_helper_stage", prefs.getString(KEY_STAGE, STAGE_NONE));
         intent.putExtra("ra2_mode", true);
         intent.putExtra("ra2_language", isGerman() ? "de" : "en");
+        startActivity(intent);
+    }
+
+    private File communityFolder() {
+        File folder = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/XWISClient");
+        if (!folder.isDirectory()) folder.mkdirs();
+        return folder;
+    }
+
+    private File communityPackages() {
+        File folder = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/XWISPackages");
+        if (!folder.isDirectory()) folder.mkdirs();
+        return folder;
+    }
+
+    private void pickCommunityInstaller(boolean yuri) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(intent, yuri ? PICK_XWIS_YURI : PICK_XWIS_RA2);
+    }
+
+    private void importCommunityInstaller(Uri uri, boolean yuri) {
+        if (container == null) { message("Wine-Laufzeit noch nicht bereit."); return; }
+        setBusy(true, "Übernehme ausgewählten XWIS-Installer …");
+        ioExecutor.execute(() -> {
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                if (in == null) throw new java.io.IOException("Installer kann nicht gelesen werden");
+                copyCommunityPackage(in, yuri, -1);
+                runOnUiThread(() -> startCommunitySetup(yuri));
+            } catch (Exception error) {
+                runOnUiThread(() -> setBusy(false, "XWIS-Import fehlgeschlagen: " + error.getMessage()));
+            }
+        });
+    }
+
+    private void downloadCommunityInstaller(boolean yuri, boolean archive) {
+        if (container == null) { message("Wine-Laufzeit noch nicht bereit."); return; }
+        String source = yuri ? (archive ? RA2XwisClient.YURI_ARCHIVE : RA2XwisClient.YURI_URL) :
+            (archive ? RA2XwisClient.RA2_ARCHIVE : RA2XwisClient.RA2_URL);
+        setBusy(true, "Lade " + (yuri ? "Yuri" : "RA2") +
+            (archive ? " aus dem Internet Archive" : " von XWIS") + " …");
+        ioExecutor.execute(() -> {
+            try {
+                java.net.URL next = new java.net.URL(source);
+                java.net.HttpURLConnection conn = null;
+                try {
+                    for (int hop=0; hop<6; hop++) {
+                        if (!"https".equalsIgnoreCase(next.getProtocol()))
+                            throw new java.io.IOException("Nur HTTPS-Downloads erlaubt");
+                        String host = next.getHost().toLowerCase(Locale.ROOT);
+                        if (!(host.equals("xwis.net") || host.endsWith(".xwis.net") ||
+                              host.equals("archive.org") || host.endsWith(".archive.org")))
+                            throw new java.io.IOException("Unbekannter Download-Server: " + host);
+                        conn = (java.net.HttpURLConnection)next.openConnection();
+                        conn.setInstanceFollowRedirects(false);
+                        conn.setConnectTimeout(18000);
+                        conn.setReadTimeout(45000);
+                        conn.setRequestProperty("User-Agent", "RA2Mobile/0.35");
+                        int code=conn.getResponseCode();
+                        if (code>=300 && code<400) {
+                            String redirect=conn.getHeaderField("Location");
+                            conn.disconnect();conn=null;
+                            if (redirect==null) throw new java.io.IOException("Weiterleitung ohne Ziel");
+                            next = new java.net.URL(next,redirect);
+                            continue;
+                        }
+                        if (code!=200) throw new java.io.IOException("HTTP " + code);
+                        long expected=conn.getContentLengthLong();
+                        if (expected>RA2XwisClient.MAX_INSTALLER)
+                            throw new java.io.IOException("Installer überschreitet die Größenbegrenzung");
+                        try (InputStream in=conn.getInputStream()) {copyCommunityPackage(in,yuri,expected);}
+                        conn.disconnect();conn=null;
+                        runOnUiThread(() -> startCommunitySetup(yuri));
+                        return;
+                    }
+                    throw new java.io.IOException("Zu viele Weiterleitungen");
+                } finally {if (conn!=null)conn.disconnect();}
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    setBusy(false,"Download fehlgeschlagen: " + error.getMessage());
+                    if (!archive) {
+                        new androidx.appcompat.app.AlertDialog.Builder(this)
+                            .setTitle("XWIS-Server nicht erreichbar")
+                            .setMessage("Der offizielle Download hat nicht funktioniert. Du kannst die archivierte XWIS-Ausgabe von Internet Archive versuchen oder eine bereits heruntergeladene EXE auswählen. Die Spiel-ISOs werden nicht verändert.")
+                            .setPositiveButton("Archivkopie versuchen", (dialog,which) -> downloadCommunityInstaller(yuri,true))
+                            .setNeutralButton("Installer auswählen", (dialog,which) -> pickCommunityInstaller(yuri))
+                            .setNegativeButton("Abbrechen",null).show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void copyCommunityPackage(InputStream input, boolean yuri, long length) throws java.io.IOException {
+        if (length>RA2XwisClient.MAX_INSTALLER) throw new java.io.IOException("Installer zu groß");
+        File out = new File(communityPackages(),yuri ? RA2XwisClient.YURI_INSTALLER : RA2XwisClient.RA2_INSTALLER);
+        File temporary = new File(communityPackages(),out.getName()+".partial");
+        long total=0;
+        try (java.io.FileOutputStream stream = new java.io.FileOutputStream(temporary)) {
+            byte[] buffer = new byte[65536];
+            int n;
+            while ((n=input.read(buffer))!=-1) {
+                total+=n;
+                if(total>RA2XwisClient.MAX_INSTALLER) throw new java.io.IOException("Installer zu groß");
+                stream.write(buffer,0,n);
+                if (total % (8L*1024*1024) < n) {
+                    long copied=total;
+                    runOnUiThread(() -> {if (status!=null)
+                        status.setText("XWIS-Paket: " + (copied/1024/1024) + " MB geladen");});
+                }
+            }
+            stream.getFD().sync();
+            if (!RA2XwisClient.isPeInstaller(temporary))
+                throw new java.io.IOException("Keine vollständige Windows-EXE (MZ/Größe).");
+            if (!temporary.renameTo(out))
+                throw new java.io.IOException("Installer konnte nicht aktiviert werden");
+        } finally {temporary.delete();}
+    }
+
+    private void startCommunitySetup(boolean yuri) {
+        setBusy(false, "XWIS-Installer gespeichert. Installation läuft im Wine-Fenster.");
+        // Installer writes ONLY to C:\RA2Mobile\XWISClient; original game is untouched.
+        prefs.edit().putString(KEY_XWIS_PENDING,yuri ? "yuri" : "ra2").apply();
+        launchRuntimeDos(RA2XwisClient.dosInstaller(yuri), RA2XwisClient.installerArgs());
+    }
+
+    private void finishCommunityInstallation(boolean yuri) {
+        if (container == null) return;
+        setBusy(true, "Prüfe XWIS-Client und ergänze Originalmissionen …");
+        ioExecutor.execute(() -> {
+            try {
+                File client=RA2XwisClient.findClient(communityFolder(),yuri);
+                if(client==null) throw new java.io.IOException(
+                    "Kein XWIS-" + (yuri?"Yuri":"RA2") + "-Spielclient gefunden. Installer/Startprotokoll prüfen.");
+                int added=RA2XwisClient.addOwnedResources(gameDir(),communityFolder());
+                runOnUiThread(() -> {
+                    setBusy(false,"XWIS-Client bereit: "+client.getName()+" • "+added+
+                        " Originalarchive ergänzt. Jetzt XWIS-Client starten.");
+                    refreshGameState();
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> setBusy(false,"XWIS-Einrichtung noch nicht abgeschlossen: "+e.getMessage()));
+            }
+        });
+    }
+
+    private void launchCommunityGame(boolean yuri) {
+        if (container==null) {message("Laufzeit nicht bereit");return;}
+        File client=RA2XwisClient.findClient(communityFolder(),yuri);
+        if(client==null) {
+            message("XWIS-Client noch nicht installiert. Bitte XWIS-Paket herunterladen oder auswählen.");
+            return;
+        }
+        setBusy(true,"Prüfe XWIS-Spielordner …");
+        ioExecutor.execute(() -> {
+            try {
+                int added=RA2XwisClient.addOwnedResources(gameDir(),communityFolder());
+                runOnUiThread(() -> {
+                    setBusy(false,"XWIS bereit • "+added+" Originalarchive ergänzt");
+                    startCommunityGame(yuri,client);
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> setBusy(false,"XWIS-Spielordner nicht bereit: "+e.getMessage()));
+            }
+        });
+    }
+
+    private void startCommunityGame(boolean yuri, File client) {
+        targetNormalServicesBeforeLaunch();
+        activateMedia(yuri);
+        writeWestwoodRegistry(yuri);
+        File registryFile=new File(container.getRootDir(), ".wine/system.reg");
+        try (WineRegistryEditor registry=new WineRegistryEditor(registryFile)) {
+            String product=yuri ? "Yuri's Revenge" : "Red Alert 2";
+            String root="Software\\Westwood\\"+product;
+            String path=RA2XwisClient.dosClientPath(client);
+            for(String key:container.isWoW64Mode() ?
+                new String[]{root, "Software\\Wow6432Node\\Westwood\\"+product} : new String[]{root}) {
+                registry.setStringValue(key,"InstallPath",path);
+                registry.setStringValue(key,"FolderPath","C:\\RA2Mobile\\XWISClient");
+            }
+        } catch(Exception e) {message("XWIS-Registry konnte nicht gesetzt werden: "+e.getMessage());return;}
+        prefs.edit().putString(KEY_LAST_GAME_LAUNCH,yuri?"XWIS Yuri":"XWIS RA2")
+            .putLong(KEY_LAST_GAME_LAUNCH_AT,System.currentTimeMillis())
+            .remove(KEY_LAST_EXIT_CODE).remove(KEY_LAST_SAW_CHILD).apply();
+        writeLaunchSeed(client,yuri,false);
+        Intent intent=new Intent(this,XServerDisplayActivity.class);
+        intent.putExtra("container_id",container.id);
+        intent.putExtra("exec_path",client.getAbsolutePath());
+        intent.putExtra("ra2_mode",true);
+        intent.putExtra("ra2_game_launch",true);
+        intent.putExtra("ra2_community_client",true);
+        intent.putExtra("ra2_language",isGerman() ? "de" : "en");
         startActivity(intent);
     }
 
