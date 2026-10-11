@@ -206,37 +206,63 @@ data class OcrGuess(
 object OcrParser {
     private val numberPattern = Regex("""\b([A-Za-z]*\d{1,3}[A-Za-z]?)[ ]*/[ ]*(\d{1,3})\b""")
 
+    private val typeOrHeaderWords = listOf(
+        "trainer", "unterstützer", "unterstuetzer", "supporter", "item",
+        "stadion", "stadium", "ausrüstung", "ausruestung", "tool",
+        "energie", "energy", "basis", "basic", "stufe", "stage",
+        "illustration", "schwäche", "weakness", "resistenz", "retreat", "rückzug",
+        "pokemon", "pokémon", "kp", "hp"
+    )
+
+    private val effectLeadWords = listOf(
+        "wähle", "waehle", "durchsuche", "lege", "mische", "wenn ", "falls ",
+        "du kannst", "während", "waehrend", "dein ", "deiner ", "deines ",
+        "ziehe", "fügt", "fuegt", "schaden", "spiele ", "nimmt ", "nimm ",
+        "wirf ", "heile ", "entferne ", "verhindere "
+    )
+
     fun parse(text: String): OcrGuess {
+        val number = numberPattern.find(text)?.groupValues?.getOrNull(1)
+        val candidate = candidateNames(text).firstOrNull().orEmpty()
+        return OcrGuess(candidate, number, text)
+    }
+
+    fun candidateNames(text: String): List<String> {
         val lines = text.lines()
             .map { it.trim() }
             .filter { it.length in 2..45 }
 
-        val number = numberPattern.find(text)?.groupValues?.getOrNull(1)
+        fun normalized(line: String): String = line.lowercase(Locale.ROOT)
 
-        val blockedWords = listOf(
-            "trainer", "energie", "energy", "basis", "basic", "stufe", "stage",
-            "illustration", "schwäche", "weakness", "resistenz", "retreat", "rückzug",
-            "pokemon", "pokémon", "kp", "hp"
-        )
+        return lines.mapIndexedNotNull { index, line ->
+            val lower = normalized(line)
+            if (typeOrHeaderWords.any { lower == it || lower.startsWith(it + " ") }) return@mapIndexedNotNull null
+            if (numberPattern.containsMatchIn(line)) return@mapIndexedNotNull null
+            if (line.count { it.isLetter() } < 3) return@mapIndexedNotNull null
 
-        val candidate = lines
-            .asSequence()
-            .filterNot { line -> blockedWords.any { line.lowercase(Locale.ROOT).contains(it) } }
-            .filterNot { line -> numberPattern.containsMatchIn(line) }
-            .filter { line -> line.count { it.isLetter() } >= 3 }
-            .sortedBy { line ->
-                var score = 0
-                if (line.any { it.isDigit() }) score += 4
-                if (line.length > 26) score += 2
-                if (line.contains(":")) score += 2
-                score
-            }
-            .firstOrNull()
-            .orEmpty()
+            var score = 0
+            val words = line.split(Regex("""\s+""")).filter { it.isNotBlank() }
+            if (line.length in 4..26) score += 5
+            if (words.size in 1..4) score += 5
+            if (line.firstOrNull()?.isUpperCase() == true) score += 2
+            if (line.none { it.isDigit() }) score += 2
+            if (line.none { it in ".,:;!?()[]" }) score += 2
 
-        return OcrGuess(candidate, number, text)
+            val previous = lines.getOrNull(index - 1)?.let(::normalized).orEmpty()
+            if (typeOrHeaderWords.any { previous == it || previous.startsWith(it + " ") }) score += 10
+
+            if (effectLeadWords.any { lower.startsWith(it) || lower.contains(" " + it) }) score -= 14
+            if (line.length > 30) score -= 8
+            if (words.size > 6) score -= 8
+
+            line to score
+        }
+            .sortedByDescending { it.second }
+            .map { it.first }
+            .distinctBy { it.lowercase(Locale.ROOT) }
     }
 }
+
 
 fun Double.euro(): String = NumberFormat.getCurrencyInstance(Locale.GERMANY).format(this)
 
