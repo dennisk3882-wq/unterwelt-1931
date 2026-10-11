@@ -184,3 +184,44 @@ fun KidTipCard(
         }
     }
 }
+
+@Composable
+fun KidCompanionWelcome() {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.94f)),
+        border = BorderStroke(1.5.dp, KidPalette.Purple.copy(alpha = 0.45f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(R.drawable.mascot_blue),
+                contentDescription = null,
+                modifier = Modifier.size(76.dp),
+                contentScale = ContentScale.Fit
+            )
+            Column(Modifier.weight(1f).padding(start = 7.dp)) {
+                Text(
+                    "Willkommen im Karten-Abenteuer!",
+                    color = KidPalette.Ink,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "Entdecke neue Karten und fülle dein Sammelalbum!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF47516F)
+                )
+            }
+            Image(
+                painter = painterResource(R.drawable.mascot_green),
+                contentDescription = null,
+                modifier = Modifier.size(62.dp),
+                contentScale = ContentScale.Fit
+            )
+        }
+    }
+}
