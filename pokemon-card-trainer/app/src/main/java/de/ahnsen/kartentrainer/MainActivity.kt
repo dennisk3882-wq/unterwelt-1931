@@ -321,7 +321,12 @@ private fun KartenCoachApp() {
                     localStore.saveStats(activeProfileId, next)
                 }
             )
-            AppScreen.PRICES -> PricesScreen(padding, collection)
+            AppScreen.PRICES -> PricesScreen(
+                padding = padding,
+                collection = collection,
+                repository = repository,
+                onReplaceCollection = { replaceCollection(it) }
+            )
             AppScreen.TWO_PLAYER -> TwoPlayerHelperScreen(collection, Modifier.padding(padding))
             AppScreen.SETTINGS -> LocalSettingsScreen(
                 padding = padding,
@@ -1703,7 +1708,12 @@ private fun PhysicalBattleScreen(collection: List<CollectionEntry>, modifier: Mo
 }
 
 @Composable
-private fun PricesScreen(padding: PaddingValues, collection: List<CollectionEntry>) {
+private fun PricesScreen(
+    padding: PaddingValues,
+    collection: List<CollectionEntry>,
+    repository: TcgDexRepository,
+    onReplaceCollection: (List<CollectionEntry>) -> Unit
+) {
     val priceContext = androidx.compose.ui.platform.LocalContext.current
     val familyStore = remember { FamilyLocalStore(priceContext.applicationContext) }
     val settings = remember { familyStore.settings() }
@@ -1756,53 +1766,10 @@ private fun PricesScreen(padding: PaddingValues, collection: List<CollectionEntr
         return
     }
 
-    val sorted = collection.sortedByDescending { it.totalEstimatedValue ?: -1.0 }
-    val total = sorted.mapNotNull { it.totalEstimatedValue }.sum()
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        item {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("Geschätzter Sammlungswert", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(if (total > 0) total.euro() else "Noch keine Preisdaten")
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Die App nutzt verfügbare Cardmarket-Marktdaten. Zustand, Sprache, Druckvariante und tatsächliche Verkäufe können deutlich abweichen.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        }
-        items(sorted, key = { it.card.id + it.variant }) { entry ->
-            OutlinedCard {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    AsyncImage(
-                        model = entry.card.imageUrl,
-                        contentDescription = entry.card.name,
-                        modifier = Modifier.size(width = 58.dp, height = 82.dp)
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(entry.card.name, fontWeight = FontWeight.Bold)
-                        Text(entry.card.setName + " · " + entry.variant, style = MaterialTheme.typography.bodySmall)
-                        Text(
-                            entry.adjustedUnitValue()?.let {
-                                "ca. " + it.euro() + " je Karte · " + entry.language + " · " + entry.condition
-                            } ?: "Kein Marktpreis verfügbar",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        MarketResearchBlock(entry)
-                    }
-                    Text(
-                        entry.totalEstimatedValue?.euro() ?: "–",
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-    }
+    AdvancedMarketScreen(
+        padding = padding,
+        collection = collection,
+        repository = repository,
+        onReplaceCollection = onReplaceCollection
+    )
 }
