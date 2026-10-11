@@ -627,7 +627,8 @@ private fun ScanScreen(
     var selected by remember { mutableStateOf<CardData?>(null) }
     var loading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("Fotografiere möglichst nur eine Karte und fülle den Bildausschnitt gut aus.") }
-    var batchMode by rememberSaveable { mutableStateOf(false) }
+    var scanModeName by rememberSaveable { mutableStateOf(ScannerMode.ONE.name) }
+    val scanMode = ScannerMode.entries.firstOrNull { it.name == scanModeName } ?: ScannerMode.ONE
     var lastConfidence by rememberSaveable { mutableIntStateOf(0) }
     var cameraCandidateIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var lastOwnershipScanAt by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -667,123 +668,163 @@ private fun ScanScreen(
     ) {
         item {
             KidHeroBanner(
-                title = "📸 Zeig mir deine Karte!",
-                subtitle = "Lege eine echte Karte in den Rahmen. Ich erkenne sie und mache daraus eine schöne digitale Karte.",
+                title = "📸 Karten entdecken!",
+                subtitle = "Wähle deinen Scan – einfach, schnell und kinderleicht.",
                 modifier = Modifier.fillMaxWidth(),
                 accent = KidPalette.Ocean
             )
             Spacer(Modifier.height(10.dp))
             KidTipCard(
                 title = "So klappt es am besten",
-                text = "1. Karte flach hinlegen  •  2. Gute Beleuchtung  •  3. Ganze Karte in den Rahmen  •  4. Kurz stillhalten"
+                text = when (scanMode) {
+                    ScannerMode.MULTI_PHOTO -> "Karten mit etwas Abstand flach auf einen Tisch legen und alle vollständig fotografieren."
+                    ScannerMode.SEQUENTIAL -> "Halte immer nur eine Karte in die Kamera und wechsle sie nach dem erkannten Treffer."
+                    else -> "Karte flach hinlegen • Gute Beleuchtung • Alle Ränder sichtbar • Kurz stillhalten"
+                }
             )
             Spacer(Modifier.height(10.dp))
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.90f))
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Scan-Modus", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
-                    Spacer(Modifier.height(4.dp))
-                    FilterChip(
-                        selected = batchMode,
-                        onClick = { batchMode = !batchMode },
-                        label = { Text(if (batchMode) "Batchmodus aktiv" else "Einzelscan") }
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    SmartCameraScanner(
-                        batchMode = batchMode,
-                        modifier = Modifier.fillMaxWidth(),
-                        onResult = { scan ->
-                            rawOcr = scan.text
-                            lastConfidence = scan.confidence
-                            val primary = scan.guess
-                            if (primary.name.isNotBlank()) query = primary.name
-                            if (!primary.localId.isNullOrBlank()) localId = primary.localId
-                            scope.launch {
-                                loading = true
-                                val candidates = runCatching {
-                                    repository.resolveScannedCards(scan.text)
-                                }.getOrDefault(emptyList())
-                                results = candidates
-                                cameraCandidateIds = candidates.map { it.id }.toSet()
-                                lastOwnershipScanAt = System.currentTimeMillis()
-                                if (batchMode && scan.confidence >= 75 && candidates.size == 1 &&
-                                    CardScanIdentityParser.isVerifiedCard(candidates.first(), scan.text)) {
-                                    val card = runCatching { repository.getCard(candidates.first().id) }.getOrNull()
-                                    if (card != null) {
-                                        val variant = card.availableVariants().firstOrNull() ?: "Normal"
-                                        CardImageCache.prefetch(scanContext, card)
-                                        onAdd(card, variant, lastOwnershipScanAt ?: System.currentTimeMillis())
-                                        query = card.name
-                                        localId = card.localId
-                                        message = "✓ " + card.name + " wurde in „Meine Karten“ gespeichert · Sicherheit " + scan.confidence +
-                                            "%. Nächste Karte einlegen."
-                                        results = emptyList()
-                                    } else {
-                                        message = "Kartendetails konnten nicht geladen werden."
-                                    }
-                                } else {
-                                    message = if (candidates.isEmpty()) {
-                                        "Keine eindeutige Karte gefunden · Sicherheit " + scan.confidence + "%."
-                                    } else {
-                                        candidates.size.toString() + " Treffer · Sicherheit " + scan.confidence + "%. Bitte passende Karte bestätigen."
-                                    }
+
+                    ScannerModePicker(
+                        selected = scanMode,
+                        onSelect = { nextMode ->
+                            if (nextMode != scanMode) {
+                                scanModeName = nextMode.name
+                                results = emptyList()
+                                selected = null
+                                rawOcr = ""
+                                cameraCandidateIds = emptySet()
+                                lastOwnershipScanAt = null
+                                message = when (nextMode) {
+                                    ScannerMode.ONE -> "Eine Karte fotografieren – Ränder werden automatisch erkannt."
+                                    ScannerMode.PRECISE -> "Bild korrigieren und richtige Karte vor dem Speichern bestätigen."
+                                    ScannerMode.SEQUENTIAL -> "Karten einzeln wechseln – die Kamera liest laufend mit."
+                                    ScannerMode.MULTI_PHOTO -> "Alle Karten auf dem Tisch auslegen und zusammen fotografieren."
                                 }
-                                loading = false
                             }
                         },
-                        onError = { message = it }
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    MultiCardPhotoScanner(
-                        repository = repository,
-                        onAdd = onAdd,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(Modifier.height(10.dp))
-                    PrecisionCardScannerButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        onText = { text ->
-                            rawOcr = text
-                            val guess = OcrParser.parse(text)
-                            if (guess.name.isNotBlank()) query = guess.name
-                            if (!guess.localId.isNullOrBlank()) localId = guess.localId
-                            scope.launch {
-                                loading = true
-                                val candidates = runCatching {
-                                    repository.resolveScannedCards(text)
-                                }.getOrDefault(emptyList())
-                                results = candidates
-                                cameraCandidateIds = candidates.map { it.id }.toSet()
-                                lastOwnershipScanAt = System.currentTimeMillis()
-                                if (candidates.size == 1 && CardScanIdentityParser.isVerifiedCard(candidates.first(), text)) {
-                                    val card = runCatching { repository.getCard(candidates.first().id) }.getOrNull()
-                                    if (card != null) {
-                                        CardImageCache.prefetch(scanContext, card)
-                                        onAdd(
-                                            card,
-                                            card.availableVariants().firstOrNull() ?: "Normal",
-                                            lastOwnershipScanAt ?: System.currentTimeMillis()
-                                        )
-                                        query = card.name
-                                        localId = card.localId
-                                        message = "✓ " + card.name + " wurde in „Meine Karten“ gespeichert. Originalbild ist ebenfalls geladen."
-                                        results = emptyList()
+                    Spacer(Modifier.height(12.dp))
+                    when (scanMode) {
+                        ScannerMode.ONE, ScannerMode.PRECISE -> {
+                            Text(
+                                if (scanMode == ScannerMode.PRECISE)
+                                    "Der genaue Scan bietet erweiterte Bildkorrektur und lässt dich den Treffer vor dem Speichern auswählen."
+                                else
+                                    "Automatische Randkorrektur. Eindeutig erkannte Karten werden direkt gespeichert.",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        PrecisionCardScannerButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            detailed = scanMode == ScannerMode.PRECISE,
+                            buttonLabel = if (scanMode == ScannerMode.PRECISE) "✨ Genaue Karte scannen" else "📷 Karte scannen",
+                            onText = { text ->
+                                rawOcr = text
+                                val guess = OcrParser.parse(text)
+                                if (guess.name.isNotBlank()) query = guess.name
+                                if (!guess.localId.isNullOrBlank()) localId = guess.localId
+                                scope.launch {
+                                    loading = true
+                                    val candidates = runCatching {
+                                        repository.resolveScannedCards(text)
+                                    }.getOrDefault(emptyList())
+                                    results = candidates
+                                    cameraCandidateIds = candidates.map { it.id }.toSet()
+                                    lastOwnershipScanAt = System.currentTimeMillis()
+                                    if (scanMode == ScannerMode.ONE && candidates.size == 1 &&
+                                        CardScanIdentityParser.isVerifiedCard(candidates.first(), text)) {
+                                        val card = runCatching { repository.getCard(candidates.first().id) }.getOrNull()
+                                        if (card != null) {
+                                            CardImageCache.prefetch(scanContext, card)
+                                            onAdd(
+                                                card,
+                                                card.availableVariants().firstOrNull() ?: "Normal",
+                                                lastOwnershipScanAt ?: System.currentTimeMillis()
+                                            )
+                                            query = card.name
+                                            localId = card.localId
+                                            message = "✓ " + card.name + " wurde in „Meine Karten“ gespeichert. Originalbild ist ebenfalls geladen."
+                                            results = emptyList()
+                                        } else {
+                                            message = "Kartendetails konnten nicht geladen werden."
+                                        }
                                     } else {
-                                        message = "Kartendetails konnten nicht geladen werden."
+                                        message = if (candidates.isEmpty()) {
+                                            "Präzisionsscan: kein eindeutiger Treffer."
+                                        } else {
+                                            "Präzisionsscan: " + candidates.size + " Treffer – bitte bestätigen."
+                                        }
                                     }
-                                } else {
-                                    message = if (candidates.isEmpty()) {
-                                        "Präzisionsscan: kein eindeutiger Treffer."
-                                    } else {
-                                        "Präzisionsscan: " + candidates.size + " Treffer – bitte bestätigen."
-                                    }
+                                    loading = false
                                 }
-                                loading = false
-                            }
-                        },
-                        onError = { message = it }
-                    )
+                            },
+                            onError = { message = it }
+                        )
+                        }
+                        ScannerMode.SEQUENTIAL -> {
+                            Text(
+                                "Halte nacheinander einzelne Karten in den Rahmen. Eindeutige Treffer werden automatisch gespeichert.",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        SmartCameraScanner(
+                            batchMode = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            onResult = { scan ->
+                                rawOcr = scan.text
+                                lastConfidence = scan.confidence
+                                val primary = scan.guess
+                                if (primary.name.isNotBlank()) query = primary.name
+                                if (!primary.localId.isNullOrBlank()) localId = primary.localId
+                                scope.launch {
+                                    loading = true
+                                    val candidates = runCatching {
+                                        repository.resolveScannedCards(scan.text)
+                                    }.getOrDefault(emptyList())
+                                    results = candidates
+                                    cameraCandidateIds = candidates.map { it.id }.toSet()
+                                    lastOwnershipScanAt = System.currentTimeMillis()
+                                    if (scan.confidence >= 75 && candidates.size == 1 &&
+                                        CardScanIdentityParser.isVerifiedCard(candidates.first(), scan.text)) {
+                                        val card = runCatching { repository.getCard(candidates.first().id) }.getOrNull()
+                                        if (card != null) {
+                                            val variant = card.availableVariants().firstOrNull() ?: "Normal"
+                                            CardImageCache.prefetch(scanContext, card)
+                                            onAdd(card, variant, lastOwnershipScanAt ?: System.currentTimeMillis())
+                                            query = card.name
+                                            localId = card.localId
+                                            message = "✓ " + card.name + " wurde in „Meine Karten“ gespeichert · Sicherheit " + scan.confidence +
+                                                "%. Nächste Karte einlegen."
+                                            results = emptyList()
+                                        } else {
+                                            message = "Kartendetails konnten nicht geladen werden."
+                                        }
+                                    } else {
+                                        message = if (candidates.isEmpty()) {
+                                            "Keine eindeutige Karte gefunden · Sicherheit " + scan.confidence + "%."
+                                        } else {
+                                            candidates.size.toString() + " Treffer · Sicherheit " + scan.confidence + "%. Bitte passende Karte bestätigen."
+                                        }
+                                    }
+                                    loading = false
+                                }
+                            },
+                            onError = { message = it }
+                        )
+                        }
+                        ScannerMode.MULTI_PHOTO -> {
+                        MultiCardPhotoScanner(
+                            repository = repository,
+                            onAdd = onAdd,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        }
+                    }
                     if (lastConfidence > 0) {
                         Text(
                             "Letzte OCR-Sicherheit: " + lastConfidence + "%",
