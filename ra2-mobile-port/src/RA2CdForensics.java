@@ -49,7 +49,7 @@ public final class RA2CdForensics {
             li.contains("createprocess failed") || li.contains("could not create remote thread");
         boolean nativeDll = java.util.regex.Pattern.compile("(?im)Loaded[^\\r\\n]*version\\.dll[^\\r\\n]*: native").matcher(f).find();
         boolean builtinDll = java.util.regex.Pattern.compile("(?im)Loaded[^\\r\\n]*version\\.dll[^\\r\\n]*: builtin").matcher(f).find();
-        boolean requestedNative = safe(metadata).contains("\\"nativeVersionDllRequested\\":true");
+        boolean requestedNative = safe(metadata).contains("\"nativeVersionDllRequested\":true");
         boolean cdCalls = lf.contains("getvolumeinformation") || lf.contains("getdrivetype")
             || lf.contains("deviceiocontrol") || lf.contains("secdrv");
         r.stage = "unbekannt";
