@@ -53,7 +53,19 @@ data class CardData(
     val priceLow: Double?,
     val priceTrend: Double?,
     val priceAvgHolo: Double?,
-    val priceLowHolo: Double?
+    val priceLowHolo: Double?,
+    val priceAvg1: Double? = null,
+    val priceAvg7: Double? = null,
+    val priceAvg30: Double? = null,
+    val priceTrendHolo: Double? = null,
+    val priceAvg1Holo: Double? = null,
+    val priceAvg7Holo: Double? = null,
+    val priceAvg30Holo: Double? = null,
+    val priceUpdatedAt: Long? = null,
+    val usMarketNormal: Double? = null,
+    val usMarketHolo: Double? = null,
+    val usMarketReverse: Double? = null,
+    val usMarketUpdatedAt: Long? = null
 ) {
     val imageUrl: String?
         get() = imageBase?.let { "$it/high.webp" }
@@ -107,11 +119,7 @@ data class CardData(
         if (isEmpty()) add("Normal")
     }
 
-    fun estimatedPrice(variant: String): Double? = when (variant) {
-        "Holo" -> priceAvgHolo ?: priceAvg ?: priceTrend
-        "Reverse" -> priceAvgHolo ?: priceAvg ?: priceTrend
-        else -> priceAvg ?: priceTrend ?: priceLow
-    }
+    fun estimatedPrice(variant: String): Double? = MarketValueEngine.marketReference(this, variant)?.price
 
     fun friendlyExplanation(): String {
         return when {
@@ -171,27 +179,12 @@ data class CollectionEntry(
     val language: String = "DE",
     val condition: String = "NM",
     val scanVerified: Boolean = true,
-    val lastScannedAt: Long? = null
+    val lastScannedAt: Long? = null,
+    val referenceSalePriceEur: Double? = null,
+    val referenceSaleSource: String? = null,
+    val referenceSaleAt: Long? = null
 ) {
-    fun adjustedUnitValue(): Double? {
-        val base = card.estimatedPrice(variant) ?: return null
-        val conditionFactor = when (condition.uppercase(Locale.ROOT)) {
-            "NM" -> 1.00
-            "EX" -> 0.88
-            "GD" -> 0.74
-            "LP" -> 0.60
-            "PL" -> 0.42
-            "PO" -> 0.25
-            else -> 1.00
-        }
-        val languageFactor = when (language.uppercase(Locale.ROOT)) {
-            "DE", "EN" -> 1.00
-            "JP" -> 0.92
-            "FR", "IT", "ES" -> 0.88
-            else -> 0.85
-        }
-        return base * conditionFactor * languageFactor
-    }
+    fun adjustedUnitValue(): Double? = MarketValueEngine.estimate(this).unitPrice
 
     val totalEstimatedValue: Double?
         get() = adjustedUnitValue()?.times(quantity)
@@ -273,6 +266,9 @@ fun CollectionEntry.toJson(): JSONObject = JSONObject().apply {
     put("variant", variant)
     put("language", language)
     put("condition", condition)
+    if (referenceSalePriceEur != null) put("referenceSalePriceEur", referenceSalePriceEur)
+    if (referenceSaleSource != null) put("referenceSaleSource", referenceSaleSource)
+    if (referenceSaleAt != null) put("referenceSaleAt", referenceSaleAt)
     put("scanVerified", scanVerified)
     put("lastScannedAt", lastScannedAt)
     put("card", card.toJson())
@@ -327,6 +323,18 @@ fun CardData.toJson(): JSONObject = JSONObject().apply {
     put("priceTrend", priceTrend)
     put("priceAvgHolo", priceAvgHolo)
     put("priceLowHolo", priceLowHolo)
+    put("priceAvg1", priceAvg1)
+    put("priceAvg7", priceAvg7)
+    put("priceAvg30", priceAvg30)
+    put("priceTrendHolo", priceTrendHolo)
+    put("priceAvg1Holo", priceAvg1Holo)
+    put("priceAvg7Holo", priceAvg7Holo)
+    put("priceAvg30Holo", priceAvg30Holo)
+    put("priceUpdatedAt", priceUpdatedAt)
+    put("usMarketNormal", usMarketNormal)
+    put("usMarketHolo", usMarketHolo)
+    put("usMarketReverse", usMarketReverse)
+    put("usMarketUpdatedAt", usMarketUpdatedAt)
 }
 
 fun cardFromJson(o: JSONObject): CardData {
@@ -408,6 +416,18 @@ fun cardFromJson(o: JSONObject): CardData {
         priceLow = nullableDouble("priceLow"),
         priceTrend = nullableDouble("priceTrend"),
         priceAvgHolo = nullableDouble("priceAvgHolo"),
-        priceLowHolo = nullableDouble("priceLowHolo")
+        priceLowHolo = nullableDouble("priceLowHolo"),
+        priceAvg1 = nullableDouble("priceAvg1"),
+        priceAvg7 = nullableDouble("priceAvg7"),
+        priceAvg30 = nullableDouble("priceAvg30"),
+        priceTrendHolo = nullableDouble("priceTrendHolo"),
+        priceAvg1Holo = nullableDouble("priceAvg1Holo"),
+        priceAvg7Holo = nullableDouble("priceAvg7Holo"),
+        priceAvg30Holo = nullableDouble("priceAvg30Holo"),
+        priceUpdatedAt = if (has("priceUpdatedAt") && !isNull("priceUpdatedAt")) optLong("priceUpdatedAt") else null,
+        usMarketNormal = nullableDouble("usMarketNormal"),
+        usMarketHolo = nullableDouble("usMarketHolo"),
+        usMarketReverse = nullableDouble("usMarketReverse"),
+        usMarketUpdatedAt = if (has("usMarketUpdatedAt") && !isNull("usMarketUpdatedAt")) optLong("usMarketUpdatedAt") else null
     )
 }
