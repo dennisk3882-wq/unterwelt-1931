@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -86,6 +87,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -197,7 +200,22 @@ private fun KartenCoachApp() {
         playerStats = localStore.stats(id)
     }
 
-    KidScreenBackground {
+    val screenBackground = when (screen) {
+        AppScreen.HOME -> R.drawable.bg_world
+        AppScreen.SCAN -> R.drawable.bg_scan
+        AppScreen.COLLECTION, AppScreen.DECK -> R.drawable.bg_collection
+        AppScreen.LEARN, AppScreen.PRICES, AppScreen.SETTINGS -> R.drawable.bg_progress
+        AppScreen.AI, AppScreen.TWO_PLAYER -> R.drawable.bg_detail
+    }
+    KidScreenBackground(
+        artwork = screenBackground,
+        veil = when (screen) {
+            AppScreen.HOME -> 0.54f
+            AppScreen.SCAN -> 0.77f
+            AppScreen.COLLECTION -> 0.64f
+            else -> 0.69f
+        }
+    ) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
@@ -358,9 +376,25 @@ private fun HomeScreen(
                             listOf(KidPalette.HeroA, KidPalette.HeroB, KidPalette.HeroC)
                         )
                     )
-                    .padding(22.dp)
             ) {
-                Column {
+                Image(
+                    painter = painterResource(R.drawable.hero_adventure),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+                Box(
+                    modifier = Modifier.matchParentSize().background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color(0xEB1B3B85),
+                                Color(0xC9364C9A),
+                                Color(0x6A176BFF)
+                            )
+                        )
+                    )
+                )
+                Column(Modifier.padding(22.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = CircleShape,
@@ -671,7 +705,8 @@ private fun ScanScreen(
                 title = "📸 Karten entdecken!",
                 subtitle = "Wähle deinen Scan – einfach, schnell und kinderleicht.",
                 modifier = Modifier.fillMaxWidth(),
-                accent = KidPalette.Ocean
+                accent = KidPalette.Ocean,
+                artwork = R.drawable.bg_scan
             )
             Spacer(Modifier.height(10.dp))
             KidTipCard(
@@ -961,13 +996,29 @@ private fun CardDetailDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                AsyncImage(
-                    model = card.imageUrl,
-                    contentDescription = card.name,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(240.dp)
-                )
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .height(260.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.bg_detail),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize()
+                    )
+                    Box(
+                        modifier = Modifier.matchParentSize()
+                            .background(Color.White.copy(alpha = 0.22f))
+                    )
+                    AsyncImage(
+                        model = card.imageUrl,
+                        contentDescription = card.name,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxWidth().height(248.dp)
+                            .align(Alignment.Center)
+                    )
+                }
                 Text(card.setName + " · #" + card.localId, fontWeight = FontWeight.SemiBold)
                 if (card.rarity.isNotBlank()) Text("Seltenheit: " + card.rarity)
                 Row(verticalAlignment = Alignment.CenterVertically) {
