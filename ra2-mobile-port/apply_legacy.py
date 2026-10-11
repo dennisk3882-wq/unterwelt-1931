@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 227")
-    s = s.replace('versionName "7.1"', 'versionName "0.27.0-ra2-original-keys"')
+    s = s.replace("versionCode 16", "versionCode 228")
+    s = s.replace('versionName "7.1"', 'versionName "0.28.0-ra2-launch-probe"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
