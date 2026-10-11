@@ -24,6 +24,10 @@ public class RA2DiagnosticEvidenceTest {
         if(!a.summary.contains("Kompatibilitätshelfer")) throw new AssertionError("injector failure missed");
         a=analyze("cdCompatibility=true\n"+START+GAME,"", "Version.DLL Loaded!\nUnable to hook CreateFileA",0,false);
         if(!a.summary.contains("Hook")) throw new AssertionError("hook failure missed");
+        a=analyze("cdCompatibility=true\n"+START+GAME, "VersionInjector Starting...\nGame exit: 1\n", "",null,false);
+        if(!a.summary.contains("Code 1") ||
+           a.findings.stream().noneMatch(f->f.title.contains("Injector erfasst Spielende")))
+            throw new AssertionError("Injector game exit not attributed to launcher");
         a=analyze("","","",null,false);
         if(a.findings.stream().noneMatch(f->f.confidence.equals("MESSLÜCKE"))) throw new AssertionError("missing data hidden");
         a=analyze(START+GAME,"","",0,true);

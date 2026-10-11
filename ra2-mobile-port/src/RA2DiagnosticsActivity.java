@@ -115,7 +115,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         top.addView(back, new LinearLayout.LayoutParams(dp(100), dp(46)));
 
         headline = text(25, Color.rgb(238, 220, 170), true);
-        headline.setText("RA2 / Yuri Diagnose-Center v0.29");
+        headline.setText("RA2 / Yuri Diagnose-Center v0.30");
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         hp.leftMargin = dp(14);
         top.addView(headline, hp);
@@ -1006,8 +1006,23 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             liveText.contains("cdCompatibility=true") ? "SafeDisc-Kompatibilitätshelfer" : "Direkter Spielstart", "");
         String volumeInfo = sessionText("cd-volume-preflight.txt");
         if (volumeInfo != null && !volumeInfo.isEmpty())
-            add(Level.INFO, "Virtuelle CDs", "CD-Abfrage in Wine (vol X:)",
-                compactLines(volumeInfo, 22), "Zeigt den tatsächlich von Wine erkannten Volume-Namen.");
+            add(Level.INFO, "Virtuelle CDs", "CD-Abfrage in Wine (dir X:)",
+                compactLines(volumeInfo, 22), "Verzeichnisprüfung in Wine. Für die tatsächliche CD-Identität den Laufzeittest auswerten.");
+        String hookStage = sessionText("safedisc-dll-stage.txt");
+        if (liveText != null && liveText.contains("cdCompatibility=true")) {
+            if (hookStage == null || hookStage.isEmpty()) {
+                add(Level.WARN, "CD-Kompatibilität", "DLL-Initialisierung nicht bestätigt",
+                    "Kein Startmarker der version.dll gefunden.",
+                    "Moduleintrag ist kein Nachweis für einen erfolgreich ausgeführten DLL-Hook. Guest-Load untersuchen.");
+            } else {
+                boolean configReady = hookStage.contains("config-loaded=1");
+                add(configReady ? Level.PASS : Level.WARN, "CD-Kompatibilität",
+                    "SafeDisc-Helper-DLL: Einstieg und Konfiguration",
+                    hookStage.trim(),
+                    configReady ? "Prüfe anschließend Hooks und CD-Abfragen im safedisc.log." :
+                        "Konfigurationsdatei konnte aus dem Spieleverzeichnis nicht gelesen werden.");
+            }
+        }
         for (String name : new String[]{"safedisc-injector.log", "safedisc.log"}) {
             File helperLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/" + name);
             if (helperLog.isFile()) {

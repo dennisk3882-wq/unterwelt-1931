@@ -26,7 +26,7 @@ s=s.replace(old,'''ResumeThread(pi.hThread);
     log("Game exit: %lu\\n", code);
     return (int)code;''')
 s=s.replace('\treturn 0;\n}', '\treturn ret;\n}')
-s=s.replace('"version.json"', '"ra2-cd-compat.json"')
+s=s.replace('"version.json"', r'"C:\\Westwood\\RA2\\ra2-cd-compat.json"')
 s=s.replace('if (GetFileAttributesA("Version.dll") == -1L)', '''char helperDLL[MAX_PATH];
     GetModuleFileNameA(NULL, helperDLL, MAX_PATH);
     char* helperSlash = strrchr(helperDLL, '\\\\');
@@ -48,6 +48,14 @@ s=p.read_bytes().decode('cp1252').replace('"version.json"','"ra2-cd-compat.json"
 start=s.index('\t\t// The below is just to force the console window visible')
 end=s.index('\t\tNString logFile', start)
 s=s[:start]+s[end:]
+needle = r'config.LoadConfig("C:\\Westwood\\RA2\\ra2-cd-compat.json");'
+assert needle in s, "Injected DLL config path not found"
+s=s.replace(needle, r'''bool configLoaded = config.LoadConfig("C:\\Westwood\\RA2\\ra2-cd-compat.json");
+    FILE* stage = fopen("C:/RA2Mobile/safedisc-dll-stage.txt", "wt");
+    if (stage) {
+        fprintf(stage, "dll-entry=1\nconfig-loaded=%d\n", configLoaded ? 1 : 0);
+        fclose(stage);
+    }''', 1)
 p.write_bytes(s.encode('cp1252'))
 ns={'m':'http://schemas.microsoft.com/developer/msbuild/2003'}
 ET.register_namespace('', ns['m'])

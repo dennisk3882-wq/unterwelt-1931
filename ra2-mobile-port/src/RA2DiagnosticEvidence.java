@@ -85,6 +85,12 @@ public final class RA2DiagnosticEvidence {
             a.add("WARN","BELEGT","Kein Spielfenster trotz Spielende",decode(exit)+"; EXE geladen: "+a.loaded,"Exit 0 ist kein Absturzbeleg und ohne Spielfenster kein Spielbarkeitstest.");
             a.add("WARN","HYPOTHESE","CD-Prüfung oder frühe Initialisierung", "CD-Helfer angefordert: "+helperRequested+"; geladen: "+a.helperLoaded+"; "+safeVersion(helper),
                 helperRequested?"Helferprotokoll auf erfolgreiche Hooks/Entschlüsselung prüfen. Wenn diese erfolgreich sind, den letzten Spiel-Dateizugriff und Grafik-/Audio-Initialisierung untersuchen.":"SafeDisc-Signatur und tatsächlich gewählten Startweg prüfen. Keine Ursache allein aus secdrv.sys ableiten.");
+        } else if(helperRequested && !window && exit==null && inj.matches("(?s).*game exit: *[0-9]+.*")) {
+            Matcher gameExit=Pattern.compile("(?im)^game exit:\s*([0-9]+)").matcher(injector);
+            String value=gameExit.find()?gameExit.group(1):"unbekannt";
+            a.summary="Original-Launcher beendete sich über den Kompatibilitätshelfer (Code "+value+"); Ursache wird noch geprüft.";
+            a.add("WARN","BELEGT","Injector erfasst Spielende", "Game exit: "+value,
+                "Das ist der tatsächliche Prozesscode laut Injector, obwohl game-exit.txt nicht geschrieben wurde. SafeDisc-/CD-Prüfung anhand des DLL-Logs untersuchen.");
         } else if(!window && exit==null) {
             a.summary="Kein abgeschlossenes Spielergebnis erfasst; Hängen, manueller Abbruch und Messlücke bleiben unterscheidbar.";
             a.add("WARN","MESSLÜCKE","Spielende nicht erfasst","game-exit.txt fehlt oder ist unvollständig.","Sitzungsereignisse und Prozess-/Helfer-Snapshot vergleichen; keinen erfolgreichen Start oder Absturz behaupten.");

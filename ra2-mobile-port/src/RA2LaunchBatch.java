@@ -82,7 +82,7 @@ public final class RA2LaunchBatch {
             + "echo registerExit=%ERRORLEVEL%>>C:\\RA2Mobile\\blowfish-register.txt\r\n"
             + "echo stage=cd-volume-preflight>>C:\\RA2Mobile\\ra2-live.log\r\n"
             + "echo X: volume:>C:\\RA2Mobile\\cd-volume-preflight.txt\r\n"
-            + "vol X: >>C:\\RA2Mobile\\cd-volume-preflight.txt 2>&1\r\n"
+            + "dir X:\\ >>C:\\RA2Mobile\\cd-volume-preflight.txt 2>&1\r\n"
             + "echo X: root:>>C:\\RA2Mobile\\cd-volume-preflight.txt\r\n"
             + "dir /b X:\\ >>C:\\RA2Mobile\\cd-volume-preflight.txt 2>&1\r\n"
             + "echo stage=game-command-started>>C:\\RA2Mobile\\ra2-live.log\r\n"

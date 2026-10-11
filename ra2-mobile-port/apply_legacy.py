@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 229")
-    s = s.replace('versionName "7.1"', 'versionName "0.29.0-ra2-disc-label"')
+    s = s.replace("versionCode 16", "versionCode 230")
+    s = s.replace('versionName "7.1"', 'versionName "0.30.0-ra2-cd-probe"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -842,7 +842,7 @@ def patch_xserver(root: Path) -> None:
         if (new File(session, "session.json").isFile() || new File(session, "ra2-live.log").isFile()) {
             File archive = new File(history, "run-" + System.currentTimeMillis());
             archive.mkdirs();
-            for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "last-start.log", "game-exit.txt", "cd-volume-preflight.txt", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt", "safedisc.log", "safedisc-injector.log"}) {
+            for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "last-start.log", "game-exit.txt", "cd-volume-preflight.txt", "safedisc-dll-stage.txt", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt", "safedisc.log", "safedisc-injector.log"}) {
                 File source = new File(session, name);
                 if (source.isFile()) source.renameTo(new File(archive, name));
             }
@@ -859,7 +859,7 @@ def patch_xserver(root: Path) -> None:
         try {
             metadata.put("runId", java.util.UUID.randomUUID().toString());
             metadata.put("startedAt", System.currentTimeMillis());
-            metadata.put("appVersion", "0.29");
+            metadata.put("appVersion", "0.30");
             metadata.put("launchMode", getIntent().getBooleanExtra("ra2_launcher_probe", false) ? "original-launcher-probe" : "direct-engine");
             metadata.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
             metadata.put("android", android.os.Build.VERSION.RELEASE);
@@ -876,6 +876,7 @@ def patch_xserver(root: Path) -> None:
         } catch (org.json.JSONException ignored) {}
         FileUtils.writeString(new File(session, "session.json"), metadata.toString());
         FileUtils.delete(new File(session, "cd-volume-preflight.txt"));
+        FileUtils.delete(new File(session, "safedisc-dll-stage.txt"));
         FileUtils.delete(new File(session, "game-exit.txt"));
         FileUtils.delete(new File(session, "game-exit.tmp"));
         FileUtils.delete(new File(session, "rpcss-after-game.txt"));
@@ -894,9 +895,15 @@ def patch_xserver(root: Path) -> None:
             org.json.JSONObject config = new org.json.JSONObject();
             try {
                 config.put("logging", true);
-                config.put("logFile", "C:\\\\RA2Mobile\\\\safedisc.log");
-                config.put("injectorLogFile", "C:\\\\RA2Mobile\\\\safedisc-injector.log");
+                // Forward slashes keep the JSON paths unambiguous in Wine.
+                config.put("logFile", "C:/RA2Mobile/safedisc.log");
+                config.put("injectorLogFile", "C:/RA2Mobile/safedisc-injector.log");
+                config.put("logCreateFile", true);
+                config.put("logSCSIPassThrough", true);
                 config.put("CDROMDriveLetter", "X");
+                String cdLabel = FileUtils.readString(new File(container.getRootDir(), ".wine/drive_x/.windows-label"));
+                if (cdLabel != null && !cdLabel.trim().isEmpty())
+                    config.put("CDROMVolumeName", cdLabel.trim());
             } catch (org.json.JSONException ignored) {}
             copied = copied && FileUtils.writeString(new File(dir, "ra2-cd-compat.json"), config.toString());
             if (!copied) throw new IllegalStateException("CD compatibility helper could not be prepared");
