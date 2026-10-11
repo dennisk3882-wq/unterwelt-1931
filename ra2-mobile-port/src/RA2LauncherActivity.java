@@ -118,7 +118,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         if (prefs == null) return;
-        if (prefs.getLong(KEY_XWIS_DOWNLOAD_ID, -1) > 0) checkCommunityDownload(false);
+        if (container != null && prefs.getLong(KEY_XWIS_DOWNLOAD_ID, -1) > 0) checkCommunityDownload(false);
         if (prefs.getBoolean(KEY_RUNTIME_OUTSTANDING, false) && !runtimeStarting) {
             String pendingXwis = prefs.getString(KEY_XWIS_PENDING, "");
             if (!pendingXwis.isEmpty()) {
