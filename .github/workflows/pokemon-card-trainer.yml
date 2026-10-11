@@ -101,17 +101,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp pokemon-card-trainer/app/build/outputs/apk/debug/app-debug.apk dist/TCG-Karten-Coach-2.4.3.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose dist/TCG-Karten-Coach-2.4.3.apk
-          sha256sum dist/TCG-Karten-Coach-2.4.3.apk | tee dist/TCG-Karten-Coach-2.4.3.sha256
+          cp pokemon-card-trainer/app/build/outputs/apk/debug/app-debug.apk dist/TCG-Karten-Coach-2.4.4.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose dist/TCG-Karten-Coach-2.4.4.apk
+          sha256sum dist/TCG-Karten-Coach-2.4.4.apk | tee dist/TCG-Karten-Coach-2.4.4.sha256
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TCG-Karten-Coach-2.4.3
+          name: TCG-Karten-Coach-2.4.4
           path: |
-            dist/TCG-Karten-Coach-2.4.3.apk
-            dist/TCG-Karten-Coach-2.4.3.sha256
+            dist/TCG-Karten-Coach-2.4.4.apk
+            dist/TCG-Karten-Coach-2.4.4.sha256
           if-no-files-found: error
           retention-days: 14
 
@@ -121,11 +121,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="tcg-karten-coach-v2.4.3"
+          tag="tcg-karten-coach-v2.4.4"
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/TCG-Karten-Coach-2.4.3.apk dist/TCG-Karten-Coach-2.4.3.sha256 --clobber
+            gh release upload "$tag" dist/TCG-Karten-Coach-2.4.4.apk dist/TCG-Karten-Coach-2.4.4.sha256 --clobber
           else
-            gh release create "$tag" dist/TCG-Karten-Coach-2.4.3.apk dist/TCG-Karten-Coach-2.4.3.sha256 --target "$GITHUB_SHA" --title "TCG Karten-Coach 2.4.3 – Mehrkarten-Scanner" --notes "Version 2.4.3: Acht neue, eigens erstellte Fantasy-Grafiken, thematische Hintergründe für alle Hauptbereiche, Maskottchen und überarbeitete bunte Bedienoberfläche. Scanner und gespeicherte Sammlung bleiben erhalten."
+            gh release create "$tag" dist/TCG-Karten-Coach-2.4.4.apk dist/TCG-Karten-Coach-2.4.4.sha256 --target "$GITHUB_SHA" --title "TCG Karten-Coach 2.4.4 – Mehrkarten-Scanner" --notes "Version 2.4.4: Professioneller Sammlerwert mit zeitbezogenen Cardmarket-Daten, getrennten Holo/Normal/Reverse-Varianten, TCGplayer-USD-Marktvergleich, Quellenalter, Bewertungsqualität, manuellen Vergleichsverkäufen und präziseren Suchlinks. Kein irreführender pauschaler Sprach- oder Zustandsfaktor."
           fi
 
       - name: Record successful build
@@ -133,15 +133,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build-status
-          echo "Version: 2.4.3" > build-status/pokemon-card-trainer.txt
+          echo "Version: 2.4.4" > build-status/pokemon-card-trainer.txt
           echo "Commit: $GITHUB_SHA" >> build-status/pokemon-card-trainer.txt
           echo "Run ID: $GITHUB_RUN_ID" >> build-status/pokemon-card-trainer.txt
-          sha256sum dist/TCG-Karten-Coach-2.4.3.apk >> build-status/pokemon-card-trainer.txt
-          echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/tcg-karten-coach-v2.4.3" >> build-status/pokemon-card-trainer.txt
+          sha256sum dist/TCG-Karten-Coach-2.4.4.apk >> build-status/pokemon-card-trainer.txt
+          echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/tcg-karten-coach-v2.4.4" >> build-status/pokemon-card-trainer.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add build-status/pokemon-card-trainer.txt
-          git commit -m "Record tested TCG Karten-Coach 2.4.3 build"
+          git commit -m "Record tested TCG Karten-Coach 2.4.4 build"
           git push origin HEAD:pokemon-card-trainer-android
 
       - name: Record failed build for diagnosis
@@ -150,12 +150,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build-status
-          echo "Version: 2.4.3" > build-status/pokemon-card-trainer.txt
+          echo "Version: 2.4.4" > build-status/pokemon-card-trainer.txt
           echo "Outcome: FAILED" >> build-status/pokemon-card-trainer.txt
           echo "Commit: $GITHUB_SHA" >> build-status/pokemon-card-trainer.txt
           echo "Run ID: $GITHUB_RUN_ID" >> build-status/pokemon-card-trainer.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add build-status/pokemon-card-trainer.txt
-          git commit -m "Record failed TCG 2.4.3 build for diagnosis"
+          git commit -m "Record failed TCG 2.4.4 build for diagnosis"
           git push origin HEAD:pokemon-card-trainer-android
