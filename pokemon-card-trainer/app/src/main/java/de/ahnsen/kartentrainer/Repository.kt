@@ -39,6 +39,79 @@ class TcgDexRepository(context: Context? = null) {
         }
     }
 
+    suspend fun resolveScannedCards(rawText: String): List<CardBrief> {
+        val parsed = OcrParser.parse(rawText)
+        val names = OcrParser.candidateNames(rawText).take(6)
+        val localId = parsed.localId?.takeIf { it.isNotBlank() }
+        val merged = linkedMapOf<String, CardBrief>()
+
+        suspend fun collect(name: String, number: String?) {
+            runCatching { searchCards(name, number) }
+                .getOrDefault(emptyList())
+                .forEach { merged[it.id] = it }
+        }
+
+        names.forEach { name -> collect(name, localId) }
+
+        if (merged.isEmpty()) {
+            names.take(4).forEach { name -> collect(name, null) }
+        }
+
+        if (localId != null) {
+            collect("", localId)
+        }
+
+        val candidates = merged.values.toList()
+        if (candidates.size <= 1) return candidates
+
+        fun normalize(value: String): String = value
+            .lowercase()
+            .replace("ä", "ae")
+            .replace("ö", "oe")
+            .replace("ü", "ue")
+            .replace("ß", "ss")
+            .filter { it.isLetterOrDigit() }
+
+        fun dice(a: String, b: String): Double {
+            val left = normalize(a)
+            val right = normalize(b)
+            if (left.isBlank() || right.isBlank()) return 0.0
+            if (left == right) return 1.0
+            if (left.length < 2 || right.length < 2) return if (left == right) 1.0 else 0.0
+            val aPairs = left.windowed(2).groupingBy { it }.eachCount().toMutableMap()
+            var overlap = 0
+            right.windowed(2).forEach { pair ->
+                val count = aPairs[pair] ?: 0
+                if (count > 0) {
+                    overlap += 1
+                    aPairs[pair] = count - 1
+                }
+            }
+            return (2.0 * overlap) / ((left.length - 1) + (right.length - 1))
+        }
+
+        val rawNormalized = normalize(rawText)
+        val scored = candidates.map { card ->
+            val normalizedName = normalize(card.name)
+            var score = 0.0
+            if (normalizedName.isNotBlank() && rawNormalized.contains(normalizedName)) score += 100.0
+            if (localId != null && card.localId.equals(localId, ignoreCase = true)) score += 30.0
+            score += names.maxOfOrNull { dice(it, card.name) * 60.0 } ?: 0.0
+            card to score
+        }.sortedByDescending { it.second }
+
+        val best = scored.firstOrNull() ?: return candidates
+        val second = scored.getOrNull(1)
+        val exactNameInOcr = rawNormalized.contains(normalize(best.first.name))
+        val clearMargin = second == null || best.second - second.second >= 18.0
+
+        return if ((exactNameInOcr && clearMargin) || (best.second >= 120.0 && clearMargin)) {
+            listOf(best.first)
+        } else {
+            scored.take(12).map { it.first }
+        }
+    }
+
     suspend fun getCard(id: String): CardData = withContext(Dispatchers.IO) {
         val key = "card_" + id
         val online = runCatching {
