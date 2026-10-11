@@ -42,10 +42,10 @@ s=s.replace('''WaitForSingleObject(hNewThread, INFINITE);''','''WaitForSingleObj
     DWORD module = 0;
     GetExitCodeThread(hNewThread, &module);
     if (!module) {
-        log("injection-result=failure\n");
+        log("injection-result=failure\\n");
         exitlog("Compatibility DLL could not be loaded");
     }
-    log("injection-result=success module=%08lx\n", module);''')
+    log("injection-result=success module=%08lx\\n", module);''')
 p.write_text(s)
 p=root/'src/version.cpp'
 s=p.read_bytes().decode('cp1252').replace('"version.json"',r'"C:\\Westwood\\RA2\\ra2-cd-compat.json"')
