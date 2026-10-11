@@ -1,9 +1,14 @@
 package de.ahnsen.kartentrainer
 
 import coil.compose.AsyncImage
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -64,24 +70,29 @@ fun kidBackgroundBrush(): Brush = Brush.verticalGradient(
 )
 
 @Composable
-fun KidScreenBackground(content: @Composable BoxScope.() -> Unit) {
+fun KidScreenBackground(
+    artwork: Int = R.drawable.bg_world,
+    veil: Float = 0.62f,
+    content: @Composable BoxScope.() -> Unit
+) {
     Box(Modifier.fillMaxSize()) {
-        AsyncImage(
-            model = R.drawable.cardworld_bg,
+        Image(
+            painter = painterResource(artwork),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
-            alpha = 0.34f
+            contentScale = ContentScale.Crop
         )
+        // A readable frosted overlay: detailed fantasy art remains visible at the
+        // edges without drowning out card titles, OCR, prices or camera controls.
         Box(
             Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color(0xDDF3FAFF),
-                            Color(0xDDF7F2FF),
-                            Color(0xE8FFF7EE)
+                            Color(0xFFF3F9FF).copy(alpha = (veil - 0.10f).coerceIn(0f, 1f)),
+                            Color(0xFFFFFAF2).copy(alpha = veil.coerceIn(0f, 1f)),
+                            Color(0xFFF4EDFF).copy(alpha = (veil + 0.09f).coerceIn(0f, 1f))
                         )
                     )
                 )
@@ -95,7 +106,8 @@ fun KidHeroBanner(
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
-    accent: Color = KidPalette.Ocean
+    accent: Color = KidPalette.Ocean,
+    artwork: Int = R.drawable.hero_adventure
 ) {
     Box(
         modifier = modifier
@@ -103,8 +115,8 @@ fun KidHeroBanner(
             .height(154.dp)
             .clip(RoundedCornerShape(28.dp))
     ) {
-        AsyncImage(
-            model = R.drawable.cardworld_bg,
+        Image(
+            painter = painterResource(artwork),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
@@ -149,16 +161,26 @@ fun KidTipCard(
     title: String,
     text: String,
     modifier: Modifier = Modifier,
-    container: Color = Color.White.copy(alpha = 0.90f)
+    container: Color = Color.White.copy(alpha = 0.94f)
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = container)
+        colors = CardDefaults.cardColors(containerColor = container),
+        border = BorderStroke(1.dp, KidPalette.Sun.copy(alpha = 0.60f))
     ) {
-        Column(Modifier.padding(14.dp)) {
-            Text(title, fontWeight = FontWeight.ExtraBold, color = KidPalette.Ink)
-            Spacer(Modifier.height(3.dp))
-            Text(text, style = MaterialTheme.typography.bodyMedium)
+        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(start = 5.dp)) {
+                Text(title, fontWeight = FontWeight.ExtraBold, color = KidPalette.Ink)
+                Spacer(Modifier.height(4.dp))
+                Text(text, style = MaterialTheme.typography.bodyMedium, color = KidPalette.Ink)
+            }
+            Spacer(Modifier.width(5.dp))
+            Image(
+                painter = painterResource(R.drawable.mascot_green),
+                contentDescription = null,
+                modifier = Modifier.width(68.dp).height(76.dp),
+                contentScale = ContentScale.Fit
+            )
         }
     }
 }
