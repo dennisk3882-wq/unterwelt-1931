@@ -94,6 +94,30 @@ internal object MarketValueEngine {
                 isManualSale = true
             )
         }
+        val filteredPrice = clean(entry.apiLivePriceEur)
+        val apiAge = ageDays(entry.apiLiveUpdatedAt, now)
+        val matchingSnapshot = filteredPrice != null &&
+            entry.apiLiveProductId?.matches(Regex("[0-9]{1,12}")) == true &&
+            entry.apiLiveLanguage == entry.language &&
+            entry.apiLiveCondition == entry.condition &&
+            entry.apiLiveVariant == entry.variant &&
+            apiAge != null && apiAge <= 7
+        if (matchingSnapshot) {
+            val isExact = entry.apiLiveExactGrade
+            return MarketValuation(
+                unitPrice = filteredPrice,
+                confidence = if (isExact) "Exakte Zustandsangebote" else "Gefilterte Angebote",
+                source = "cardmarketapi.com · Drittanbieter",
+                note = if (isExact)
+                    "Schätzung aus Angeboten für exakt angegebene Sprache und Zustandsstufe. Keine bestätigten Verkäufe; Druckvariante wurde manuell zugeordnet."
+                else
+                    "Durchschnitt der günstigsten Angebote für die ausgewählte Sprache und den Mindestzustand oder besser. Nicht ausschließlich genau dieser Zustand; Druckvariante wurde manuell zugeordnet.",
+                ageDays = apiAge,
+                rangeLow = null,
+                rangeHigh = null,
+                isManualSale = false
+            )
+        }
         val market = marketReference(entry.card, entry.variant, now)
         if (market == null) {
             return MarketValuation(
