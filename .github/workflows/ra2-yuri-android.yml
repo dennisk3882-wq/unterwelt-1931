@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.31-forensic-cd-capture
+# build-version: 0.32-verified-zip-export
 
 on:
   push:
@@ -151,6 +151,8 @@ jobs:
           javac -d test-launch ra2-mobile-port/src/RA2LaunchBatch.java ra2-mobile-port/src/RA2DiagnosticEvidence.java ra2-mobile-port/src/RA2SerialPolicy.java ra2-mobile-port/tests/RA2LaunchBatchTest.java ra2-mobile-port/tests/RA2DiagnosticEvidenceTest.java ra2-mobile-port/tests/RA2SerialPolicyTest.java
           javac -d test-launch ra2-mobile-port/src/RA2CdForensics.java ra2-mobile-port/tests/RA2CdForensicsTest.java
           java -cp test-launch RA2CdForensicsTest
+          javac -d test-launch ra2-mobile-port/src/RA2ZipExport.java ra2-mobile-port/tests/RA2ZipExportTest.java
+          java -cp test-launch RA2ZipExportTest
           javac -d test-launch ra2-mobile-port/src/Iso9660Extractor.java ra2-mobile-port/tests/RA2VolumeLabelTest.java
           java -cp test-launch RA2VolumeLabelTest
           java -cp test-launch RA2LaunchBatchTest

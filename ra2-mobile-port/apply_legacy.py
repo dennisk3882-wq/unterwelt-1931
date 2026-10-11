@@ -16,7 +16,7 @@ APP_ID = "com.winlator"
 def copy_sources_legacy(root: Path) -> None:
     dst = root / "app/src/main/java/com/winlator"
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java", "RA2DiagnosticEvidence.java", "RA2CdForensics.java", "RA2SerialPolicy.java"]:
+    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java", "RA2DiagnosticEvidence.java", "RA2CdForensics.java", "RA2ZipExport.java", "RA2SerialPolicy.java"]:
         require(SRC / name)
         text = read(SRC / name)
 
@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 231")
-    s = s.replace('versionName "7.1"', 'versionName "0.31.0-ra2-forensics"')
+    s = s.replace("versionCode 16", "versionCode 232")
+    s = s.replace('versionName "7.1"', 'versionName "0.32.0-ra2-export"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -226,7 +226,16 @@ def patch_manifest(root: Path) -> None:
         '<activity android:name="com.winlator.MainActivity"\n            android:theme="@style/AppTheme"\n            android:exported="false"'
     )
 
-    launcher = '''        <activity
+    launcher = '''        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.winlator.ra2diag.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/ra2_diag_paths" />
+        </provider>
+        <activity
             android:name="com.winlator.RA2DiagnosticsActivity"
             android:theme="@style/AppThemeFullscreen"
             android:exported="false"
@@ -252,6 +261,9 @@ def patch_manifest(root: Path) -> None:
             raise SystemExit("MainActivity manifest anchor missing")
         s = s.replace(anchor, launcher + anchor, 1)
     write(p, s)
+    diagnostic_paths = root / "app/src/main/res/xml/ra2_diag_paths.xml"
+    diagnostic_paths.parent.mkdir(parents=True, exist_ok=True)
+    diagnostic_paths.write_bytes((Path(__file__).parent / "resources/ra2_diag_paths.xml").read_bytes())
 
 def patch_strings(root: Path) -> None:
     p = root / "app/src/main/res/values/strings.xml"
@@ -868,7 +880,7 @@ def patch_xserver(root: Path) -> None:
         try {
             metadata.put("runId", java.util.UUID.randomUUID().toString());
             metadata.put("startedAt", System.currentTimeMillis());
-            metadata.put("appVersion", "0.31");
+            metadata.put("appVersion", "0.32");
             metadata.put("launchMode", getIntent().getBooleanExtra("ra2_launcher_probe", false) ? "original-launcher-probe" : "direct-engine");
             metadata.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
             metadata.put("android", android.os.Build.VERSION.RELEASE);

@@ -62,6 +62,10 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
     private TextView summary;
     private ProgressBar progress;
     private Button copyButton;
+    private Button exportButton;
+    private Button shareButton;
+    private TextView exportStatus;
+    private volatile File preparedZip;
     private Button rescanButton;
     private Button repairButton;
     private String reportText = "";
@@ -115,7 +119,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         top.addView(back, new LinearLayout.LayoutParams(dp(100), dp(46)));
 
         headline = text(25, Color.rgb(238, 220, 170), true);
-        headline.setText("RA2 / Yuri Diagnose-Center v0.31");
+        headline.setText("RA2 / Yuri Diagnose-Center v0.32");
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         hp.leftMargin = dp(14);
         top.addView(headline, hp);
@@ -163,15 +167,23 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         cp.leftMargin = dp(8);
         actions.addView(copyButton, cp);
         page.addView(actions);
-        Button export = button("Diagnose-ZIP speichern");
-        export.setOnClickListener(v -> {
-            android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
-            intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);
-            intent.setType("application/zip");
-            intent.putExtra(android.content.Intent.EXTRA_TITLE, "RA2-Diagnose-" + System.currentTimeMillis() + ".zip");
-            startActivityForResult(intent, 2401);
-        });
-        page.addView(export, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(46)));
+        LinearLayout zipActions = new LinearLayout(this);
+        zipActions.setOrientation(LinearLayout.HORIZONTAL);
+        exportButton = button("ZIP erstellen & speichern");
+        shareButton = button("ZIP direkt teilen");
+        exportButton.setEnabled(false);
+        shareButton.setEnabled(false);
+        exportButton.setOnClickListener(v -> prepareZip(false));
+        shareButton.setOnClickListener(v -> prepareZip(true));
+        LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        zipActions.addView(exportButton, ep);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        sp.leftMargin = dp(8);
+        zipActions.addView(shareButton, sp);
+        page.addView(zipActions);
+        exportStatus = text(13, Color.LTGRAY, false);
+        exportStatus.setText("Die ZIP wird vor dem Teilen vollständig erstellt und geprüft.");
+        page.addView(exportStatus);
 
         return page;
     }
@@ -182,6 +194,8 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         repairButton.setEnabled(false);
         rescanButton.setEnabled(false);
         copyButton.setEnabled(false);
+        if (exportButton != null) exportButton.setEnabled(false);
+        if (shareButton != null) shareButton.setEnabled(false);
         resultBox.removeAllViews();
         results.clear();
         suspiciousLogLines.clear();
@@ -1421,6 +1435,8 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         repairButton.setEnabled(container != null);
         rescanButton.setEnabled(true);
         copyButton.setEnabled(true);
+        if (exportButton != null) exportButton.setEnabled(true);
+        if (shareButton != null) shareButton.setEnabled(true);
 
         int fail = 0, warn = 0, pass = 0;
         for (Result r : results) {
@@ -1479,31 +1495,153 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         summary.setText(summary.getText() + " • Protokoll kopiert");
     }
 
+    /** Build the entire ZIP inside private app cache, then verify it. Only after
+     * that should Android's document picker or share sheet be offered. */
+    private void prepareZip(boolean share) {
+        exportButton.setEnabled(false);
+        shareButton.setEnabled(false);
+        exportStatus.setText("Erstelle und prüfe die ZIP-Datei … bitte warten.");
+        worker.execute(() -> {
+            try {
+                File folder = new File(getCacheDir(), "diagnostics");
+                if (!folder.isDirectory() && !folder.mkdirs())
+                    throw new java.io.IOException("Diagnose-Cache kann nicht erstellt werden");
+                File target = new File(folder, "RA2-Diagnose-" + System.currentTimeMillis() + ".zip");
+                String[] secrets = diagnosticSecrets();
+                String report = RA2SerialPolicy.redact(reportText, secrets);
+                if (report == null || report.trim().length() < 32)
+                    throw new java.io.IOException("Bericht ist noch nicht fertig – Diagnose erneut ausführen");
+                try (java.io.FileOutputStream out = new java.io.FileOutputStream(target);
+                     java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {
+                    zip.putNextEntry(new java.util.zip.ZipEntry("Diagnosebericht.txt"));
+                    zip.write(report.getBytes(StandardCharsets.UTF_8));
+                    zip.closeEntry();
+                    // Guarantee a second, useful entry even if session files disappeared.
+                    zip.putNextEntry(new java.util.zip.ZipEntry("aktueller-lauf/export-info.txt"));
+                    String info = "Android-Diagnose ZIP\nErstellt: " + System.currentTimeMillis() +
+                        "\nContainer verfuegbar: " + (container != null) + "\n";
+                    zip.write(info.getBytes(StandardCharsets.UTF_8));
+                    zip.closeEntry();
+                    if (container != null) {
+                        File session = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile");
+                        zipSession(zip, session, "aktueller-lauf/", secrets);
+                        File historyRoot = new File(session, "history");
+                        File[] history = historyRoot.listFiles();
+                        if (history != null) {
+                            Arrays.sort(history, (a,b) -> b.getName().compareTo(a.getName()));
+                            for (int i = 0; i < Math.min(3, history.length); i++) {
+                                if (history[i].isDirectory())
+                                    zipSession(zip, history[i], "history/" + history[i].getName() + "/", secrets);
+                            }
+                        }
+                    }
+                    zip.finish();
+                    out.getFD().sync();
+                } catch (Exception e) {
+                    target.delete();
+                    throw e;
+                }
+                long size = RA2ZipExport.verify(target);
+                preparedZip = target;
+                runOnUiThread(() -> {
+                    exportButton.setEnabled(true);
+                    shareButton.setEnabled(true);
+                    exportStatus.setText("ZIP fertig und geprüft: " + target.getName() +
+                        " • " + humanSize(size));
+                    if (share) showZipShareSheet(target);
+                    else showZipSavePicker(target);
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    exportButton.setEnabled(true);
+                    shareButton.setEnabled(true);
+                    exportStatus.setText("ZIP-Export fehlgeschlagen: " + error.getClass().getSimpleName()
+                        + " – " + String.valueOf(error.getMessage()));
+                });
+            }
+        });
+    }
+
+    private void showZipSavePicker(File file) {
+        android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+        intent.setType("application/zip");
+        intent.putExtra(android.content.Intent.EXTRA_TITLE, file.getName());
+        startActivityForResult(intent, 2401);
+    }
+
+    private void showZipShareSheet(File file) {
+        try {
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(this,
+                getPackageName() + ".ra2diag.fileprovider", file);
+            android.content.Intent send = new android.content.Intent(android.content.Intent.ACTION_SEND);
+            send.setType("application/zip");
+            send.putExtra(android.content.Intent.EXTRA_STREAM, uri);
+            send.setClipData(ClipData.newUri(getContentResolver(), "RA2 Diagnose ZIP", uri));
+            send.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(android.content.Intent.createChooser(send, "Diagnose-ZIP teilen"));
+        } catch (Exception error) {
+            exportStatus.setText("Teilen nicht möglich: " + String.valueOf(error.getMessage())
+                + " – bitte ZIP erstellen & speichern verwenden.");
+        }
+    }
+
     @Override
     protected void onActivityResult(int request, int result, android.content.Intent data) {
         super.onActivityResult(request, result, data);
-        if (request != 2401 || result != RESULT_OK || data == null || data.getData() == null) return;
+        if (request != 2401) return;
+        if (result != RESULT_OK || data == null || data.getData() == null) {
+            exportStatus.setText("Speichern abgebrochen. Die vorbereitete ZIP bleibt in der App verfügbar.");
+            return;
+        }
         final Uri destination = data.getData();
-        final String report = reportText;
-        final String[] secrets = diagnosticSecrets();
+        final File source = preparedZip;
+        exportButton.setEnabled(false);
+        shareButton.setEnabled(false);
+        exportStatus.setText("Übertrage fertige ZIP in den ausgewählten Ordner …");
         worker.execute(() -> {
-            try (java.io.OutputStream output = getContentResolver().openOutputStream(destination);
-                 java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(output)) {
-                zip.putNextEntry(new java.util.zip.ZipEntry("Diagnosebericht.txt"));
-                zip.write(RA2SerialPolicy.redact(report,secrets).getBytes(StandardCharsets.UTF_8));
-                zip.closeEntry();
-                if (container != null) {
-                    File session = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile");
-                    zipSession(zip, session, "aktueller-lauf/",secrets);
-                    File[] history = new File(session, "history").listFiles();
-                    if (history != null) {
-                        Arrays.sort(history, (a,b) -> b.getName().compareTo(a.getName()));
-                        for (int i=0;i<Math.min(3,history.length);i++) zipSession(zip,history[i],"history/"+history[i].getName()+"/",secrets);
+            try {
+                long sourceSize = RA2ZipExport.verify(source);
+                long written = 0;
+                try (java.io.InputStream in = new java.io.FileInputStream(source);
+                     java.io.OutputStream output = getContentResolver().openOutputStream(destination, "wt")) {
+                    if (output == null) throw new java.io.IOException("Android-Speicherziel liefert keinen Datenstrom");
+                    byte[] buffer = new byte[65536];
+                    int n;
+                    while ((n = in.read(buffer)) != -1) {
+                        output.write(buffer, 0, n);
+                        written += n;
                     }
+                    output.flush();
                 }
-                runOnUiThread(() -> android.widget.Toast.makeText(this,"Diagnose-ZIP gespeichert",android.widget.Toast.LENGTH_LONG).show());
+                if (written != sourceSize)
+                    throw new java.io.IOException("Übertragung unvollständig: " + written + "/" + sourceSize);
+                // Read back the ZIP magic to catch empty documents or bad providers.
+                try (java.io.InputStream in = getContentResolver().openInputStream(destination)) {
+                    if (in == null || in.read() != 0x50 || in.read() != 0x4b ||
+                            in.read() != 0x03 || in.read() != 0x04)
+                        throw new java.io.IOException("Gespeicherte ZIP ist leer oder ungültig");
+                }
+                long providerSize = querySize(destination);
+                if (providerSize == 0)
+                    throw new java.io.IOException("Dateianbieter meldet 0 Byte nach dem Speichern");
+                final long actual = written;
+                runOnUiThread(() -> {
+                    exportButton.setEnabled(true);
+                    shareButton.setEnabled(true);
+                    exportStatus.setText("ZIP gespeichert und erneut geöffnet: " + humanSize(actual)
+                        + " • jetzt in ChatGPT als Datei anhängen.");
+                    android.widget.Toast.makeText(this, "Diagnose-ZIP vollständig gespeichert",
+                        android.widget.Toast.LENGTH_LONG).show();
+                });
             } catch (Exception error) {
-                runOnUiThread(() -> android.widget.Toast.makeText(this,"ZIP konnte nicht gespeichert werden: " + error.getMessage(),android.widget.Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> {
+                    exportButton.setEnabled(true);
+                    shareButton.setEnabled(true);
+                    exportStatus.setText("Speichern nicht bestätigt: " +
+                        String.valueOf(error.getMessage()) +
+                        " • Mit „ZIP direkt teilen“ erneut versuchen.");
+                });
             }
         });
     }
