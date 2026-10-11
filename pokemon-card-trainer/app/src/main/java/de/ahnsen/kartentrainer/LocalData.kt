@@ -295,7 +295,10 @@ class LocalAppStore(context: Context) {
                         scanVerified = o.optBoolean("scanVerified", true),
                         lastScannedAt = if (o.has("lastScannedAt") && !o.isNull("lastScannedAt")) {
                             o.optLong("lastScannedAt")
-                        } else null
+                        } else null,
+                        referenceSalePriceEur = if (o.has("referenceSalePriceEur") && !o.isNull("referenceSalePriceEur")) o.optDouble("referenceSalePriceEur") else null,
+                        referenceSaleSource = o.optString("referenceSaleSource").takeIf { it.isNotBlank() },
+                        referenceSaleAt = if (o.has("referenceSaleAt") && !o.isNull("referenceSaleAt")) o.optLong("referenceSaleAt") else null
                     )
                 )
             }
