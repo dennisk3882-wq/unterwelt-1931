@@ -16,7 +16,7 @@ APP_ID = "com.winlator"
 def copy_sources_legacy(root: Path) -> None:
     dst = root / "app/src/main/java/com/winlator"
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java", "RA2DiagnosticEvidence.java", "RA2SerialPolicy.java"]:
+    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java", "RA2DiagnosticEvidence.java", "RA2CdForensics.java", "RA2SerialPolicy.java"]:
         require(SRC / name)
         text = read(SRC / name)
 
@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 230")
-    s = s.replace('versionName "7.1"', 'versionName "0.30.0-ra2-cd-probe"')
+    s = s.replace("versionCode 16", "versionCode 231")
+    s = s.replace('versionName "7.1"', 'versionName "0.31.0-ra2-forensics"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -604,6 +604,15 @@ def patch_xserver(root: Path) -> None:
                 } catch (Exception ignored) {}
             }
             // A compact ordered trace keeps phase markers even when verbose file tracing rotates.
+            // A separate, bounded, low-noise trace survives high-volume ReadFile relay spam.
+            if (RA2CdForensics.relevant(value)) {
+                File focus = new File(file.getParentFile(), "ra2-cd-focus.log");
+                if (focus.length() < 3L * 1024 * 1024) {
+                    try (java.io.FileOutputStream out = new java.io.FileOutputStream(focus, true)) {
+                        out.write(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    } catch (Exception ignored) {}
+                }
+            }
             String lower = value.toLowerCase(java.util.Locale.ROOT);
             if (!lower.contains(":file:") || lower.contains("c0000034") || lower.contains("c000003a") || lower.contains("c0000022") || lower.contains(":err:")) {
                 File evidence = new File(file.getParentFile(), "ra2-evidence.log");
@@ -842,7 +851,7 @@ def patch_xserver(root: Path) -> None:
         if (new File(session, "session.json").isFile() || new File(session, "ra2-live.log").isFile()) {
             File archive = new File(history, "run-" + System.currentTimeMillis());
             archive.mkdirs();
-            for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "last-start.log", "game-exit.txt", "cd-volume-preflight.txt", "safedisc-dll-stage.txt", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt", "safedisc.log", "safedisc-injector.log"}) {
+            for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "last-start.log", "game-exit.txt", "cd-volume-preflight.txt", "safedisc-dll-stage.txt", "ra2-cd-focus.log", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt", "safedisc.log", "safedisc-injector.log"}) {
                 File source = new File(session, name);
                 if (source.isFile()) source.renameTo(new File(archive, name));
             }
@@ -859,7 +868,7 @@ def patch_xserver(root: Path) -> None:
         try {
             metadata.put("runId", java.util.UUID.randomUUID().toString());
             metadata.put("startedAt", System.currentTimeMillis());
-            metadata.put("appVersion", "0.30");
+            metadata.put("appVersion", "0.31");
             metadata.put("launchMode", getIntent().getBooleanExtra("ra2_launcher_probe", false) ? "original-launcher-probe" : "direct-engine");
             metadata.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
             metadata.put("android", android.os.Build.VERSION.RELEASE);
@@ -872,11 +881,12 @@ def patch_xserver(root: Path) -> None:
             metadata.put("ddrawSHA256", RA2DiagnosticEvidence.sha256(new File(dir, "ddraw.dll")));
             metadata.put("binkSHA256", RA2DiagnosticEvidence.sha256(findLegacyHelperFile(dir, "binkw32.dll", 0)));
             metadata.put("freeBytes", session.getUsableSpace());
-            metadata.put("trace", "process,loaddll,module,seh,file,filtered-relay,timestamp; bounded last 16 MiB");
+            metadata.put("trace", "process,loaddll,module,seh,file,filtered-relay,timestamp; focused CD trace bounded 3 MiB");
         } catch (org.json.JSONException ignored) {}
         FileUtils.writeString(new File(session, "session.json"), metadata.toString());
         FileUtils.delete(new File(session, "cd-volume-preflight.txt"));
         FileUtils.delete(new File(session, "safedisc-dll-stage.txt"));
+        FileUtils.delete(new File(session, "ra2-cd-focus.log"));
         FileUtils.delete(new File(session, "game-exit.txt"));
         FileUtils.delete(new File(session, "game-exit.tmp"));
         FileUtils.delete(new File(session, "rpcss-after-game.txt"));

@@ -115,7 +115,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         top.addView(back, new LinearLayout.LayoutParams(dp(100), dp(46)));
 
         headline = text(25, Color.rgb(238, 220, 170), true);
-        headline.setText("RA2 / Yuri Diagnose-Center v0.30");
+        headline.setText("RA2 / Yuri Diagnose-Center v0.31");
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         hp.leftMargin = dp(14);
         top.addView(headline, hp);
@@ -1245,6 +1245,28 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             sessionText("rpcss-preflight.txt"), sessionText("rpcss-after-game.txt"), code,
             prefs.getBoolean("last_saw_child", false));
         primaryDiagnosis = analysis.summary;
+        String cdStage = sessionText("safedisc-dll-stage.txt");
+        String focus = sessionText("ra2-cd-focus.log");
+        RA2CdForensics.Report cdReport = RA2CdForensics.analyze(
+            cdStage, sessionText("safedisc-injector.log"), sessionText("safedisc.log"),
+            sessionText("cd-volume-preflight.txt"), focus, sessionText("session.json"));
+        if (sessionText("session.json").contains("original-launcher-probe")) {
+            primaryDiagnosis = cdReport.headline;
+            add(Level.INFO, "CD-Forensik", "Letzte erreichte SafeDisc-Stufe",
+                cdReport.stage, "Getrennte DLL-Einstiegs-, Konfigurations- und Hook-Marker.");
+            for (String statement : cdReport.findings)
+                add(statement.startsWith("MESSLÜCKE") ? Level.WARN : Level.INFO, "CD-Forensik",
+                    statement.startsWith("NÄCHSTER TEST") ? "Gezielte nächste Untersuchung" : "Messbefund",
+                    statement, "");
+            if (!cdReport.focusedTrace.isEmpty())
+                add(Level.INFO, "CD-Forensik", "Letzte CD-/Laufwerks-API-Ereignisse",
+                    String.join("\n", cdReport.focusedTrace),
+                    "Die vollständige begrenzte CD-Spur liegt als ra2-cd-focus.log im Diagnose-ZIP.");
+            else
+                add(Level.WARN, "CD-Forensik", "Eigene CD-API-Spur fehlt",
+                    "Es wurden keine passenden CD-Aufrufe im Wine-Trace erfasst.",
+                    "Die originale CD kann trotzdem geprüft worden sein; Wine-Tracing ist keine vollständige API-Instrumentierung.");
+        }
         add(Level.INFO, "Sitzung", "Aktueller Testlauf", sessionText("session.json"),
             "Nur Daten dieses Laufs werden für die Ursachenanalyse verwendet. Ältere Läufe stehen im ZIP getrennt bereit.");
         add(Level.INFO, "Sitzung", "Ereignisse mit Zeitstempel", sessionText("events.log"),
@@ -1501,7 +1523,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
 
     private void zipSession(java.util.zip.ZipOutputStream zip, File session, String prefix, String[] secrets) throws java.io.IOException {
         // Explicit allowlist: no ISOs, registry, saved games or unrelated app files.
-        for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "game-exit.txt", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt", "safedisc.log", "safedisc-injector.log"}) {
+        for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "game-exit.txt", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt", "cd-volume-preflight.txt", "safedisc-dll-stage.txt", "ra2-cd-focus.log", "safedisc.log", "safedisc-injector.log"}) {
             File file = new File(session,name);
             if (!file.isFile()) continue;
             zip.putNextEntry(new java.util.zip.ZipEntry(prefix+name));
