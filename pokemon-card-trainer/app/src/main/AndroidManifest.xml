@@ -10,6 +10,13 @@
         android:roundIcon="@drawable/app_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.TCGKartenCoach">
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="de.ahnsen.kartentrainer.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/multi_scanner_paths" />
+        </provider>
         <activity
             android:name=".MainActivity"
             android:screenOrientation="portrait"
