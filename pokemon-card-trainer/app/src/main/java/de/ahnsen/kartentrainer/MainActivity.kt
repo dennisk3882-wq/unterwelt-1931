@@ -734,6 +734,12 @@ private fun ScanScreen(
                         onError = { message = it }
                     )
                     Spacer(Modifier.height(8.dp))
+                    MultiCardPhotoScanner(
+                        repository = repository,
+                        onAdd = onAdd,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
                     PrecisionCardScannerButton(
                         modifier = Modifier.fillMaxWidth(),
                         onText = { text ->
