@@ -27,21 +27,23 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 @Composable
 fun PrecisionCardScannerButton(
     modifier: Modifier = Modifier,
+    detailed: Boolean = false,
+    buttonLabel: String = "Karte scannen",
     onText: (String) -> Unit,
     onError: (String) -> Unit
 ) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val recognizer = remember { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
-    val options = remember {
+    val options = remember(detailed) {
         GmsDocumentScannerOptions.Builder()
             .setGalleryImportAllowed(false)
-            .setPageLimit(9)
+            .setPageLimit(1)
             .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
-            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+            .setScannerMode(if (detailed) GmsDocumentScannerOptions.SCANNER_MODE_FULL else GmsDocumentScannerOptions.SCANNER_MODE_BASE)
             .build()
     }
-    val scanner = remember { GmsDocumentScanning.getClient(options) }
+    val scanner = remember(options) { GmsDocumentScanning.getClient(options) }
 
     DisposableEffect(Unit) {
         onDispose { recognizer.close() }
@@ -96,7 +98,7 @@ fun PrecisionCardScannerButton(
         }
     ) {
         Icon(Icons.Default.DocumentScanner, contentDescription = null)
-        Text(" Präzisionsscan mit Rand-/Perspektivkorrektur")
+        Text(" " + buttonLabel)
     }
 }
 
