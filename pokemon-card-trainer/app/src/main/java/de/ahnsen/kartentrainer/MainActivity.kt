@@ -439,6 +439,10 @@ private fun HomeScreen(
         }
 
         item {
+            KidCompanionWelcome()
+        }
+
+        item {
             Text(
                 "Was möchtest du machen?",
                 style = MaterialTheme.typography.titleLarge,
@@ -567,8 +571,8 @@ private fun HomeTile(
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.94f)),
-        border = BorderStroke(2.dp, accent.copy(alpha = 0.35f))
+        colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.13f).compositeOver(Color.White)),
+        border = BorderStroke(2.dp, accent.copy(alpha = 0.48f))
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
