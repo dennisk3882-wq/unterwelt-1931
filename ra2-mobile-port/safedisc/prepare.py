@@ -44,7 +44,7 @@ s=s.replace('''WaitForSingleObject(hNewThread, INFINITE);''','''WaitForSingleObj
     if (!module) exitlog("Compatibility DLL could not be loaded");''')
 p.write_text(s)
 p=root/'src/version.cpp'
-s=p.read_bytes().decode('cp1252').replace('"version.json"','"ra2-cd-compat.json"')
+s=p.read_bytes().decode('cp1252').replace('"version.json"',r'"C:\\Westwood\\RA2\\ra2-cd-compat.json"')
 start=s.index('\t\t// The below is just to force the console window visible')
 end=s.index('\t\tNString logFile', start)
 s=s[:start]+s[end:]
