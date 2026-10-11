@@ -24,7 +24,12 @@ class MainActivitySmokeTest {
     @Test
     fun scannerNavigationOpensLiveScannerArea() {
         composeRule.onNodeWithText("Karten scannen").performClick()
-        composeRule.onNodeWithText("📸 Zeig mir deine Karte!").assertIsDisplayed()
-        composeRule.onNodeWithText("Einzelscan").assertIsDisplayed()
+        composeRule.onNodeWithText("📸 Karten entdecken!").assertIsDisplayed()
+        composeRule.onNodeWithText("Wie möchtest du scannen?").assertExists()
+        composeRule.onNodeWithText("Eine Karte scannen").assertExists()
+        composeRule.onNodeWithText("Eine Karte genau scannen").assertExists()
+        composeRule.onNodeWithText("Viele Karten nacheinander").assertExists()
+        composeRule.onNodeWithText("Viele Karten auf einem Foto").assertExists()
+        composeRule.onNodeWithText("📷 Karte scannen").assertExists()
     }
 }
