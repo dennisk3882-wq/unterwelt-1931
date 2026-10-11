@@ -1,4 +1,5 @@
 Version: 2.4.4
-Outcome: FAILED
-Commit: d10f244f99eaa6a39a7cbf05409c44af01a14242
-Run ID: 38147209771
+Commit: b1fa9e126400d1794a1f3e2d923b224b2cc1085c
+Run ID: 38147566224
+2a70fe820d91b31f476bd8692ef27a15dbec421a4acfbd64c262af8a921796c0  dist/TCG-Karten-Coach-2.4.4.apk
+Release: https://github.com/dennisk3882-wq/unterwelt-1931/releases/tag/tcg-karten-coach-v2.4.4
