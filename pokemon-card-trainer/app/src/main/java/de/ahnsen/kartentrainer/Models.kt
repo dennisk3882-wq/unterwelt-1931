@@ -182,7 +182,15 @@ data class CollectionEntry(
     val lastScannedAt: Long? = null,
     val referenceSalePriceEur: Double? = null,
     val referenceSaleSource: String? = null,
-    val referenceSaleAt: Long? = null
+    val referenceSaleAt: Long? = null,
+    val apiLivePriceEur: Double? = null,
+    val apiLiveProductId: String? = null,
+    val apiLiveLanguage: String? = null,
+    val apiLiveCondition: String? = null,
+    val apiLiveVariant: String? = null,
+    val apiLiveUpdatedAt: Long? = null,
+    val apiLiveExactGrade: Boolean = false,
+    val apiLiveOffers: Int = 0
 ) {
     fun adjustedUnitValue(): Double? = MarketValueEngine.estimate(this).unitPrice
 
@@ -269,6 +277,14 @@ fun CollectionEntry.toJson(): JSONObject = JSONObject().apply {
     if (referenceSalePriceEur != null) put("referenceSalePriceEur", referenceSalePriceEur)
     if (referenceSaleSource != null) put("referenceSaleSource", referenceSaleSource)
     if (referenceSaleAt != null) put("referenceSaleAt", referenceSaleAt)
+    if (apiLivePriceEur != null) put("apiLivePriceEur", apiLivePriceEur)
+    if (apiLiveProductId != null) put("apiLiveProductId", apiLiveProductId)
+    if (apiLiveLanguage != null) put("apiLiveLanguage", apiLiveLanguage)
+    if (apiLiveCondition != null) put("apiLiveCondition", apiLiveCondition)
+    if (apiLiveVariant != null) put("apiLiveVariant", apiLiveVariant)
+    if (apiLiveUpdatedAt != null) put("apiLiveUpdatedAt", apiLiveUpdatedAt)
+    put("apiLiveExactGrade", apiLiveExactGrade)
+    put("apiLiveOffers", apiLiveOffers)
     put("scanVerified", scanVerified)
     put("lastScannedAt", lastScannedAt)
     put("card", card.toJson())
