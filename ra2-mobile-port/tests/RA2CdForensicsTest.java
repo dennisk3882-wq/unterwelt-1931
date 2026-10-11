@@ -14,6 +14,12 @@ public class RA2CdForensicsTest {
         RA2CdForensics.Report ready=RA2CdForensics.analyze("dllmain-attach\nload-entry\nconfig-loaded=1\nhooks-enabled\n",
              "injection-result=success\n","Hooks Complete!\n",disc,"","original-launcher-probe");
         require(ready.headline.contains("DLL-Hooks bestätigt"),"Hook conclusion");
+        RA2CdForensics.Report dllMode=RA2CdForensics.analyze("",
+            "injection-result=success", "", disc,
+            "wineMs=99:trace:loaddll:build_module Loaded L\"C:\\RA2Mobile\\SafeDisc\\version.dll\" at 0000: native\n",
+            "{\"launchMode\":\"original-launcher-probe\",\"nativeVersionDllRequested\":true}");
+        require(dllMode.findings.toString().contains("VERSION.DLL nativ geladen"),
+            "Native DLL distinguishable from Wine builtin");
         require(!RA2CdForensics.relevant("wineMs=1 00:Call kernel32.ReadFile()"),"Noise dropped");
         require(RA2CdForensics.relevant("Call KERNEL32.GetVolumeInformationA()"),"Volume call retained");
         System.out.println("RA2 CD forensic stage/capture tests passed");

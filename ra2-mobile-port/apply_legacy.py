@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 233")
-    s = s.replace('versionName "7.1"', 'versionName "0.33.0-ra2-bounded-zip"')
+    s = s.replace("versionCode 16", "versionCode 234")
+    s = s.replace('versionName "7.1"', 'versionName "0.34.0-ra2-native-dll"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -851,6 +851,10 @@ def patch_xserver(root: Path) -> None:
                 String debugKey = "Software\\\\Wine\\\\Debug";
                 registry.removeValue(debugKey, "RelayExclude");
                 registry.removeValue(debugKey, "RelayFromExclude");
+                // Prefer the actual native compatibility VERSION.DLL only for
+                // RA2.EXE; do not modify global Wine DLL rules or system services.
+                registry.setStringValue("Software\\\\Wine\\\\AppDefaults\\\\RA2.EXE\\\\DllOverrides",
+                    "version", "native,builtin");
                 registry.setStringValue(debugKey, "RelayInclude",
                     "ExitProcess;RtlExitUserProcess;TerminateProcess;NtTerminateProcess;CoCreateInstance;CoGetClassObject;GetVersion;GetVersionExA;GetVersionExW;GetDriveTypeA;GetDriveTypeW;CreateWindowExA;CreateWindowExW;OleInitialize;OleUninitialize;CoInitializeEx;GetCommandLineA;GetCommandLineW;GetCurrentDirectoryA;GetModuleFileNameA;FindWindowA;FindWindowW;FindWindowExA;FindWindowExW;CreateMutexA;CreateMutexW;OpenMutexA;OpenMutexW;GetLastError;RegOpenKeyExA;RegOpenKeyExW;RegQueryValueExA;RegQueryValueExW;RegGetValueA;RegGetValueW;GetVolumeInformationA;GetVolumeInformationW;GetFileAttributesA;CreateFileA;ReadFile;MessageBoxA;MessageBoxW;LoadLibraryA;LoadLibraryExA;GetProcAddress;IsDebuggerPresent;CheckRemoteDebuggerPresent;GetSystemMetrics;GetDeviceCaps");
             }
@@ -863,7 +867,7 @@ def patch_xserver(root: Path) -> None:
         if (new File(session, "session.json").isFile() || new File(session, "ra2-live.log").isFile()) {
             File archive = new File(history, "run-" + System.currentTimeMillis());
             archive.mkdirs();
-            for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "last-start.log", "game-exit.txt", "cd-volume-preflight.txt", "safedisc-dll-stage.txt", "ra2-cd-focus.log", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt", "safedisc.log", "safedisc-injector.log"}) {
+            for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "last-start.log", "game-exit.txt", "cd-volume-preflight.txt", "safedisc-dll-stage.txt", "ra2-cd-focus.log", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt", "wine-dll-override.txt", "safedisc.log", "safedisc-injector.log"}) {
                 File source = new File(session, name);
                 if (source.isFile()) source.renameTo(new File(archive, name));
             }
@@ -880,13 +884,15 @@ def patch_xserver(root: Path) -> None:
         try {
             metadata.put("runId", java.util.UUID.randomUUID().toString());
             metadata.put("startedAt", System.currentTimeMillis());
-            metadata.put("appVersion", "0.33");
+            metadata.put("appVersion", "0.34");
             metadata.put("launchMode", getIntent().getBooleanExtra("ra2_launcher_probe", false) ? "original-launcher-probe" : "direct-engine");
             metadata.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
             metadata.put("android", android.os.Build.VERSION.RELEASE);
             metadata.put("abis", java.util.Arrays.toString(android.os.Build.SUPPORTED_ABIS));
             metadata.put("wow64", container.isWoW64Mode());
             metadata.put("driveXRequestedType", "cdrom");
+            metadata.put("nativeVersionDllRequested", getIntent().getBooleanExtra("ra2_launcher_probe", false));
+            metadata.put("dllOverrideScope", "HKCU/AppDefaults/RA2.EXE/version=native,builtin");
             metadata.put("game", new File(execPath).getName());
             metadata.put("gameBytes", new File(execPath).length());
             metadata.put("gameSHA256", RA2DiagnosticEvidence.sha256(new File(execPath)));
@@ -905,6 +911,7 @@ def patch_xserver(root: Path) -> None:
         FileUtils.delete(new File(session, "blowfish-register.txt"));
         FileUtils.delete(new File(session, "rpcss-preflight.txt"));
         FileUtils.delete(new File(session, "registry-preflight.txt"));
+        FileUtils.delete(new File(session, "wine-dll-override.txt"));
         FileUtils.writeString(new File(session, "ra2-live.log"), "stage=runtime-wrapper-ready\\n");
         FileUtils.delete(new File(session, "safedisc.log"));
         FileUtils.delete(new File(session, "safedisc-injector.log"));

@@ -47,6 +47,9 @@ public final class RA2CdForensics {
         boolean injected = li.contains("injection-result=success");
         boolean failed = li.contains("injection-result=failure") ||
             li.contains("createprocess failed") || li.contains("could not create remote thread");
+        boolean nativeDll = java.util.regex.Pattern.compile("(?im)Loaded[^\\r\\n]*version\\.dll[^\\r\\n]*: native").matcher(f).find();
+        boolean builtinDll = java.util.regex.Pattern.compile("(?im)Loaded[^\\r\\n]*version\\.dll[^\\r\\n]*: builtin").matcher(f).find();
+        boolean requestedNative = safe(metadata).contains("\\"nativeVersionDllRequested\\":true");
         boolean cdCalls = lf.contains("getvolumeinformation") || lf.contains("getdrivetype")
             || lf.contains("deviceiocontrol") || lf.contains("secdrv");
         r.stage = "unbekannt";
@@ -66,6 +69,9 @@ public final class RA2CdForensics {
         r.findings.add("Injector: "+(failed?"FEHLER belegt":injected?"Injektion gemeldet":i.isEmpty()?"Kein Injector-Log":"Log vorhanden, kein Injektionsresultat"));
         r.findings.add("DLL angehängt: "+yes(attached)+"; Load betreten: "+yes(entered)+
             "; Konfiguration: "+yes(configured)+"; Hooks: "+yes(hooks));
+        r.findings.add("Wine DLL-Modus: "+(nativeDll?"VERSION.DLL nativ geladen":builtinDll?"Wine-builtin VERSION.DLL belegt":"native/builtin noch nicht unterscheidbar"));
+        if (requestedNative && !nativeDll)
+            r.findings.add("MESSLÜCKE: Native DLL angefordert; Wine bestätigt sie im erfassten Trace noch nicht.");
         r.findings.add("CD-API-Aufrufe in eigener Wine-Spur: "+(cdCalls?"vorhanden":"nicht nachgewiesen"));
         if (!attached && !entered && !h.contains("Version.DLL Loaded!"))
             r.findings.add("MESSLÜCKE: Fehlende DLL-Marker dürfen nicht als definitiv fehlende Injektion gewertet werden.");

@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.33-bounded-zip-export
+# build-version: 0.34-native-version-dll
 
 on:
   push:

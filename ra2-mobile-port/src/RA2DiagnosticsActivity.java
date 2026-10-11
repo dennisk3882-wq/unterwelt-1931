@@ -122,7 +122,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         top.addView(back, new LinearLayout.LayoutParams(dp(100), dp(46)));
 
         headline = text(25, Color.rgb(238, 220, 170), true);
-        headline.setText("RA2 / Yuri Diagnose-Center v0.33");
+        headline.setText("RA2 / Yuri Diagnose-Center v0.34");
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         hp.leftMargin = dp(14);
         top.addView(headline, hp);
@@ -1025,6 +1025,12 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         if (volumeInfo != null && !volumeInfo.isEmpty())
             add(Level.INFO, "Virtuelle CDs", "CD-Abfrage in Wine (dir X:)",
                 compactLines(volumeInfo, 22), "Verzeichnisprüfung in Wine. Für die tatsächliche CD-Identität den Laufzeittest auswerten.");
+        String wineOverride = sessionText("wine-dll-override.txt");
+        if (!wineOverride.isEmpty())
+            add(wineOverride.contains("native,builtin") ? Level.PASS : Level.WARN,
+                "CD-Kompatibilität", "Wine-DLL-Regel für RA2.EXE",
+                compactLines(wineOverride, 14),
+                "Nativ bevorzugt heißt nicht automatisch, dass die DLL auch geladen wurde. Wine-Module-Trace prüfen.");
         String hookStage = sessionText("safedisc-dll-stage.txt");
         if (liveText != null && liveText.contains("cdCompatibility=true")) {
             if (hookStage == null || hookStage.isEmpty()) {
@@ -1673,7 +1679,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log",
                            "ra2-live.previous.log", "game-exit.txt", "rpcss-preflight.txt",
                            "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt",
-                           "cd-volume-preflight.txt", "safedisc-dll-stage.txt", "ra2-cd-focus.log",
+                           "cd-volume-preflight.txt", "wine-dll-override.txt", "safedisc-dll-stage.txt", "ra2-cd-focus.log",
                            "safedisc.log", "safedisc-injector.log"};
         for (String name : entries) {
             if (Thread.currentThread().isInterrupted())
