@@ -52,4 +52,53 @@ class MarketValueEngineTest {
         assertNull(MarketValueEngine.clean(Double.NaN))
         assertEquals(1_760_000_000_000L, MarketValueEngine.epochMs(1_760_000_000L))
     }
+
+    @Test fun verifiedGermanApiQuoteOverridesOnlyMatchingCardMetadata() {
+        val now = System.currentTimeMillis()
+        val entry = CollectionEntry(card(), 2, "Normal", "DE", "NM",
+            apiLivePriceEur = 4.20,
+            apiLiveProductId = "869888",
+            apiLiveLanguage = "DE",
+            apiLiveCondition = "NM",
+            apiLiveVariant = "Normal",
+            apiLiveUpdatedAt = now,
+            apiLiveExactGrade = true,
+            apiLiveOffers = 4
+        )
+        val good = MarketValueEngine.estimate(entry, now)
+        assertEquals(4.20, good.unitPrice!!, 0.0001)
+        assertEquals("Exakte Zustandsangebote", good.confidence)
+        assertEquals(8.40, entry.totalEstimatedValue!!, 0.001)
+        val otherLanguage = MarketValueEngine.estimate(entry.copy(language = "EN"), now)
+        assertEquals(1.35, otherLanguage.unitPrice!!, 0.0001)
+        val otherVariant = MarketValueEngine.estimate(entry.copy(variant = "Reverse"), now)
+        assertNull(otherVariant.unitPrice)
+    }
+
+    @Test fun oldApiQuoteExpiresAndMarketReferenceIsUsed() {
+        val now = System.currentTimeMillis()
+        val eightDays = now - 8L * 86400000L
+        val entry = CollectionEntry(card(), 1, "Normal", "DE", "NM",
+            apiLivePriceEur = 99.0,
+            apiLiveProductId = "869888",
+            apiLiveLanguage = "DE",
+            apiLiveCondition = "NM",
+            apiLiveVariant = "Normal",
+            apiLiveUpdatedAt = eightDays
+        )
+        assertEquals(1.35, MarketValueEngine.estimate(entry, now).unitPrice!!, 0.001)
+    }
+
+    @Test fun livePriceRequiresValidatedProductIdAndMatchingCondition() {
+        val now = System.currentTimeMillis()
+        val entry = CollectionEntry(card(), 1, "Reverse", "DE", "NM",
+            apiLivePriceEur = 19.0,
+            apiLiveProductId = "not-a-valid-id",
+            apiLiveLanguage = "DE",
+            apiLiveCondition = "EX",
+            apiLiveVariant = "Reverse",
+            apiLiveUpdatedAt = now
+        )
+        assertNull(MarketValueEngine.estimate(entry, now).unitPrice)
+    }
 }
