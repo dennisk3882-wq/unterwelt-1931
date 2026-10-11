@@ -756,7 +756,7 @@ private fun ScanScreen(
                                 results = candidates
                                 cameraCandidateIds = candidates.map { it.id }.toSet()
                                 lastOwnershipScanAt = System.currentTimeMillis()
-                                if (candidates.size == 1) {
+                                if (candidates.size == 1 && CardScanIdentityParser.isVerifiedCard(candidates.first(), text)) {
                                     val card = runCatching { repository.getCard(candidates.first().id) }.getOrNull()
                                     if (card != null) {
                                         CardImageCache.prefetch(scanContext, card)
