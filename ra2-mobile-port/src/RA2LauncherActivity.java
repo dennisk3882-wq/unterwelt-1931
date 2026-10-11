@@ -86,6 +86,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private TextView status;
     private TextView storageHint;
     private ProgressBar progress;
+    private Button cdKeysButton;
     private Button languageDe;
     private volatile boolean installationBusy;
     private Button languageEn;
@@ -154,7 +155,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.26 · Frühe Startprüfungen");
+        version.setText("v0.27 · Originalschlüssel & Registry-Test");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
@@ -196,6 +197,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         status = label(14, Color.rgb(185, 220, 190));
         status.setPadding(dp(4), dp(7), dp(4), dp(12));
         root.addView(status, matchWrap(0));
+
+        cdKeysButton = button("");
+        cdKeysButton.setOnClickListener(v -> editOriginalKeys());
+        root.addView(cdKeysButton, matchWrap(dp(7)));
 
         installRa2Button = accentButton("");
         installYuriButton = accentButton("");
@@ -262,6 +267,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             ? "Die ISO wird während der Einrichtung temporär in den App-Bereich kopiert und direkt von Android gelesen. Die CD-Daten bleiben als virtuelles Laufwerk X: erhalten, damit Originalvideos und CD-Abfragen funktionieren."
             : "The ISO is copied temporarily into private app storage and read directly by Android. Disc data remains as virtual drive X: for original movies and disc checks.");
 
+        cdKeysButton.setText(de ? "Original-CD-Schlüssel" : "Original CD keys");
         installRa2Button.setText(de ? "Alarmstufe Rot 2 einrichten" : "Set up Red Alert 2");
         installYuriButton.setText(de ? "Yuri’s Rache einrichten" : "Set up Yuri’s Revenge");
         playRa2Button.setText(de ? "ALARMSTUFE ROT 2 STARTEN" : "START RED ALERT 2");
@@ -468,7 +474,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
             .setTitle(isGerman() ? "Alarmstufe Rot 2 einrichten" : "Set up Red Alert 2")
             .setMessage(isGerman()
-                ? "Beide Original-CDs werden direkt ausgewertet. Die Spieldateien werden ohne das alte Westwood-Setup installiert."
+                ? "Beide Original-CDs werden direkt ausgewertet. Die Spieldateien werden ohne das alte Westwood-Setup installiert. Deinen Original-CD-Schlüssel kannst du über den Button Original-CD-Schlüssel eintragen."
                 : "Both original discs will be read directly. The game files are installed without the old Westwood setup.")
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(isGerman() ? "Starten" : "Start", (d, w) -> {
@@ -977,6 +983,60 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         catch (Exception ignored) {}
     }
 
+    private void editOriginalKeys() {
+        if(installationBusy || runtimeStarting) {
+            message(isGerman()?"Bitte die laufende Einrichtung zuerst beenden.":"Finish the current setup first.");
+            return;
+        }
+        boolean de=isGerman();
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20),dp(10),dp(20),dp(8));
+        TextView hint=label(14,Color.WHITE);
+        hint.setText(de?"Trage die Schlüssel von deinen Originalverpackungen ein. Leer lassen behält den bisherigen Wert. Die Eingabe bleibt auf deinem Gerät. Die App prüft das Eingabeformat, nicht die Echtheit des Schlüssels.":"Enter the keys from your original boxes. Leave a field empty to keep its current value. Keys stay on this device. The app checks input format, not authenticity.");
+        form.addView(hint,matchWrap(0));
+        android.widget.EditText ra2 = new android.widget.EditText(this);
+        android.widget.EditText yuri = new android.widget.EditText(this);
+        android.widget.EditText[] inputs={ra2,yuri};
+        for(int i=0;i<inputs.length;i++) {
+            TextView name=label(14,Color.WHITE);
+            name.setText(i==0?"Alarmstufe Rot 2 / Red Alert 2":"Yuri’s Rache / Yuri’s Revenge");
+            form.addView(name,matchWrap(dp(10)));
+            inputs[i].setSingleLine(true);
+            inputs[i].setTextColor(Color.WHITE);
+            inputs[i].setHintTextColor(Color.LTGRAY);
+            inputs[i].setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            inputs[i].setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(80)});
+            inputs[i].setHint(de?"Neuer Schlüssel (optional)":"New key (optional)");
+            form.addView(inputs[i],matchWrap(0));
+        }
+        android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this)
+            .setTitle(de?"Original-CD-Schlüssel":"Original CD keys").setView(form)
+            .setNegativeButton(de?"Abbrechen":"Cancel",null).setPositiveButton(de?"Speichern":"Save",null).create();
+        dialog.setOnShowListener(v -> {
+            dialog.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(w -> {
+                String a=ra2.getText().toString(), b=yuri.getText().toString();
+                if((!a.trim().isEmpty() && !RA2SerialPolicy.acceptableInput(a)) || (!b.trim().isEmpty() && !RA2SerialPolicy.acceptableInput(b))) {
+                    if(!a.trim().isEmpty() && !RA2SerialPolicy.acceptableInput(a)) ra2.setError(de?"Bitte den vollständigen Schlüssel mit Buchstaben/Ziffern eingeben.":"Enter the complete key using letters/digits.");
+                    if(!b.trim().isEmpty() && !RA2SerialPolicy.acceptableInput(b)) yuri.setError(de?"Bitte den vollständigen Schlüssel mit Buchstaben/Ziffern eingeben.":"Enter the complete key using letters/digits.");
+                    return;
+                }
+                SharedPreferences.Editor edit=prefs.edit();
+                if(!a.trim().isEmpty()) edit.putString("original_cd_key_ra2",RA2SerialPolicy.normalize(a));
+                if(!b.trim().isEmpty()) edit.putString("original_cd_key_yuri",RA2SerialPolicy.normalize(b));
+                edit.apply();
+                if(container!=null) {
+                    writeWestwoodRegistry(false);
+                    if(findIgnoreCase(gameDir(),"gamemd.exe",2)!=null) writeWestwoodRegistry(true);
+                }
+                dialog.dismiss();
+                message(de?"Schlüssel gespeichert. Starte das Spiel erneut; die Einrichtung muss nicht wiederholt werden.":"Keys saved. Start the game again; no reinstall is needed.");
+            });
+        });
+        dialog.show();
+    }
+
     private void writeWestwoodRegistry(boolean yuri) {
         if (yuri) writeWestwoodRegistry(false);
         File systemReg = new File(container.getRootDir(), ".wine/system.reg");
@@ -984,9 +1044,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             String product = yuri ? "Yuri's Revenge" : "Red Alert 2";
             String root = "Software\\Westwood\\" + product;
             String root32 = "Software\\Wow6432Node\\Westwood\\" + product;
-            String serial = registry.getStringValue(root32, "Serial");
-            if (serial == null || serial.isEmpty() || serial.equals("0")) serial = registry.getStringValue(root, "Serial");
-            if (serial == null || serial.isEmpty()) serial = "0";
+            String serial = RA2SerialPolicy.resolve(prefs.getString(yuri ? "original_cd_key_yuri" : "original_cd_key_ra2", ""),
+                registry.getStringValue(root32, "Serial"), registry.getStringValue(root, "Serial"));
             String[] views = container.isWoW64Mode() ? new String[]{root, root32} : new String[]{root};
             for (String view : views) {
                 registry.setStringValue(view, "Name", product);

@@ -115,7 +115,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         top.addView(back, new LinearLayout.LayoutParams(dp(100), dp(46)));
 
         headline = text(25, Color.rgb(238, 220, 170), true);
-        headline.setText("RA2 / Yuri Diagnose-Center v0.26");
+        headline.setText("RA2 / Yuri Diagnose-Center v0.27");
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         hp.leftMargin = dp(14);
         top.addView(headline, hp);
@@ -545,9 +545,18 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
                         install==null || install.isEmpty()?"InstallPath fehlt unter Wow6432Node":install,
                         "Der nächste Spielstart repariert beide Registry-Ansichten. Relay-Aufrufe prüfen, um die tatsächliche Sicht des Spiels zu bestätigen.");
                     String serial = editor.getStringValue(key32, "Serial");
+                    String configured=prefs.getString(product.startsWith("Yuri")?"original_cd_key_yuri":"original_cd_key_ra2", "");
+                    if(RA2SerialPolicy.acceptableInput(configured)) {
+                        boolean matches=RA2SerialPolicy.normalize(configured).equals(serial);
+                        add(matches?Level.PASS:Level.WARN,"Registry",product+" – Eingabe übernommen",
+                            matches?"Originalschlüssel stimmt mit der 32-Bit-Registry überein (Werte ausgeblendet)":"Gespeicherte Eingabe und 32-Bit-Registry unterscheiden sich",
+                            "Keine Echtheitsprüfung. Beim nächsten Start wird der lokal gespeicherte Schlüssel erneut übernommen.");
+                    }
+                    String serial64=editor.getStringValue("Software\\Westwood\\"+product,"Serial");
+                    if(RA2SerialPolicy.present(serial) && RA2SerialPolicy.present(serial64) && !serial.equals(serial64)) add(Level.WARN,"Registry",product+" – Seriennummer-Ansichten unterscheiden sich","Werte werden nicht ausgegeben","Der nächste Start synchronisiert beide Ansichten; anschließend erneut prüfen.");
                     add(serial==null || serial.isEmpty() || serial.equals("0")?Level.WARN:Level.INFO, "Registry", product+" – Seriennummer-Zustand",
                         serial==null || serial.isEmpty()?"Nicht vorhanden":serial.equals("0")?"Platzhalter 0":"Vorhanden (Wert wird nicht exportiert)",
-                        "Ein vorhandener Wert beweist keine gültige Seriennummer und keinen Zusammenhang mit dem Abbruch. Bestehende Werte werden beim Start erhalten.");
+                        "Trage deinen Originalschlüssel über den Button Original-CD-Schlüssel ein. Ein vorhandener Wert beweist keine Echtheit und keinen Zusammenhang mit dem Abbruch.");
                 }
             } catch(Exception e) {
                 add(Level.WARN,"Registry","32-Bit-Ansicht nicht geprüft",e.getClass().getSimpleName(),"Registry-Relay des nächsten Starts auswerten.");
@@ -1194,6 +1203,11 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
 
     private void createRootCauseAnalysis() {
         if (container == null) return;
+        String registryProbe=sessionText("registry-preflight.txt");
+        String probeState=RA2SerialPolicy.probeState(registryProbe);
+        add(probeState.equals("READABLE")?Level.PASS:probeState.equals("QUERY_FAILED")?Level.WARN:Level.INFO,
+            "Registry-Laufzeittest","32-Bit-reg.exe vor Spielstart",probeState+"\n"+registryProbe,
+            "READABLE = alle Abfragen erfolgreich; QUERY_FAILED = mindestens eine Abfrage fehlgeschlagen; INCOMPLETE = Messlücke; TOOL_UNAVAILABLE = reg.exe nicht ausführbar. Serial wird nur auf Existenz geprüft, nicht auf Echtheit oder Inhalt.");
         Integer code = RA2LaunchBatch.readGameExit(new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/game-exit.txt"));
         RA2DiagnosticEvidence.Analysis analysis = RA2DiagnosticEvidence.analyze(lastLaunchText,
             sessionText("safedisc-injector.log"), sessionText("safedisc.log"),
@@ -1418,19 +1432,20 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         if (request != 2401 || result != RESULT_OK || data == null || data.getData() == null) return;
         final Uri destination = data.getData();
         final String report = reportText;
+        final String[] secrets = diagnosticSecrets();
         worker.execute(() -> {
             try (java.io.OutputStream output = getContentResolver().openOutputStream(destination);
                  java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(output)) {
                 zip.putNextEntry(new java.util.zip.ZipEntry("Diagnosebericht.txt"));
-                zip.write(report.getBytes(StandardCharsets.UTF_8));
+                zip.write(RA2SerialPolicy.redact(report,secrets).getBytes(StandardCharsets.UTF_8));
                 zip.closeEntry();
                 if (container != null) {
                     File session = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile");
-                    zipSession(zip, session, "aktueller-lauf/");
+                    zipSession(zip, session, "aktueller-lauf/",secrets);
                     File[] history = new File(session, "history").listFiles();
                     if (history != null) {
                         Arrays.sort(history, (a,b) -> b.getName().compareTo(a.getName()));
-                        for (int i=0;i<Math.min(3,history.length);i++) zipSession(zip,history[i],"history/"+history[i].getName()+"/");
+                        for (int i=0;i<Math.min(3,history.length);i++) zipSession(zip,history[i],"history/"+history[i].getName()+"/",secrets);
                     }
                 }
                 runOnUiThread(() -> android.widget.Toast.makeText(this,"Diagnose-ZIP gespeichert",android.widget.Toast.LENGTH_LONG).show());
@@ -1440,15 +1455,28 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         });
     }
 
-    private void zipSession(java.util.zip.ZipOutputStream zip, File session, String prefix) throws java.io.IOException {
+    private String[] diagnosticSecrets() {
+        java.util.List<String> secrets = new java.util.ArrayList<>();
+        secrets.add(prefs.getString("original_cd_key_ra2",""));
+        secrets.add(prefs.getString("original_cd_key_yuri",""));
+        if(container!=null) {
+            try(WineRegistryEditor editor = new WineRegistryEditor(new File(container.getRootDir(),".wine/system.reg"))) {
+                for(String view : new String[]{"Software\\Westwood\\","Software\\Wow6432Node\\Westwood\\"})
+                    for(String product : new String[]{"Red Alert 2","Yuri's Revenge"}) secrets.add(editor.getStringValue(view+product,"Serial"));
+            } catch(Exception ignored) {}
+        }
+        return secrets.toArray(new String[0]);
+    }
+
+    private void zipSession(java.util.zip.ZipOutputStream zip, File session, String prefix, String[] secrets) throws java.io.IOException {
         // Explicit allowlist: no ISOs, registry, saved games or unrelated app files.
-        for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "game-exit.txt", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "safedisc.log", "safedisc-injector.log"}) {
+        for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "game-exit.txt", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt", "safedisc.log", "safedisc-injector.log"}) {
             File file = new File(session,name);
             if (!file.isFile()) continue;
             zip.putNextEntry(new java.util.zip.ZipEntry(prefix+name));
-            try (FileInputStream input = new FileInputStream(file)) {
-                byte[] buffer = new byte[65536]; int count;
-                while ((count=input.read(buffer))!=-1) zip.write(buffer,0,count);
+            try (java.io.BufferedReader input = new java.io.BufferedReader(new java.io.InputStreamReader(new FileInputStream(file),StandardCharsets.UTF_8))) {
+                String line;
+                while ((line=input.readLine())!=null) zip.write((RA2SerialPolicy.redact(line,secrets)+"\n").getBytes(StandardCharsets.UTF_8));
             }
             zip.closeEntry();
         }

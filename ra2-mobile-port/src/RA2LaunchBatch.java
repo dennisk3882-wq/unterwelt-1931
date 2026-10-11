@@ -61,7 +61,18 @@ public final class RA2LaunchBatch {
             throw new IllegalArgumentException("Unexpected game path: " + exe);
         }
         String command = cdCompatibility ? "\"C:\\RA2Mobile\\SafeDisc\\VersionInjector.exe\" \"" + exe + "\"" : "\"" + exe + "\"";
+        String product = exe.toLowerCase(java.util.Locale.ROOT).endsWith("gamemd.exe") ? "Yuri's Revenge" : "Red Alert 2";
+        String registryKey = "HKLM\\Software\\Westwood\\" + product;
         String batch = "@echo off\r\n"
+            + "set RA2_REG_EXE=C:\\windows\\system32\\reg.exe\r\n"
+            + "if exist C:\\windows\\syswow64\\reg.exe set RA2_REG_EXE=C:\\windows\\syswow64\\reg.exe\r\n"
+            + "echo product=" + product + ">C:\\RA2Mobile\\registry-preflight.txt\r\n"
+            + "%RA2_REG_EXE% query \"" + registryKey + "\" /v InstallPath >>C:\\RA2Mobile\\registry-preflight.txt 2>&1\r\n"
+            + "echo installQueryExit=%ERRORLEVEL%>>C:\\RA2Mobile\\registry-preflight.txt\r\n"
+            + "%RA2_REG_EXE% query \"" + registryKey + "\" /v FolderPath >>C:\\RA2Mobile\\registry-preflight.txt 2>&1\r\n"
+            + "echo folderQueryExit=%ERRORLEVEL%>>C:\\RA2Mobile\\registry-preflight.txt\r\n"
+            + "%RA2_REG_EXE% query \"" + registryKey + "\" /v Serial >nul 2>&1\r\n"
+            + "echo serialQueryExit=%ERRORLEVEL%>>C:\\RA2Mobile\\registry-preflight.txt\r\n"
             + "echo stage=rpc-preflight-started>>C:\\RA2Mobile\\ra2-live.log\r\n"
             + "C:\\windows\\system32\\sc.exe start RpcSs >C:\\RA2Mobile\\rpcss-preflight.txt 2>&1\r\n"
             + "C:\\windows\\system32\\sc.exe query RpcSs >>C:\\RA2Mobile\\rpcss-preflight.txt 2>&1\r\n"
