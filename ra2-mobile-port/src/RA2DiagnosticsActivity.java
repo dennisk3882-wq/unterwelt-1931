@@ -52,6 +52,8 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
     private static final String KEY_YURI = "iso_yuri";
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    // ZIP exports must never queue behind Wine scans or diagnostic repairs.
+    private final ExecutorService exportWorker = Executors.newSingleThreadExecutor();
     private final List<Result> results = new ArrayList<>();
     private final List<String> suspiciousLogLines = new ArrayList<>();
 
@@ -101,6 +103,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         worker.shutdownNow();
+        exportWorker.shutdownNow();
         super.onDestroy();
     }
 
@@ -119,7 +122,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         top.addView(back, new LinearLayout.LayoutParams(dp(100), dp(46)));
 
         headline = text(25, Color.rgb(238, 220, 170), true);
-        headline.setText("RA2 / Yuri Diagnose-Center v0.32");
+        headline.setText("RA2 / Yuri Diagnose-Center v0.33");
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         hp.leftMargin = dp(14);
         top.addView(headline, hp);
@@ -1500,8 +1503,9 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
     private void prepareZip(boolean share) {
         exportButton.setEnabled(false);
         shareButton.setEnabled(false);
-        exportStatus.setText("Erstelle und prüfe die ZIP-Datei … bitte warten.");
-        worker.execute(() -> {
+        preparedZip = null;
+        exportStatus.setText("ZIP-Export startet …");
+        exportWorker.execute(() -> {
             try {
                 File folder = new File(getCacheDir(), "diagnostics");
                 if (!folder.isDirectory() && !folder.mkdirs())
@@ -1599,7 +1603,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         exportButton.setEnabled(false);
         shareButton.setEnabled(false);
         exportStatus.setText("Übertrage fertige ZIP in den ausgewählten Ordner …");
-        worker.execute(() -> {
+        exportWorker.execute(() -> {
             try {
                 long sourceSize = RA2ZipExport.verify(source);
                 long written = 0;
@@ -1659,17 +1663,41 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         return secrets.toArray(new String[0]);
     }
 
-    private void zipSession(java.util.zip.ZipOutputStream zip, File session, String prefix, String[] secrets) throws java.io.IOException {
-        // Explicit allowlist: no ISOs, registry, saved games or unrelated app files.
-        for (String name : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log", "ra2-live.previous.log", "game-exit.txt", "rpcss-preflight.txt", "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt", "cd-volume-preflight.txt", "safedisc-dll-stage.txt", "ra2-cd-focus.log", "safedisc.log", "safedisc-injector.log"}) {
-            File file = new File(session,name);
-            if (!file.isFile()) continue;
-            zip.putNextEntry(new java.util.zip.ZipEntry(prefix+name));
-            try (java.io.BufferedReader input = new java.io.BufferedReader(new java.io.InputStreamReader(new FileInputStream(file),StandardCharsets.UTF_8))) {
-                String line;
-                while ((line=input.readLine())!=null) zip.write((RA2SerialPolicy.redact(line,secrets)+"\n").getBytes(StandardCharsets.UTF_8));
+    private void zipSession(java.util.zip.ZipOutputStream zip, File session,
+                            String prefix, String[] secrets) throws java.io.IOException {
+        // Bounded snapshots of each file; no more reading unbounded Wine logs line by line.
+        final boolean oldRun = prefix.startsWith("history/");
+        final String[] entries = oldRun
+            ? new String[]{"session.json", "events.log", "ra2-evidence.log", "safedisc.log",
+                           "safedisc-injector.log", "safedisc-dll-stage.txt"}
+            : new String[]{"session.json", "events.log", "ra2-evidence.log", "ra2-live.log",
+                           "ra2-live.previous.log", "game-exit.txt", "rpcss-preflight.txt",
+                           "rpcss-after-game.txt", "blowfish-register.txt", "registry-preflight.txt",
+                           "cd-volume-preflight.txt", "safedisc-dll-stage.txt", "ra2-cd-focus.log",
+                           "safedisc.log", "safedisc-injector.log"};
+        for (String name : entries) {
+            if (Thread.currentThread().isInterrupted())
+                throw new java.io.IOException("ZIP-Export wurde abgebrochen");
+            File source = new File(session, name);
+            if (!source.isFile()) continue;
+            int maxBytes = oldRun ? 32768 :
+                name.equals("ra2-cd-focus.log") ? 384 * 1024 :
+                name.startsWith("ra2-live") ? 192 * 1024 :
+                name.equals("ra2-evidence.log") ? 160 * 1024 : 65536;
+            runOnUiThread(() -> {
+                if (exportStatus != null)
+                    exportStatus.setText("Packe " + prefix + name + " …");
+            });
+            try {
+                RA2ZipExport.appendSnapshot(zip, source, prefix + name, secrets, maxBytes);
+            } catch (java.io.EOFException changed) {
+                // A concurrently rotating Wine log must not prevent downloading
+                // the complete diagnostic report and all other captured files.
+                zip.putNextEntry(new java.util.zip.ZipEntry(prefix + name + ".hinweis.txt"));
+                zip.write("Datei wurde während des Exports neu geschrieben; Auszug übersprungen."
+                    .getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
             }
-            zip.closeEntry();
         }
     }
 
