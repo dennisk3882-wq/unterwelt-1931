@@ -424,10 +424,10 @@ fun cardFromJson(o: JSONObject): CardData {
         priceAvg1Holo = nullableDouble("priceAvg1Holo"),
         priceAvg7Holo = nullableDouble("priceAvg7Holo"),
         priceAvg30Holo = nullableDouble("priceAvg30Holo"),
-        priceUpdatedAt = if (has("priceUpdatedAt") && !isNull("priceUpdatedAt")) optLong("priceUpdatedAt") else null,
+        priceUpdatedAt = if (o.has("priceUpdatedAt") && !o.isNull("priceUpdatedAt")) o.optLong("priceUpdatedAt") else null,
         usMarketNormal = nullableDouble("usMarketNormal"),
         usMarketHolo = nullableDouble("usMarketHolo"),
         usMarketReverse = nullableDouble("usMarketReverse"),
-        usMarketUpdatedAt = if (has("usMarketUpdatedAt") && !isNull("usMarketUpdatedAt")) optLong("usMarketUpdatedAt") else null
+        usMarketUpdatedAt = if (o.has("usMarketUpdatedAt") && !o.isNull("usMarketUpdatedAt")) o.optLong("usMarketUpdatedAt") else null
     )
 }
