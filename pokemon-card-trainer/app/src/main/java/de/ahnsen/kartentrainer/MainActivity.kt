@@ -701,19 +701,9 @@ private fun ScanScreen(
                             if (!primary.localId.isNullOrBlank()) localId = primary.localId
                             scope.launch {
                                 loading = true
-                                val merged = linkedMapOf<String, CardBrief>()
-                                val guesses = if (batchMode) scan.guesses.take(5) else listOf(primary)
-                                guesses.forEach { guess ->
-                                    runCatching {
-                                        repository.searchCards(
-                                            guess.name,
-                                            guess.localId.takeIf { !it.isNullOrBlank() }
-                                        )
-                                    }.getOrDefault(emptyList()).forEach { brief ->
-                                        merged[brief.id] = brief
-                                    }
-                                }
-                                val candidates = merged.values.toList()
+                                val candidates = runCatching {
+                                    repository.resolveScannedCards(scan.text)
+                                }.getOrDefault(emptyList())
                                 results = candidates
                                 cameraCandidateIds = candidates.map { it.id }.toSet()
                                 lastOwnershipScanAt = System.currentTimeMillis()
@@ -723,8 +713,10 @@ private fun ScanScreen(
                                         val variant = card.availableVariants().firstOrNull() ?: "Normal"
                                         CardImageCache.prefetch(scanContext, card)
                                         onAdd(card, variant, lastOwnershipScanAt ?: System.currentTimeMillis())
-                                        message = card.name + " automatisch als eigene Karte bestätigt · Sicherheit " + scan.confidence +
-                                            "%. Originalbild wurde für Sammlung und Spiel vorgeladen. Nächste Karte einlegen."
+                                        query = card.name
+                                        localId = card.localId
+                                        message = "✓ " + card.name + " wurde in „Meine Karten“ gespeichert · Sicherheit " + scan.confidence +
+                                            "%. Nächste Karte einlegen."
                                         results = emptyList()
                                     } else {
                                         message = "Kartendetails konnten nicht geladen werden."
@@ -752,10 +744,7 @@ private fun ScanScreen(
                             scope.launch {
                                 loading = true
                                 val candidates = runCatching {
-                                    repository.searchCards(
-                                        guess.name,
-                                        guess.localId.takeIf { !it.isNullOrBlank() }
-                                    )
+                                    repository.resolveScannedCards(text)
                                 }.getOrDefault(emptyList())
                                 results = candidates
                                 cameraCandidateIds = candidates.map { it.id }.toSet()
@@ -769,7 +758,9 @@ private fun ScanScreen(
                                             card.availableVariants().firstOrNull() ?: "Normal",
                                             lastOwnershipScanAt ?: System.currentTimeMillis()
                                         )
-                                        message = card.name + " aus Präzisionsscan als eigene Karte bestätigt; Originalbild vorgeladen."
+                                        query = card.name
+                                        localId = card.localId
+                                        message = "✓ " + card.name + " wurde in „Meine Karten“ gespeichert. Originalbild ist ebenfalls geladen."
                                         results = emptyList()
                                     } else {
                                         message = "Kartendetails konnten nicht geladen werden."
