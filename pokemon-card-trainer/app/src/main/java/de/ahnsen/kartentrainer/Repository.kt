@@ -156,6 +156,7 @@ class TcgDexRepository(context: Context? = null) {
         val variants = o.optJSONObject("variants") ?: JSONObject()
         val pricing = o.optJSONObject("pricing") ?: JSONObject()
         val market = pricing.optJSONObject("cardmarket") ?: JSONObject()
+        val usPricing = pricing.optJSONObject("tcgplayer") ?: JSONObject()
 
         val typesArr = o.optJSONArray("types") ?: JSONArray()
         val types = buildList {
@@ -245,7 +246,20 @@ class TcgDexRepository(context: Context? = null) {
             priceLow = nullableMarketDouble("low"),
             priceTrend = nullableMarketDouble("trend"),
             priceAvgHolo = nullableMarketDouble("avg-holo"),
-            priceLowHolo = nullableMarketDouble("low-holo")
+            priceLowHolo = nullableMarketDouble("low-holo"),
+            priceAvg1 = nullableMarketDouble("avg1"),
+            priceAvg7 = nullableMarketDouble("avg7"),
+            priceAvg30 = nullableMarketDouble("avg30"),
+            priceTrendHolo = nullableMarketDouble("trend-holo"),
+            priceAvg1Holo = nullableMarketDouble("avg1-holo"),
+            priceAvg7Holo = nullableMarketDouble("avg7-holo"),
+            priceAvg30Holo = nullableMarketDouble("avg30-holo"),
+            priceUpdatedAt = if (market.has("updated") && !market.isNull("updated")) market.optLong("updated").takeIf { it > 0L } else null,
+            usMarketNormal = usPricing.optJSONObject("normal")?.optDouble("marketPrice")?.takeIf { !it.isNaN() && it > 0 },
+            usMarketHolo = usPricing.optJSONObject("holofoil")?.optDouble("marketPrice")?.takeIf { !it.isNaN() && it > 0 },
+            usMarketReverse = usPricing.optJSONObject("reverse-holofoil")?.optDouble("marketPrice")?.takeIf { !it.isNaN() && it > 0 }
+                ?: usPricing.optJSONObject("reverseHolofoil")?.optDouble("marketPrice")?.takeIf { !it.isNaN() && it > 0 },
+            usMarketUpdatedAt = if (usPricing.has("updated") && !usPricing.isNull("updated")) usPricing.optLong("updated").takeIf { it > 0L } else null
         )
     }
 
