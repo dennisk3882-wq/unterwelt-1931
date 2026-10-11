@@ -81,13 +81,12 @@ public final class Iso9660Extractor {
             int type = descriptor[0] & 255;
             if (type == 255) return "";
             if (type == 1) {
-                String label = new String(descriptor, 40, 32, StandardCharsets.US_ASCII).trim();
-                if (label.isEmpty()) return "";
-                for (int i = 0; i < label.length(); i++) {
-                    char ch = label.charAt(i);
+                String rawLabel = new String(descriptor, 40, 32, StandardCharsets.US_ASCII);
+                for (int i = 0; i < rawLabel.length(); i++) {
+                    char ch = rawLabel.charAt(i);
                     if (ch < 32 || ch > 126) return "";
                 }
-                return label;
+                return rawLabel.trim();
             }
         }
         return "";
