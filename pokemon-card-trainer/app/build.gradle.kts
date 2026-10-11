@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 9
-        versionName = "2.3.1"
+        versionCode = 10
+        versionName = "2.4.0"
     }
 
     buildFeatures {
@@ -47,6 +47,7 @@ dependencies {
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
     implementation("com.google.mlkit:object-detection:17.0.2")
+    implementation("org.opencv:opencv:4.11.0")
     implementation("androidx.camera:camera-view:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-camera2:1.4.2")
