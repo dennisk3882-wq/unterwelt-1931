@@ -40,75 +40,97 @@ class TcgDexRepository(context: Context? = null) {
     }
 
     suspend fun resolveScannedCards(rawText: String): List<CardBrief> {
+        val identity = CardScanIdentityParser.parse(rawText)
         val parsed = OcrParser.parse(rawText)
         val names = OcrParser.candidateNames(rawText).take(6)
-        val localId = parsed.localId?.takeIf { it.isNotBlank() }
-        val merged = linkedMapOf<String, CardBrief>()
+        val localId = identity.localId ?: parsed.localId?.takeIf { it.isNotBlank() }
 
+        // Exact collector number and set code/card count beat fuzzy name searches.
+        // Validate the OCR name too: do not save a wrong card on a coincidental ID.
+        if (identity.localId != null && identity.setId != null) {
+            for (id in CardScanIdentityParser.candidateIds(identity)) {
+                val card = runCatching { getCard(id) }.getOrNull() ?: continue
+                if (identity.numberMatches(card.localId) &&
+                    CardScanIdentityParser.matchesPrintedName(card.name, rawText)
+                ) {
+                    return listOf(CardBrief(card.id, card.localId, card.name, card.imageBase))
+                }
+            }
+        }
+
+        val merged = linkedMapOf<String, CardBrief>()
         suspend fun collect(name: String, number: String?) {
             runCatching { searchCards(name, number) }
                 .getOrDefault(emptyList())
                 .forEach { merged[it.id] = it }
         }
 
-        names.forEach { name -> collect(name, localId) }
+        // Try name+collector number first; never let a Pokédex number win.
+        names.take(4).forEach { collect(it, localId) }
+        if (merged.isEmpty() && localId != null) collect("", localId)
+        if (merged.isEmpty()) names.take(3).forEach { collect(it, null) }
 
-        if (merged.isEmpty()) {
-            names.take(4).forEach { name -> collect(name, null) }
-        }
+        val allCandidates = merged.values.toList()
+        if (allCandidates.isEmpty()) return emptyList()
 
-        if (localId != null) {
-            collect("", localId)
-        }
-
-        val candidates = merged.values.toList()
-        if (candidates.size <= 1) return candidates
-
-        fun normalize(value: String): String = value
-            .lowercase()
-            .replace("ä", "ae")
-            .replace("ö", "oe")
-            .replace("ü", "ue")
-            .replace("ß", "ss")
-            .filter { it.isLetterOrDigit() }
+        // TCGdex searches may include other printings, because some endpoints
+        // perform fuzzy filtering. Keep same-number results ahead of anything else.
+        val numberMatching = if (localId != null) {
+            allCandidates.filter { card ->
+                identity.numberMatches(card.localId) ||
+                    (identity.localId == null && card.localId.trimStart('0') ==
+                        localId.trimStart('0'))
+            }
+        } else emptyList()
+        val candidates = if (numberMatching.isNotEmpty()) numberMatching else allCandidates
+        val rawNormalized = CardScanIdentityParser.normalizeName(rawText)
 
         fun dice(a: String, b: String): Double {
-            val left = normalize(a)
-            val right = normalize(b)
+            val left = CardScanIdentityParser.normalizeName(a)
+            val right = CardScanIdentityParser.normalizeName(b)
             if (left.isBlank() || right.isBlank()) return 0.0
             if (left == right) return 1.0
-            if (left.length < 2 || right.length < 2) return if (left == right) 1.0 else 0.0
-            val aPairs = left.windowed(2).groupingBy { it }.eachCount().toMutableMap()
+            if (left.length < 2 || right.length < 2) return 0.0
+            val available = left.windowed(2).groupingBy { it }.eachCount().toMutableMap()
             var overlap = 0
-            right.windowed(2).forEach { pair ->
-                val count = aPairs[pair] ?: 0
+            for (pair in right.windowed(2)) {
+                val count = available[pair] ?: 0
                 if (count > 0) {
-                    overlap += 1
-                    aPairs[pair] = count - 1
+                    overlap++
+                    available[pair] = count - 1
                 }
             }
-            return (2.0 * overlap) / ((left.length - 1) + (right.length - 1))
+            return 2.0 * overlap / ((left.length - 1) + (right.length - 1))
         }
 
-        val rawNormalized = normalize(rawText)
         val scored = candidates.map { card ->
-            val normalizedName = normalize(card.name)
+            val name = CardScanIdentityParser.normalizeName(card.name)
+            val exactName = name.length >= 3 && rawNormalized.contains(name)
+            val matchingNumber = localId != null &&
+                card.localId.trimStart('0').equals(localId.trimStart('0'), ignoreCase = true)
             var score = 0.0
-            if (normalizedName.isNotBlank() && rawNormalized.contains(normalizedName)) score += 100.0
-            if (localId != null && card.localId.equals(localId, ignoreCase = true)) score += 30.0
+            if (exactName) score += 110.0
+            if (matchingNumber) score += 130.0
+            if (localId != null && !matchingNumber) score -= 180.0
+            if (identity.setId != null && card.id.substringBeforeLast('-') == identity.setId) score += 280.0
+            if (identity.setId != null && card.id.substringBeforeLast('-') != identity.setId) score -= 200.0
             score += names.maxOfOrNull { dice(it, card.name) * 60.0 } ?: 0.0
             card to score
         }.sortedByDescending { it.second }
+        val top = scored.first()
+        val runnerUp = scored.getOrNull(1)
+        val clear = runnerUp == null || top.second - runnerUp.second >= 55.0
+        val exactName = CardScanIdentityParser.matchesPrintedName(top.first.name, rawText)
+        val numberCorrect = localId != null &&
+            top.first.localId.trimStart('0').equals(localId.trimStart('0'), ignoreCase = true)
+        val setCorrect = identity.setId == null ||
+            top.first.id.substringBeforeLast('-') == identity.setId
 
-        val best = scored.firstOrNull() ?: return candidates
-        val second = scored.getOrNull(1)
-        val exactNameInOcr = rawNormalized.contains(normalize(best.first.name))
-        val clearMargin = second == null || best.second - second.second >= 18.0
-
-        return if ((exactNameInOcr && clearMargin) || (best.second >= 120.0 && clearMargin)) {
-            listOf(best.first)
+        return if (exactName && numberCorrect && setCorrect && clear) {
+            listOf(top.first)
         } else {
-            scored.take(12).map { it.first }
+            // Never auto-pick from a weak/ambiguous name-only match.
+            scored.filter { it.second > 0 }.take(12).map { it.first }
         }
     }
 
