@@ -23,7 +23,7 @@ public final class RA2DiagnosticEvidence {
     private static final Pattern ACTOR=Pattern.compile("(?i)([0-9a-f]{4,}):(?:(?:trace|err|warn|fixme):|(?:Call|Ret) )");
     private static final Pattern MODULE=Pattern.compile("(?i)Loaded L\\\"([^\\\"]+)\\\"");
     private static String actor(String line) { Matcher m=ACTOR.matcher(line); return m.find()?m.group(1).toLowerCase(Locale.ROOT):""; }
-    private static boolean target(String s) { return s.contains("\\game.exe\"") || s.contains("\\gamemd.exe\""); }
+    private static boolean target(String s) { return s.contains("\\game.exe\"") || s.contains("\\gamemd.exe\"") || s.contains("\\ra2.exe\"") || s.contains("\\ra2md.exe\""); }
     private static boolean rpc(String s) { return s.contains("code=6ba") || s.contains("error 6be") || s.contains("rpc_s_server_unavailable") || s.contains("failed to start rpcss"); }
     public static Analysis analyze(String trace, String injector, String helper, String before, String after, Integer exit, boolean window) {
         Analysis a=new Analysis();

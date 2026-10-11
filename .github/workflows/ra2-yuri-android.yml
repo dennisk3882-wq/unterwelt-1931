@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.28-original-launcher-probe
+# build-version: 0.29-original-disc-label
 
 on:
   push:
@@ -149,6 +149,8 @@ jobs:
         run: |
           set -euo pipefail
           javac -d test-launch ra2-mobile-port/src/RA2LaunchBatch.java ra2-mobile-port/src/RA2DiagnosticEvidence.java ra2-mobile-port/src/RA2SerialPolicy.java ra2-mobile-port/tests/RA2LaunchBatchTest.java ra2-mobile-port/tests/RA2DiagnosticEvidenceTest.java ra2-mobile-port/tests/RA2SerialPolicyTest.java
+          javac -d test-launch ra2-mobile-port/src/Iso9660Extractor.java ra2-mobile-port/tests/RA2VolumeLabelTest.java
+          java -cp test-launch RA2VolumeLabelTest
           java -cp test-launch RA2LaunchBatchTest
           java -cp test-launch RA2DiagnosticEvidenceTest
           java -cp test-launch RA2SerialPolicyTest

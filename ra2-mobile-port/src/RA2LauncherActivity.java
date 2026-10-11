@@ -155,7 +155,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.28 · Originalstart-Vergleich");
+        version.setText("v0.29 · Original-CD-Erkennung");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
@@ -586,6 +586,10 @@ public final class RA2LauncherActivity extends AppCompatActivity {
                     }
                 });
 
+                String volumeName = Iso9660Extractor.readVolumeId(staging);
+                if (!volumeName.isEmpty() &&
+                        !FileUtils.writeString(new File(driveX(), ".windows-label"), volumeName + "\n"))
+                    throw new java.io.IOException("ISO volume name could not be saved");
                 FileUtils.delete(staging);
 
                 runOnUiThread(() -> {
@@ -1493,6 +1497,22 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private void activateMedia(boolean yuri) {
         File media = mediaDir(yuri);
         if (!media.isDirectory()) return;
+        // The existing game files remain untouched. Repair only the missing
+        // ISO-9660 volume label in installations created before this version.
+        File marker = new File(media, ".windows-label");
+        String existing = marker.isFile() ? FileUtils.readString(marker) : "";
+        if (existing == null || existing.trim().isEmpty()) {
+            Uri source = savedUri(yuri ? KEY_YURI : KEY_SOVIET);
+            if (source != null) {
+                try (InputStream stream = getContentResolver().openInputStream(source)) {
+                    String original = Iso9660Extractor.readVolumeId(stream);
+                    if (!original.isEmpty())
+                        FileUtils.writeString(marker, original + "\n");
+                } catch (Exception e) {
+                    android.util.Log.w("RA2-CD", "Original volume name unavailable", e);
+                }
+            }
+        }
         File driveX = driveX();
         FileUtils.delete(driveX);
         FileUtils.symlink(media.getName(), driveX.getAbsolutePath());

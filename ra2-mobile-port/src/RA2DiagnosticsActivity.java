@@ -115,7 +115,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
         top.addView(back, new LinearLayout.LayoutParams(dp(100), dp(46)));
 
         headline = text(25, Color.rgb(238, 220, 170), true);
-        headline.setText("RA2 / Yuri Diagnose-Center v0.27");
+        headline.setText("RA2 / Yuri Diagnose-Center v0.29");
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         hp.leftMargin = dp(14);
         top.addView(headline, hp);
@@ -926,6 +926,7 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             long[] stats = directoryStats(ra2Media, 6);
             add(Level.PASS, "Virtuelle CDs", "RA2-CD-Medium gespeichert",
                 stats[0] + " Dateien • " + humanSize(stats[1]), "");
+            reportVolumeLabel(ra2Media, "RA2");
         }
         else {
             add(Level.WARN, "Virtuelle CDs", "RA2-CD-Medium nicht archiviert",
@@ -947,7 +948,18 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             long[] stats = directoryStats(yuriMedia, 6);
             add(Level.PASS, "Virtuelle CDs", "Yuri-CD-Medium gespeichert",
                 stats[0] + " Dateien • " + humanSize(stats[1]), "");
+            reportVolumeLabel(yuriMedia, "Yuri");
         }
+    }
+
+    private void reportVolumeLabel(File media, String game) {
+        File labelFile = new File(media, ".windows-label");
+        String label = labelFile.isFile() ? FileUtils.readString(labelFile) : "";
+        boolean found = label != null && !label.trim().isEmpty();
+        add(found ? Level.PASS : Level.WARN, "Virtuelle CDs", game + " – ISO-Volume-Label",
+            found ? label.trim() : "(nicht gespeichert)",
+            found ? "Mit Windows-Volume-Ausgabe vergleichen." :
+                "Der nächste Start liest die originale Datenträgerbezeichnung aus der gewählten ISO.");
     }
 
     private void checkLastLaunch() {
@@ -992,6 +1004,10 @@ public final class RA2DiagnosticsActivity extends AppCompatActivity {
             compactLines(FileUtils.readString(rpcAfter), 10), "");
         if (liveText != null) add(Level.INFO, "CD-Kompatibilität", "Startweg",
             liveText.contains("cdCompatibility=true") ? "SafeDisc-Kompatibilitätshelfer" : "Direkter Spielstart", "");
+        String volumeInfo = sessionText("cd-volume-preflight.txt");
+        if (volumeInfo != null && !volumeInfo.isEmpty())
+            add(Level.INFO, "Virtuelle CDs", "CD-Abfrage in Wine (vol X:)",
+                compactLines(volumeInfo, 22), "Zeigt den tatsächlich von Wine erkannten Volume-Namen.");
         for (String name : new String[]{"safedisc-injector.log", "safedisc.log"}) {
             File helperLog = new File(container.getRootDir(), ".wine/drive_c/RA2Mobile/" + name);
             if (helperLog.isFile()) {

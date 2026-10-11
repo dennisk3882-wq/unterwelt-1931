@@ -1,6 +1,8 @@
 package com.winlator;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -53,6 +55,42 @@ public final class Iso9660Extractor {
         finally {
             extractor.iso.close();
         }
+    }
+
+    /** Read the actual ISO-9660 volume name from the primary descriptor. */
+    public static String readVolumeId(File image) throws IOException {
+        try (InputStream stream = new FileInputStream(image)) {
+            return readVolumeId(stream);
+        }
+    }
+
+    public static String readVolumeId(InputStream stream) throws IOException {
+        if (stream == null) return "";
+        byte[] descriptor = new byte[SECTOR];
+        for (int sector = 0; sector <= LAST_DESCRIPTOR; sector++) {
+            int count = 0;
+            while (count < SECTOR) {
+                int n = stream.read(descriptor, count, SECTOR - count);
+                if (n < 0) return "";
+                if (n == 0) continue;
+                count += n;
+            }
+            if (sector < FIRST_DESCRIPTOR) continue;
+            if (!"CD001".equals(new String(descriptor, 1, 5, StandardCharsets.US_ASCII))
+                    || (descriptor[6] & 255) != 1) continue;
+            int type = descriptor[0] & 255;
+            if (type == 255) return "";
+            if (type == 1) {
+                String label = new String(descriptor, 40, 32, StandardCharsets.US_ASCII).trim();
+                if (label.isEmpty()) return "";
+                for (int i = 0; i < label.length(); i++) {
+                    char ch = label.charAt(i);
+                    if (ch < 32 || ch > 126) return "";
+                }
+                return label;
+            }
+        }
+        return "";
     }
 
     private void extractInternal() throws IOException {
