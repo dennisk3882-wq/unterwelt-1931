@@ -71,6 +71,14 @@ internal object CardScanIdentityParser {
             normalizeName(ocrText).contains(norm)
     }
 
+    fun isVerifiedCard(card: CardBrief, ocrText: String): Boolean {
+        val identity = parse(ocrText)
+        return identity.setId != null && identity.localId != null &&
+            card.id.substringBeforeLast('-') == identity.setId &&
+            identity.numberMatches(card.localId) &&
+            matchesPrintedName(card.name, ocrText)
+    }
+
     fun candidateIds(identity: CardScanIdentity): List<String> {
         val set = identity.setId ?: return emptyList()
         val number = identity.localId ?: return emptyList()
