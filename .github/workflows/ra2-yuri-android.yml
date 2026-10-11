@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.35-xwis-community-client
+# build-version: 0.36-xwis-download-manager
 
 on:
   push:
@@ -112,6 +112,8 @@ jobs:
           python3 ra2-mobile-port/apply_legacy.py upstream
           grep -q "applicationId 'com.winlator'" upstream/app/build.gradle
           grep -q 'RA2LauncherActivity' upstream/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.INTERNET' upstream/app/src/main/AndroidManifest.xml
+          grep -q 'DownloadManager' upstream/app/src/main/java/com/winlator/RA2LauncherActivity.java
           grep -q 'setRtsMode' upstream/app/src/main/java/com/winlator/widget/TouchpadView.java
           grep -q 'exec_dos_path' upstream/app/src/main/java/com/winlator/XServerDisplayActivity.java
           grep -q 'SUPPORTED_32_BIT_ABIS' upstream/app/src/main/java/com/winlator/RA2LauncherActivity.java

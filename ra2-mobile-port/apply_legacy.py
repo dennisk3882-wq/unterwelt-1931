@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 235")
-    s = s.replace('versionName "7.1"', 'versionName "0.35.0-ra2-xwis-client"')
+    s = s.replace("versionCode 16", "versionCode 236")
+    s = s.replace('versionName "7.1"', 'versionName "0.36.0-xwis-system-download"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -214,6 +214,9 @@ def patch_manifest(root: Path) -> None:
     p = root / "app/src/main/AndroidManifest.xml"
     require(p)
     s = read(p)
+    # The app's new Android DownloadManager path needs network access.
+    if 'android.permission.INTERNET' not in s:
+        s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET" />\n    <application', 1)
 
     old_filter = '''            <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -884,7 +887,7 @@ def patch_xserver(root: Path) -> None:
         try {
             metadata.put("runId", java.util.UUID.randomUUID().toString());
             metadata.put("startedAt", System.currentTimeMillis());
-            metadata.put("appVersion", "0.35");
+            metadata.put("appVersion", "0.36");
             metadata.put("launchMode", getIntent().getBooleanExtra("ra2_community_client", false) ? "xwis-community-client" : (getIntent().getBooleanExtra("ra2_launcher_probe", false) ? "original-launcher-probe" : "direct-engine"));
             metadata.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
             metadata.put("android", android.os.Build.VERSION.RELEASE);

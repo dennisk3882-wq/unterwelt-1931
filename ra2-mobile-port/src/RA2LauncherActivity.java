@@ -76,6 +76,8 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private static final int PICK_XWIS_RA2 = 4111;
     private static final int PICK_XWIS_YURI = 4112;
     private static final String KEY_XWIS_PENDING = "xwis_installer_pending";
+    private static final String KEY_XWIS_DOWNLOAD_ID = "xwis_download_id";
+    private static final String KEY_XWIS_DOWNLOAD_YURI = "xwis_download_yuri";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
@@ -116,6 +118,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         if (prefs == null) return;
+        if (prefs.getLong(KEY_XWIS_DOWNLOAD_ID, -1) > 0) checkCommunityDownload(false);
         if (prefs.getBoolean(KEY_RUNTIME_OUTSTANDING, false) && !runtimeStarting) {
             String pendingXwis = prefs.getString(KEY_XWIS_PENDING, "");
             if (!pendingXwis.isEmpty()) {
@@ -167,7 +170,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.35 · XWIS-Kompatibilitätsclient");
+        version.setText("v0.36 · XWIS-Downloadreparatur");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
@@ -244,8 +247,14 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         communityDownloads.addView(downloadXwisRa2, weighted());
         communityDownloads.addView(downloadXwisYuri, weighted());
         root.addView(communityDownloads, matchWrap(dp(7)));
-        downloadXwisRa2.setOnClickListener(v -> downloadCommunityInstaller(false, false));
-        downloadXwisYuri.setOnClickListener(v -> downloadCommunityInstaller(true, false));
+        Button xwisBrowser = button("Archiv im Browser öffnen (RA2)");
+        root.addView(xwisBrowser, matchWrap(dp(7)));
+        xwisBrowser.setOnClickListener(v -> openCommunityDownloadInBrowser(false));
+        Button xwisCheck = button("XWIS-Download prüfen / übernehmen");
+        root.addView(xwisCheck, matchWrap(dp(7)));
+        xwisCheck.setOnClickListener(v -> checkCommunityDownload(true));
+        downloadXwisRa2.setOnClickListener(v -> downloadCommunityInstaller(false, true));
+        downloadXwisYuri.setOnClickListener(v -> downloadCommunityInstaller(true, true));
         LinearLayout communityImports = horizontal();
         Button importXwisRa2 = button("RA2-Installer auswählen");
         Button importXwisYuri = button("Yuri-Installer auswählen");
@@ -1408,62 +1417,148 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Hand downloads to Android's DownloadManager. Its system HTTP stack handles
+     * the large Internet Archive CDN redirects and survives activity pauses.
+     * Old XWIS links are documented but no longer assumed reachable.
+     */
     private void downloadCommunityInstaller(boolean yuri, boolean archive) {
-        if (container == null) { message("Wine-Laufzeit noch nicht bereit."); return; }
-        String source = yuri ? (archive ? RA2XwisClient.YURI_ARCHIVE : RA2XwisClient.YURI_URL) :
-            (archive ? RA2XwisClient.RA2_ARCHIVE : RA2XwisClient.RA2_URL);
-        setBusy(true, "Lade " + (yuri ? "Yuri" : "RA2") +
-            (archive ? " aus dem Internet Archive" : " von XWIS") + " …");
-        ioExecutor.execute(() -> {
-            try {
-                java.net.URL next = new java.net.URL(source);
-                java.net.HttpURLConnection conn = null;
-                try {
-                    for (int hop=0; hop<6; hop++) {
-                        if (!"https".equalsIgnoreCase(next.getProtocol()))
-                            throw new java.io.IOException("Nur HTTPS-Downloads erlaubt");
-                        String host = next.getHost().toLowerCase(Locale.ROOT);
-                        if (!(host.equals("xwis.net") || host.endsWith(".xwis.net") ||
-                              host.equals("archive.org") || host.endsWith(".archive.org")))
-                            throw new java.io.IOException("Unbekannter Download-Server: " + host);
-                        conn = (java.net.HttpURLConnection)next.openConnection();
-                        conn.setInstanceFollowRedirects(false);
-                        conn.setConnectTimeout(18000);
-                        conn.setReadTimeout(45000);
-                        conn.setRequestProperty("User-Agent", "RA2Mobile/0.35");
-                        int code=conn.getResponseCode();
-                        if (code>=300 && code<400) {
-                            String redirect=conn.getHeaderField("Location");
-                            conn.disconnect();conn=null;
-                            if (redirect==null) throw new java.io.IOException("Weiterleitung ohne Ziel");
-                            next = new java.net.URL(next,redirect);
-                            continue;
+        if (container == null) {message("Wine-Laufzeit noch nicht bereit.");return;}
+        String source = archive ? (yuri ? RA2XwisClient.YURI_ARCHIVE : RA2XwisClient.RA2_ARCHIVE)
+                                : (yuri ? RA2XwisClient.YURI_URL : RA2XwisClient.RA2_URL);
+        try {
+            android.app.DownloadManager manager=(android.app.DownloadManager)getSystemService(DOWNLOAD_SERVICE);
+            if(manager==null)throw new java.io.IOException("Android DownloadManager fehlt");
+            long existing=prefs.getLong(KEY_XWIS_DOWNLOAD_ID,-1);
+            if(existing>0){
+                android.app.DownloadManager.Query q=new android.app.DownloadManager.Query().setFilterById(existing);
+                try(android.database.Cursor c=manager.query(q)){
+                    if(c!=null && c.moveToFirst()){
+                        int state=c.getInt(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS));
+                        if(state==android.app.DownloadManager.STATUS_PENDING||
+                           state==android.app.DownloadManager.STATUS_RUNNING||
+                           state==android.app.DownloadManager.STATUS_PAUSED){
+                            new androidx.appcompat.app.AlertDialog.Builder(this)
+                                .setTitle("Ein Download läuft bereits")
+                                .setMessage("Bitte erst den bestehenden Download prüfen oder abbrechen.")
+                                .setPositiveButton("Fortschritt prüfen",(d,w)->checkCommunityDownload(true))
+                                .setNeutralButton("Alten Auftrag abbrechen",(d,w)->{
+                                    manager.remove(existing);
+                                    prefs.edit().remove(KEY_XWIS_DOWNLOAD_ID).apply();
+                                    downloadCommunityInstaller(yuri,archive);
+                                })
+                                .setNegativeButton("Schließen",null).show();
+                            return;
                         }
-                        if (code!=200) throw new java.io.IOException("HTTP " + code);
-                        long expected=conn.getContentLengthLong();
-                        if (expected>RA2XwisClient.MAX_INSTALLER)
-                            throw new java.io.IOException("Installer überschreitet die Größenbegrenzung");
-                        try (InputStream in=conn.getInputStream()) {copyCommunityPackage(in,yuri,expected);}
-                        conn.disconnect();conn=null;
-                        runOnUiThread(() -> startCommunitySetup(yuri));
-                        return;
                     }
-                    throw new java.io.IOException("Zu viele Weiterleitungen");
-                } finally {if (conn!=null)conn.disconnect();}
-            } catch (Exception error) {
-                runOnUiThread(() -> {
-                    setBusy(false,"Download fehlgeschlagen: " + error.getMessage());
-                    if (!archive) {
-                        new androidx.appcompat.app.AlertDialog.Builder(this)
-                            .setTitle("XWIS-Server nicht erreichbar")
-                            .setMessage("Der offizielle Download hat nicht funktioniert. Du kannst die archivierte XWIS-Ausgabe von Internet Archive versuchen oder eine bereits heruntergeladene EXE auswählen. Die Spiel-ISOs werden nicht verändert.")
-                            .setPositiveButton("Archivkopie versuchen", (dialog,which) -> downloadCommunityInstaller(yuri,true))
-                            .setNeutralButton("Installer auswählen", (dialog,which) -> pickCommunityInstaller(yuri))
-                            .setNegativeButton("Abbrechen",null).show();
-                    }
-                });
+                }
+                prefs.edit().remove(KEY_XWIS_DOWNLOAD_ID).apply();
             }
-        });
+            String name = (yuri ? "Yuri-XWIS-" : "RA2-XWIS-") + System.currentTimeMillis() + ".exe";
+            android.app.DownloadManager.Request request=new android.app.DownloadManager.Request(Uri.parse(source));
+            request.setAllowedOverMetered(true);
+            request.setAllowedOverRoaming(false);
+            request.setTitle("Alarmstufe Rot 2 – " + (yuri?"Yuri":"RA2") + " XWIS-Client");
+            request.setDescription("Community-Client wird über Android heruntergeladen");
+            request.setMimeType("application/octet-stream");
+            request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setDestinationInExternalFilesDir(this, android.os.Environment.DIRECTORY_DOWNLOADS, name);
+            long id=manager.enqueue(request);
+            prefs.edit().putLong(KEY_XWIS_DOWNLOAD_ID,id)
+                .putBoolean(KEY_XWIS_DOWNLOAD_YURI,yuri).apply();
+            setBusy(false,"Android-Download gestartet ("+(yuri?"Yuri":"RA2")+
+                "). Öffne Benachrichtigungen oder tippe auf „Download prüfen“.");
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Download an Android übergeben")
+                .setMessage("Der System-Download läuft im Hintergrund. Wenn er fertig ist, kehre zur App zurück und drücke „XWIS-Download prüfen / übernehmen“. Falls das Internet Archive ebenfalls nicht erreichbar ist, kannst du die Archivseite im Browser öffnen und die Datei anschließend importieren.")
+                .setPositiveButton("Download prüfen",(d,w)->checkCommunityDownload(true))
+                .setNeutralButton("Archiv im Browser",(d,w)->openCommunityDownloadInBrowser(yuri))
+                .setNegativeButton("Schließen",null).show();
+        } catch (Exception e) {
+            reportCommunityDownloadFailure("Android-Download konnte nicht gestartet werden: "+e.getClass().getSimpleName()+" – "+e.getMessage(),yuri);
+        }
+    }
+
+    private void checkCommunityDownload(boolean interactive) {
+        if(prefs==null)return;
+        long id=prefs.getLong(KEY_XWIS_DOWNLOAD_ID,-1);
+        boolean yuri=prefs.getBoolean(KEY_XWIS_DOWNLOAD_YURI,false);
+        if(id<=0) {
+            if(interactive)
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                  .setTitle("Kein aktiver XWIS-Download")
+                  .setMessage("Starte den Archivdownload oder wähle einen bereits heruntergeladenen Installer aus.")
+                  .setPositiveButton("RA2-Archiv laden",(d,w)->downloadCommunityInstaller(false,true))
+                  .setNeutralButton("Datei auswählen",(d,w)->pickCommunityInstaller(false))
+                  .setNegativeButton("Schließen",null).show();
+            return;
+        }
+        try {
+            android.app.DownloadManager manager=(android.app.DownloadManager)getSystemService(DOWNLOAD_SERVICE);
+            if(manager==null)throw new java.io.IOException("DownloadManager nicht verfügbar");
+            try(android.database.Cursor cursor=manager.query(new android.app.DownloadManager.Query().setFilterById(id))){
+                if(cursor==null||!cursor.moveToFirst()) {
+                    prefs.edit().remove(KEY_XWIS_DOWNLOAD_ID).apply();
+                    if(interactive) reportCommunityDownloadFailure("Android hat keinen Eintrag mehr für diesen Download.",yuri);
+                    return;
+                }
+                int state=cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS));
+                if(state==android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                    Uri downloaded=manager.getUriForDownloadedFile(id);
+                    prefs.edit().remove(KEY_XWIS_DOWNLOAD_ID).apply();
+                    if(downloaded==null)throw new java.io.IOException("Android hat keine heruntergeladene Datei geliefert");
+                    setBusy(false,"XWIS-Paket heruntergeladen. Import und Prüfung starten …");
+                    importCommunityInstaller(downloaded,yuri);
+                    return;
+                }
+                if(state==android.app.DownloadManager.STATUS_FAILED) {
+                    int error=cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_REASON));
+                    prefs.edit().remove(KEY_XWIS_DOWNLOAD_ID).apply();
+                    reportCommunityDownloadFailure("Android-Systemdownload fehlgeschlagen (Fehlercode "+error+"). Die Quelle ist eventuell nicht erreichbar.",yuri);
+                    return;
+                }
+                long current=cursor.getLong(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                long total=cursor.getLong(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                String msg="XWIS-Download "+(state==android.app.DownloadManager.STATUS_PAUSED?"pausiert":"läuft")+
+                    ": "+(current/(1024*1024))+" MB"+(total>0?" / "+(total/(1024*1024))+" MB":"");
+                if(status!=null)status.setText(msg);
+                if(interactive)
+                    new androidx.appcompat.app.AlertDialog.Builder(this)
+                      .setTitle("XWIS-Downloadstatus")
+                      .setMessage(msg+"\nDu kannst die App verlassen und später den Status prüfen.")
+                      .setPositiveButton("Archivseite öffnen",(d,w)->openCommunityDownloadInBrowser(yuri))
+                      .setNegativeButton("OK",null).show();
+            }
+        }catch(Exception e){if(interactive)reportCommunityDownloadFailure("Downloadprüfung: "+e.getMessage(),yuri);}
+    }
+
+    private void openCommunityDownloadInBrowser(boolean yuri) {
+        String source = yuri ? "https://archive.org/details/yuris-revenge-multiplayer"
+                             : "https://archive.org/details/red-alert-2-multiplayer";
+        try {
+            Intent browser=new Intent(Intent.ACTION_VIEW,Uri.parse(source));
+            browser.addCategory(Intent.CATEGORY_BROWSABLE);
+            startActivity(browser);
+            if(status!=null)status.setText("Archivseite geöffnet. Nach dem Download den EXE-Installer über „Installer auswählen“ importieren.");
+        }catch(Exception e){
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Keine Browser-App gefunden")
+                .setMessage("Öffne manuell: "+source+"\nNach dem Download die EXE-Datei in der App auswählen.")
+                .setPositiveButton("URL kopieren",(d,w)->{
+                    android.content.ClipboardManager cb=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                    if(cb!=null)cb.setPrimaryClip(android.content.ClipData.newPlainText("XWIS-Archiv",source));
+                }).setNegativeButton("OK",null).show();
+        }
+    }
+
+    private void reportCommunityDownloadFailure(String reason, boolean yuri) {
+        setBusy(false,reason);
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("XWIS-Download nicht erfolgreich")
+            .setMessage(reason+"\n\nDer Original-Spielordner wurde nicht verändert. Du kannst die Archivseite im Browser öffnen oder die heruntergeladene EXE-Datei auswählen.")
+            .setPositiveButton("Archivseite öffnen",(d,w)->openCommunityDownloadInBrowser(yuri))
+            .setNeutralButton("EXE auswählen",(d,w)->pickCommunityInstaller(yuri))
+            .setNegativeButton("Schließen",null).show();
     }
 
     private void copyCommunityPackage(InputStream input, boolean yuri, long length) throws java.io.IOException {
