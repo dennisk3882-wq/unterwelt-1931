@@ -862,7 +862,7 @@ private fun ScanScreen(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(brief.name, fontWeight = FontWeight.Bold)
-                        Text("Kartennummer " + brief.localId, style = MaterialTheme.typography.bodyMedium)
+                        Text("Kartennummer " + brief.localId + " · Set " + brief.id.substringBeforeLast('-'), style = MaterialTheme.typography.bodyMedium)
                         Text("Antippen für Set, Regeln und Preis", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
