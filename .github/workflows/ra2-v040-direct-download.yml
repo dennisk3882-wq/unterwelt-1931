@@ -1,0 +1,36 @@
+name: RA2 v0.40 – direct APK download
+on:
+  push:
+    branches: [ra2-yuri-android]
+    paths:
+      - '.github/workflows/ra2-v040-direct-download.yml'
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download already built Android APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p package
+          gh run download 38253750190 -R dennisk3882-wq/unterwelt-1931 -n ra2-yuri-android-debug -D package
+          test -s package/upstream/app/build/outputs/apk/debug/app-debug.apk
+          cp package/upstream/app/build/outputs/apk/debug/app-debug.apk RA2-Yuri-Android-v0.40.apk
+          printf '%s  %s\n' '738601a3e66a0b08fc26c09c14122f285203c55328b9a280ff8695954ee4211a' 'RA2-Yuri-Android-v0.40.apk' > RA2-Yuri-Android-v0.40.sha256
+          sha256sum --check RA2-Yuri-Android-v0.40.sha256
+      - name: Publish permanent GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create 'ra2-yuri-android-v0.40' \
+            'RA2-Yuri-Android-v0.40.apk' \
+            'RA2-Yuri-Android-v0.40.sha256' \
+            --repo 'dennisk3882-wq/unterwelt-1931' \
+            --target '41e1efbad91217ece67a65d4889c808a81b73aaa' \
+            --title 'RA2 / Yuri Android v0.40 – Vollbild & Breitbild' \
+            --notes 'Android-APK mit offline RA2-VM-Engine, virtueller CD 2, optionalem Einstellungsmenü und 2080×960-Breitbild. Originalspiel-Dateien sind nicht enthalten; bitte bestehende Installation in-place aktualisieren. SHA-256 liegt als Asset bei.'
