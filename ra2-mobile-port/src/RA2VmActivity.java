@@ -193,6 +193,56 @@ public final class RA2VmActivity extends AppCompatActivity {
             applyEngineUi();
             closeMenu();
         });
+        addMenuButton("🤖 2-Minuten-Gefechts-Autotest", () -> {
+            closeMenu();
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("RA2 – automatischer Gefechtstest")
+                .setMessage("Die Spielengine startet mit deinen vorhandenen Originaldaten direkt " +
+                    "auf dem Schlachtfeld und sendet zwei Minuten lang Testbefehle. " +
+                    "Spielerstatus, Einheiten und native Spiel-Frames werden beobachtet. " +
+                    "Bei einer Spielauswahl bitte Red Alert 2 auswählen. " +
+                    "Dies ist ein Funktionstest, kein selbstständig gewinnender KI-Spieler. " +
+                    "Deine originalen Spieldateien bleiben unverändert.")
+                .setNegativeButton("Abbrechen",null)
+                .setPositiveButton("Test starten",(dialog,which)->{
+                    append("AUTOTEST angefordert – RA2 Gefecht mit Originaldateien");
+                    browser.loadUrl(RA2VmFiles.URL+"?start-page=battle&ra2-autotest=1");
+                }).show();
+        });
+        addMenuButton("⏺ Spielablauf aufzeichnen", () -> {
+            closeMenu();
+            browser.evaluateJavascript(
+                "String(window.ra2AndroidLab?.startRecording?.() ?? false)",
+                result -> Toast.makeText(this,
+                    result.contains("true") ? "Aufzeichnung läuft – jetzt spielen." :
+                    "Zuerst ein Spiel in der RA2-VM starten.",Toast.LENGTH_LONG).show());
+        });
+        addMenuButton("⏹ Aufzeichnung speichern", () -> {
+            closeMenu();
+            browser.evaluateJavascript(
+                "String(window.ra2AndroidLab?.stopRecording?.() ?? 'Kein Spiel geladen')",
+                result -> Toast.makeText(this,result,Toast.LENGTH_LONG).show());
+        });
+        addMenuButton("▶ Ablauf automatisch wiederholen", () -> {
+            closeMenu();
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Aufgezeichneten Ablauf wiederholen")
+                .setMessage("Die RA2-VM wird neu gestartet und führt die zuletzt auf diesem " +
+                    "Gerät aufgezeichneten Maus- und Tastaturbefehle erneut aus. " +
+                    "Eine andere Karte oder Spielauflösung kann zu Abweichungen führen.")
+                .setNegativeButton("Abbrechen",null)
+                .setPositiveButton("Wiederholen",(dialog,which)->
+                    browser.loadUrl(RA2VmFiles.URL+"?ra2-replay=1"))
+                .show();
+        });
+        addMenuButton("📋 Intelligente Analyse + Log kopieren", () -> {
+            closeMenu();
+            copyLog();
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Automatische Ursachenanalyse")
+                .setMessage(buildReasonedAnalysis())
+                .setPositiveButton("OK",null).show();
+        });
         addMenuButton("💥 Niederlage markieren + Log kopieren", () -> {
             append("PLAYER_EVENT=UNITS_EXPLODED_DEFEAT");
             copyLog();
@@ -368,8 +418,46 @@ public final class RA2VmActivity extends AppCompatActivity {
         synchronized(log) {if(log.size()>=300)log.removeFirst();log.addLast(stamped);}
     }
 
+    private String buildReasonedAnalysis() {
+        StringBuilder capture=new StringBuilder();
+        synchronized(log){for(String line:log)capture.append(line).append('\n');}
+        String value=capture.toString();
+        boolean mediaOk=value.contains("CD2=true") || value.contains("RA2-CD2=true");
+        boolean guestCD=value.contains("GetDriveTypeA D:=CDROM");
+        boolean registry=value.contains("Original installation registration connected");
+        boolean registryRead=value.contains("RegQuery") || value.contains("RegOpen");
+        boolean houseDeath=value.contains("ALARM=SPIELER_TOT");
+        boolean noUnits=value.contains("ALARM=KEINE_EINHEITEN");
+        boolean houseObserved=value.contains("[RA2-HOUSE] Battle");
+        boolean autoStarted=value.contains("AUTOTEST gestartet");
+        boolean autoFinished=value.contains("AUTOTEST ENDE");
+        boolean autoFailed=value.contains("AUTOTEST FEHLER") || value.contains("AUTOTEST ABBRUCH");
+        boolean stale=value.contains("ENGINE_ANHALT");
+        StringBuilder out=new StringBuilder();
+        out.append("Original-CD erkannt: ").append(mediaOk?"JA":"NOCH NICHT BESTAETIGT").append('\n');
+        out.append("CD-ROM im Windows-Gast: ").append(guestCD?"JA":"NOCH NICHT BESTAETIGT").append('\n');
+        out.append("Registrierung uebertragen: ").append(registry?"JA":"NOCH NICHT BESTAETIGT").append('\n');
+        out.append("Windows-Registry im Spiel abgefragt: ").append(registryRead?"JA":"NICHT BEOBACHTET").append('\n');
+        out.append("House-Speicherzustand lesbar: ").append(houseObserved?"JA":"NICHT BESTAETIGT").append('\n');
+        out.append("Gefechts-Autotest: ").append(autoFailed?"START/LAUFZEITFEHLER":
+            autoFinished?"BEENDET":autoStarted?"LAEUFT":"NICHT GESTARTET").append("\n\n");
+        if(houseDeath) out.append("BERECHNETES ERGEBNIS: RA2 markiert den lokalen Spieler als tot. " +
+            "Die Niederlage ist in der Spielsimulation messbar; die ausloesende Routine muss noch untersucht werden.");
+        else if(noUnits) out.append("VERDACHT: Der lokale Spieler hat keine Einheiten mehr. " +
+            "Bitte Zeitpunkt zur Niederlage vergleichen, da auch normaler Spielverlauf moeglich ist.");
+        else if(stale) out.append("VERDACHT: Die native Spiellogik/Frameausgabe stoppt. " +
+            "Bitte das Zeitfenster und die letzten Win32-Aufrufe vergleichen.");
+        else if(!houseObserved) out.append("DATENLUECKE: Keine gueltige House-Speicherprobe. " +
+            "Moeglicherweise abweichende GAME.EXE-Version oder Spiel noch nicht auf dem Schlachtfeld.");
+        else out.append("Bisher kein gemessener Uebergang zum Verliererstatus. " +
+            "Automatischen Test laufen lassen und nach der Explosion direkt markieren.");
+        out.append("\nKein CD-Schluessel oder Spielinhalt wird fuer diese Analyse hochgeladen.");
+        return out.toString();
+    }
+
     private void copyLog() {
         StringBuilder result=new StringBuilder("RA2 Android VM – Diagnose\n");
+        result.append("Automatische Ursachenanalyse:\n").append(buildReasonedAnalysis()).append("\n\n");
         synchronized(log) {for(String line:log)result.append(line).append('\n');}
         if(!lastFailure.isEmpty())result.append("LastFailure: ").append(lastFailure).append('\n');
         ClipboardManager clip=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
