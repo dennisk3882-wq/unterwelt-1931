@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.42-native-key-dialog-with-auto-vm-registry
+# build-version: 0.43-clean-mobile-homepage
 
 on:
   push:
@@ -424,7 +424,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  publish-v042:
+  publish-v043:
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -444,15 +444,15 @@ jobs:
           set -euo pipefail
           apk=release/upstream/app/build/outputs/apk/debug/app-debug.apk
           test -s "$apk"
-          cp "$apk" RA2-Yuri-Android-v0.42.apk
-          unzip -t RA2-Yuri-Android-v0.42.apk >/dev/null
-          sha256sum RA2-Yuri-Android-v0.42.apk > RA2-Yuri-Android-v0.42.sha256
-          tag=ra2-yuri-android-v0.42
+          cp "$apk" RA2-Yuri-Android-v0.43.apk
+          unzip -t RA2-Yuri-Android-v0.43.apk >/dev/null
+          sha256sum RA2-Yuri-Android-v0.43.apk > RA2-Yuri-Android-v0.43.sha256
+          tag=ra2-yuri-android-v0.43
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" RA2-Yuri-Android-v0.42.apk RA2-Yuri-Android-v0.42.sha256 --clobber --repo "$GITHUB_REPOSITORY"
+            gh release upload "$tag" RA2-Yuri-Android-v0.43.apk RA2-Yuri-Android-v0.43.sha256 --clobber --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$tag" RA2-Yuri-Android-v0.42.apk RA2-Yuri-Android-v0.42.sha256 \
+            gh release create "$tag" RA2-Yuri-Android-v0.43.apk RA2-Yuri-Android-v0.43.sha256 \
               --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title 'RA2 / Yuri Android v0.42 – CD-Schlüssel direkt im Spiel' \
-              --notes 'Direkt im Zahnrad-Menü kann der eigene Original-CD-Schlüssel lokal eingegeben werden. Beim Neustart wird er automatisch in die virtuelle Windows-Registrierung übernommen. Auf der Startseite ist der Knopf zusätzlich direkt oberhalb des RA2-VM-Starts. Keine fremden Seriennummern oder Originalspieldaten in der APK. Gefechtsverhalten muss auf dem Gerät getestet werden. In-place aktualisieren, nicht deinstallieren.'
+              --title 'RA2 / Yuri Android v0.43 – Schlankes Startmenü & Vollbild' \
+              --notes 'Vereinfachtes Landscape-Hauptmenü: RA2/Yuri-Spielstart direkt oben, Originalmedien/CD-Schlüssel/Installation und Wine/XWIS/Diagnose in zwei einklappbaren Bereichen. Störende schwebende Diagnose-Schaltfläche entfernt. Galaxy-Navigationsrandleiste wird berücksichtigt. Bestehende Installation ohne Deinstallation aktualisieren. Eigene Original-CD-Schlüssel können weiter lokal eingegeben werden; keine Seriennummer wird fest veröffentlicht.'
           fi

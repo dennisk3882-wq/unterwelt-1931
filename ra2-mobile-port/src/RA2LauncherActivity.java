@@ -104,11 +104,23 @@ public final class RA2LauncherActivity extends AppCompatActivity {
     private Button playYuriButton;
     private Button playXwisRa2;
     private Button playXwisYuri;
+    private Button setupToggle;
+    private Button advancedToggle;
+    private LinearLayout setupPanel;
+    private LinearLayout advancedPanel;
+    private TextView quickStatus;
+    private boolean setupExpanded;
+    private boolean advancedExpanded;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        setupExpanded = prefs.getBoolean("launcher_setup_expanded", false);
+        advancedExpanded = prefs.getBoolean("launcher_advanced_expanded", false);
+        // On the very first launch show the setup controls instead of an empty screen.
+        if (savedUri(KEY_ALLIED) == null && savedUri(KEY_SOVIET) == null)
+            setupExpanded = true;
         setContentView(buildUi());
         applyLanguage();
         ensureRuntimeAndContainer();
@@ -150,162 +162,226 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
+    /**
+     * Primary UX: launch the working VM immediately. Keep the original CD
+     * importer, Wine launcher and experimental XWIS tools accessible,
+     * but out of the normal play flow. Do not delete user data or installations.
+     */
     private View buildUi() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(Color.rgb(8, 12, 14));
+        scroll.setClipToPadding(false);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(22), dp(22), dp(22), dp(28));
-        scroll.addView(root, new ScrollView.LayoutParams(
-            ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
+        root.setPadding(dp(20), dp(12), dp(20), dp(28));
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            // Galaxy phones put landscape navigation on the right. Respect its
+            // actual inset rather than allowing tappable buttons beneath it.
+            root.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets safe = insets.getInsets(
+                    android.view.WindowInsets.Type.navigationBars() |
+                    android.view.WindowInsets.Type.displayCutout());
+                int left = dp(20) + safe.left;
+                int right = dp(20) + safe.right;
+                int bottom = dp(28) + safe.bottom;
+                if (root.getPaddingLeft() != left || root.getPaddingRight() != right ||
+                    root.getPaddingBottom() != bottom)
+                    root.setPadding(left, dp(12), right, bottom);
+                return insets;
+            });
+        }
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
-        title = label(30, Color.rgb(238, 220, 170));
+        title = label(27, Color.rgb(238, 220, 170));
         title.setGravity(Gravity.CENTER);
         root.addView(title, matchWrap(0));
 
         subtitle = label(15, Color.LTGRAY);
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setPadding(0, dp(4), 0, dp(18));
+        subtitle.setPadding(0, dp(3), 0, dp(6));
         root.addView(subtitle, matchWrap(0));
-        TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.42 · CD-Schlüssel direkt im Spiel eingeben");
+
+        TextView version = label(11, 0xff859397);
+        version.setText("v0.43 · Direktstart & aufgeräumtes Hauptmenü");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
+
+        Button vmLaunch = accentButton("▶  JETZT SPIELEN – ALARMSTUFE ROT 2 / YURI");
+        vmLaunch.setTextSize(18);
+        vmLaunch.setMinHeight(dp(64));
+        vmLaunch.setContentDescription("Alarmstufe Rot 2 oder Yuri’s Rache mit der neuen Spielengine starten");
+        root.addView(vmLaunch, matchWrap(dp(14)));
+        vmLaunch.setOnClickListener(v -> startActivity(new Intent(this, RA2VmActivity.class)));
+
+        quickStatus = label(14, 0xffb9d6bd);
+        quickStatus.setGravity(Gravity.CENTER);
+        quickStatus.setPadding(dp(8), dp(12), dp(8), dp(2));
+        root.addView(quickStatus, matchWrap(0));
+
+        TextView touchInfo = label(12, 0xffabb6b8);
+        touchInfo.setTag("touchInfo");
+        touchInfo.setGravity(Gravity.CENTER);
+        touchInfo.setPadding(dp(4), dp(6), dp(4), dp(7));
+        root.addView(touchInfo, matchWrap(0));
+
+        setupToggle = button("");
+        setupToggle.setTextSize(15);
+        setupToggle.setContentDescription("Originalmedien, CD-Schlüssel, Sprache und Einrichtung aufklappen");
+        root.addView(setupToggle, matchWrap(dp(15)));
+        setupToggle.setOnClickListener(v -> {
+            setupExpanded = !setupExpanded;
+            prefs.edit().putBoolean("launcher_setup_expanded", setupExpanded).apply();
+            updateFoldouts();
+        });
+
+        setupPanel = sectionPanel();
+        root.addView(setupPanel, matchWrap(dp(5)));
+        TextView setupHeading = label(16, Color.rgb(180, 235, 210));
+        setupHeading.setText("Originalmedien und Einrichtung");
+        setupPanel.addView(setupHeading, matchWrap(dp(4)));
 
         LinearLayout languageRow = horizontal();
         languageDe = button("");
         languageEn = button("");
         languageRow.addView(languageDe, weighted());
         languageRow.addView(languageEn, weighted());
-        root.addView(languageRow, matchWrap(dp(8)));
-
+        setupPanel.addView(languageRow, matchWrap(dp(10)));
         languageDe.setOnClickListener(v -> setLanguage("de"));
         languageEn.setOnClickListener(v -> setLanguage("en"));
 
-        TextView mediaHeading = label(20, Color.WHITE);
-        mediaHeading.setText("Originalmedien");
+        TextView mediaHeading = label(16, Color.WHITE);
+        mediaHeading.setText("Original-CDs / ISOs");
         mediaHeading.setTag("mediaHeading");
-        root.addView(mediaHeading, matchWrap(dp(20)));
+        setupPanel.addView(mediaHeading, matchWrap(dp(9)));
 
         alliedButton = button("");
         sovietButton = button("");
         yuriIsoButton = button("");
-        root.addView(alliedButton, matchWrap(dp(8)));
-        root.addView(sovietButton, matchWrap(dp(8)));
-        root.addView(yuriIsoButton, matchWrap(dp(8)));
-
+        setupPanel.addView(alliedButton, matchWrap(dp(7)));
+        setupPanel.addView(sovietButton, matchWrap(dp(7)));
+        setupPanel.addView(yuriIsoButton, matchWrap(dp(7)));
         alliedButton.setOnClickListener(v -> pickIso(PICK_ALLIED));
         sovietButton.setOnClickListener(v -> pickIso(PICK_SOVIET));
         yuriIsoButton.setOnClickListener(v -> pickIso(PICK_YURI));
 
-        storageHint = label(13, Color.LTGRAY);
-        storageHint.setPadding(dp(4), dp(8), dp(4), dp(6));
-        root.addView(storageHint, matchWrap(0));
+        storageHint = label(12, 0xff9caeae);
+        storageHint.setPadding(dp(4), dp(8), dp(4), dp(5));
+        setupPanel.addView(storageHint, matchWrap(0));
 
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(1000);
         progress.setVisibility(View.GONE);
-        root.addView(progress, matchWrap(dp(4)));
+        setupPanel.addView(progress, matchWrap(dp(5)));
 
         status = label(14, Color.rgb(185, 220, 190));
-        status.setPadding(dp(4), dp(7), dp(4), dp(12));
-        root.addView(status, matchWrap(0));
+        status.setPadding(dp(4), dp(7), dp(4), dp(6));
+        setupPanel.addView(status, matchWrap(0));
 
         cdKeysButton = button("");
         cdKeysButton.setOnClickListener(v -> editOriginalKeys());
-        root.addView(cdKeysButton, matchWrap(dp(7)));
-
+        setupPanel.addView(cdKeysButton, matchWrap(dp(7)));
         installRa2Button = accentButton("");
         installYuriButton = accentButton("");
-        root.addView(installRa2Button, matchWrap(dp(7)));
-        root.addView(installYuriButton, matchWrap(dp(7)));
+        setupPanel.addView(installRa2Button, matchWrap(dp(7)));
+        setupPanel.addView(installYuriButton, matchWrap(dp(7)));
         installRa2Button.setOnClickListener(v -> beginRa2Install());
         installYuriButton.setOnClickListener(v -> beginYuriInstall());
 
+        advancedToggle = button("");
+        advancedToggle.setTextSize(15);
+        advancedToggle.setContentDescription("Weitere Startarten und Diagnose öffnen");
+        root.addView(advancedToggle, matchWrap(dp(10)));
+        advancedToggle.setOnClickListener(v -> {
+            advancedExpanded = !advancedExpanded;
+            prefs.edit().putBoolean("launcher_advanced_expanded", advancedExpanded).apply();
+            updateFoldouts();
+        });
+
+        advancedPanel = sectionPanel();
+        root.addView(advancedPanel, matchWrap(dp(5)));
+        TextView advancedHeading = label(16, Color.rgb(235, 211, 162));
+        advancedHeading.setText("Klassischer Wine-Start (optional)");
+        advancedPanel.addView(advancedHeading, matchWrap(dp(5)));
         playRa2Button = button("");
         playYuriButton = button("");
-        root.addView(playRa2Button, matchWrap(dp(18)));
-        root.addView(playYuriButton, matchWrap(dp(7)));
+        advancedPanel.addView(playRa2Button, matchWrap(dp(8)));
+        advancedPanel.addView(playYuriButton, matchWrap(dp(7)));
         Button originalStartProbe = button("");
         originalStartProbe.setTag("originalStartProbeButton");
-        root.addView(originalStartProbe, matchWrap(dp(7)));
+        advancedPanel.addView(originalStartProbe, matchWrap(dp(7)));
         originalStartProbe.setOnClickListener(v -> launchGame(false, true));
         playRa2Button.setOnClickListener(v -> launchGame(false));
         playYuriButton.setOnClickListener(v -> launchGame(true));
 
-        TextView communityHeading = label(20, Color.rgb(235, 211, 162));
-        communityHeading.setText("XWIS – kompatibler Start ohne Original-CD-Launcher");
-        root.addView(communityHeading, matchWrap(dp(20)));
-        TextView communityInfo = label(13, Color.LTGRAY);
-        communityInfo.setText("Separater Spielclient. Original-ISOs, Kampagnen, Videos und bisherige Installation bleiben erhalten.");
-        root.addView(communityInfo, matchWrap(dp(5)));
+        TextView communityHeading = label(16, Color.rgb(235, 211, 162));
+        communityHeading.setText("XWIS – alternative Spielclients");
+        advancedPanel.addView(communityHeading, matchWrap(dp(17)));
+        TextView communityInfo = label(12, Color.LTGRAY);
+        communityInfo.setText("Nur bei Bedarf: separate Clients und Installer. Deine Originaldaten bleiben erhalten.");
+        advancedPanel.addView(communityInfo, matchWrap(dp(4)));
+
         LinearLayout communityDownloads = horizontal();
         Button downloadXwisRa2 = accentButton("XWIS RA2 herunterladen");
         Button downloadXwisYuri = accentButton("XWIS Yuri herunterladen");
         communityDownloads.addView(downloadXwisRa2, weighted());
         communityDownloads.addView(downloadXwisYuri, weighted());
-        root.addView(communityDownloads, matchWrap(dp(7)));
+        advancedPanel.addView(communityDownloads, matchWrap(dp(8)));
         Button xwisBrowser = button("Archiv im Browser öffnen (RA2)");
-        root.addView(xwisBrowser, matchWrap(dp(7)));
+        advancedPanel.addView(xwisBrowser, matchWrap(dp(7)));
         xwisBrowser.setOnClickListener(v -> openCommunityDownloadInBrowser(false));
         Button xwisCheck = button("XWIS-Download prüfen / übernehmen");
-        root.addView(xwisCheck, matchWrap(dp(7)));
+        advancedPanel.addView(xwisCheck, matchWrap(dp(7)));
         xwisCheck.setOnClickListener(v -> checkCommunityDownload(true));
         downloadXwisRa2.setOnClickListener(v -> downloadCommunityInstaller(false, true));
         downloadXwisYuri.setOnClickListener(v -> downloadCommunityInstaller(true, true));
+
         LinearLayout communityImports = horizontal();
         Button importXwisRa2 = button("RA2-Installer auswählen");
         Button importXwisYuri = button("Yuri-Installer auswählen");
         communityImports.addView(importXwisRa2, weighted());
         communityImports.addView(importXwisYuri, weighted());
-        root.addView(communityImports, matchWrap(dp(7)));
+        advancedPanel.addView(communityImports, matchWrap(dp(7)));
         importXwisRa2.setOnClickListener(v -> pickCommunityInstaller(false));
         importXwisYuri.setOnClickListener(v -> pickCommunityInstaller(true));
         playXwisRa2 = button("RA2 – XWIS-Client starten");
         playXwisYuri = button("Yuri – XWIS-Client starten");
-        root.addView(playXwisRa2, matchWrap(dp(7)));
-        root.addView(playXwisYuri, matchWrap(dp(7)));
+        advancedPanel.addView(playXwisRa2, matchWrap(dp(7)));
+        advancedPanel.addView(playXwisYuri, matchWrap(dp(7)));
         playXwisRa2.setOnClickListener(v -> launchCommunityGame(false));
         playXwisYuri.setOnClickListener(v -> launchCommunityGame(true));
 
-        TextView vmTitle = label(20, Color.rgb(180, 235, 210));
-        vmTitle.setText("NEUE SPIELENGINE – RA2 + YURI OHNE WINE");
-        root.addView(vmTitle, matchWrap(dp(18)));
-        TextView vmHint = label(13, Color.LTGRAY);
-        vmHint.setText("Experimenteller GPL-Client RA2 VM: nutzt Original-EXEs mit einer eigenen x86-/Win32-Laufzeit. Kampagnen noch nicht vollständig geprüft. Originaldateien bleiben erhalten.");
-        root.addView(vmHint, matchWrap(dp(7)));
-        Button vmKeyEntry = button("🔑 Original-CD-Schlüssel für die neue Engine");
-        root.addView(vmKeyEntry, matchWrap(dp(8)));
-        vmKeyEntry.setOnClickListener(v -> editOriginalKeys());
-        Button vmLaunch = accentButton("RA2 / YURI MIT NEUER ENGINE TESTEN");
-        root.addView(vmLaunch, matchWrap(dp(12)));
-        vmLaunch.setOnClickListener(v -> startActivity(new Intent(this, RA2VmActivity.class)));
-
-        TextView touchInfo = label(13, Color.LTGRAY);
-        touchInfo.setTag("touchInfo");
-        touchInfo.setPadding(dp(4), dp(18), dp(4), dp(84));
-        root.addView(touchInfo, matchWrap(0));
-
-        FrameLayout shell = new FrameLayout(this);
-        shell.setBackgroundColor(Color.rgb(8, 12, 14));
-        shell.addView(scroll, new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-
-        Button diagnostics = accentButton("🩺 Diagnose");
+        Button diagnostics = button("🩺 Diagnose und Fehlerprotokoll");
         diagnostics.setTag("diagnosticsButton");
-        diagnostics.setOnClickListener(v -> {
-            Intent intent = new Intent(this, RA2DiagnosticsActivity.class);
-            startActivity(intent);
-        });
+        advancedPanel.addView(diagnostics, matchWrap(dp(17)));
+        diagnostics.setOnClickListener(v -> startActivity(
+            new Intent(this, RA2DiagnosticsActivity.class)));
 
-        FrameLayout.LayoutParams dp = new FrameLayout.LayoutParams(
-            dp(170), dp(54), Gravity.BOTTOM | Gravity.END);
-        dp.setMargins(dp(12), dp(12), dp(18), dp(18));
-        shell.addView(diagnostics, dp);
+        updateFoldouts();
+        return scroll;
+    }
 
-        return shell;
+    private LinearLayout sectionPanel() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(13), dp(11), dp(13), dp(14));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.rgb(18, 26, 29));
+        bg.setCornerRadius(dp(9));
+        bg.setStroke(dp(1), Color.rgb(58, 75, 79));
+        panel.setBackground(bg);
+        return panel;
+    }
+
+    private void updateFoldouts() {
+        boolean de = isGerman();
+        if (setupPanel != null) setupPanel.setVisibility(setupExpanded ? View.VISIBLE : View.GONE);
+        if (advancedPanel != null) advancedPanel.setVisibility(advancedExpanded ? View.VISIBLE : View.GONE);
+        if (setupToggle != null) setupToggle.setText((setupExpanded ? "▾  " : "▸  ") +
+            (de ? "Originalmedien, CD-Schlüssel & Einrichtung" : "Original discs, CD keys & setup"));
+        if (advancedToggle != null) advancedToggle.setText((advancedExpanded ? "▾  " : "▸  ") +
+            (de ? "Erweiterte Startarten & Diagnose" : "Alternative launchers & diagnostics"));
     }
 
     private void setLanguage(String language) {
@@ -355,6 +431,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         if (diagnostics != null) diagnostics.setText(de ? "🩺 Diagnose" : "🩺 Diagnostics");
         Button originalProbe = root.findViewWithTag("originalStartProbeButton");
         if (originalProbe != null) originalProbe.setText(de ? "🧪 RA2.EXE-Originalstart testen" : "🧪 Test original RA2.EXE launcher");
+        updateFoldouts();
         refreshGameState();
     }
 
@@ -1799,6 +1876,17 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         playYuriButton.setAlpha(yuri ? 1.0f : 0.45f);
         installYuriButton.setEnabled(!installationBusy && container != null && ra2 && savedUri(KEY_YURI) != null);
         installRa2Button.setEnabled(!installationBusy && container != null && savedUri(KEY_ALLIED) != null && savedUri(KEY_SOVIET) != null);
+        if (quickStatus != null) {
+            if (container == null) quickStatus.setText("Laufzeit wird vorbereitet…");
+            else {
+                boolean mediaRa2 = savedUri(KEY_ALLIED) != null && savedUri(KEY_SOVIET) != null;
+                boolean mediaYuri = savedUri(KEY_YURI) != null;
+                quickStatus.setText("Originalmedien: RA2 " + (mediaRa2 ? "✓" : "nicht gewählt") +
+                    "  ·  Yuri " + (mediaYuri ? "✓" : "nicht gewählt") +
+                    "     |     Klassisch installiert: RA2 " + (ra2 ? "✓" : "–") +
+                    "  ·  Yuri " + (yuri ? "✓" : "–"));
+            }
+        }
     }
 
     private boolean isInstalled(boolean yuri) {
@@ -1929,6 +2017,11 @@ public final class RA2LauncherActivity extends AppCompatActivity {
             progress.setVisibility(busy ? View.VISIBLE : View.GONE);
             if (!busy) progress.setProgress(0);
             status.setText(text == null ? "" : text);
+            if (busy && !setupExpanded) {
+                setupExpanded = true;
+                prefs.edit().putBoolean("launcher_setup_expanded", true).apply();
+                updateFoldouts();
+            }
             refreshGameState();
             installRa2Button.setEnabled(!busy && container != null && savedUri(KEY_ALLIED) != null && savedUri(KEY_SOVIET) != null);
             installYuriButton.setEnabled(!busy && container != null && isInstalled(false) && savedUri(KEY_YURI) != null);
