@@ -157,18 +157,18 @@ jobs:
           start=s.index("export function loadStoredResolution(")
           end=s.index("export function storeResolution(",start)
           s=s[:start]+"""export function loadStoredResolution(gameId: SupportedGameId): GameResolution | null {
-  try {
-    const raw = window.localStorage.getItem(STORED_RESOLUTION_PREFIX + gameId);
-    if (raw === 'ini') return null;
-    const saved = parseGameResolution(raw);
-    if (saved) return saved;
-    return window.location.hostname === 'ra2.android.local' ? { width: 2080, height: 960 } : null;
-  } catch {
-    return null;
-  }
-}
+            try {
+              const raw = window.localStorage.getItem(STORED_RESOLUTION_PREFIX + gameId);
+              if (raw === 'ini') return null;
+              const saved = parseGameResolution(raw);
+              if (saved) return saved;
+              return window.location.hostname === 'ra2.android.local' ? { width: 2080, height: 960 } : null;
+            } catch {
+              return null;
+            }
+          }
 
-"""+s[end:]
+          """+s[end:]
           original="    else window.localStorage.removeItem(key);"
           assert s.count(original)==1
           s=s.replace(original,
