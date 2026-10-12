@@ -1,0 +1,38 @@
+name: RA2 v0.41 – direct APK download
+on:
+  push:
+    branches: [ra2-yuri-android]
+    paths:
+      - '.github/workflows/ra2-v041-direct-download.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve verified 0.41 APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p package
+          gh run download 38261062136 -R dennisk3882-wq/unterwelt-1931 -n ra2-yuri-android-debug -D package
+          test -s package/upstream/app/build/outputs/apk/debug/app-debug.apk
+          cp package/upstream/app/build/outputs/apk/debug/app-debug.apk RA2-Yuri-Android-v0.41.apk
+          unzip -t RA2-Yuri-Android-v0.41.apk >/dev/null
+          sha256sum RA2-Yuri-Android-v0.41.apk > RA2-Yuri-Android-v0.41.sha256
+          cat RA2-Yuri-Android-v0.41.sha256
+      - name: Publish installable GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create 'ra2-yuri-android-v0.41' \
+            'RA2-Yuri-Android-v0.41.apk' \
+            'RA2-Yuri-Android-v0.41.sha256' \
+            --repo 'dennisk3882-wq/unterwelt-1931' \
+            --target '4961166b765317f1ba27704da12b7df3a9d26920' \
+            --title 'RA2 / Yuri Android v0.41 – Originalregistrierung & Breitbild' \
+            --notes 'Testversion für Galaxy S26 Ultra: Der originale lokale CD-Schlüssel wird bei gültiger Eingabe vom Android-Installer in das Win32-Registry-Profil der RA2-VM übertragen (kein Schlüssel in der APK). Zusätzliche breite Auflösungen und Migration alter 4:3-Werte. Native Vollbildansicht mit Zahnrad. Spieldateien sind nicht enthalten. Die bestehende App ohne Deinstallation aktualisieren und anschließend Gefecht sowie Breitbild testen.'
