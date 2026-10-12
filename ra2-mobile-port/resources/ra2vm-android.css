@@ -1,0 +1,70 @@
+
+/*
+ * RA2 Android immersive landscape layout.
+ * Enable only in the privately packaged Android WebView on ra2.android.local.
+ * The PC/browser distribution is unaffected.
+ */
+html.ra2-android,
+html.ra2-android body,
+html.ra2-android #app-layout {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+html.ra2-android #app-layout {
+  inset: 0 !important;
+  display: flex !important;
+}
+html.ra2-android #stage {
+  flex: 1 1 100% !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: hidden !important;
+  background: #000 !important;
+}
+html.ra2-android #screen-frame {
+  max-width: 100vw;
+  max-height: 100dvh;
+}
+/* The runtime controls are not lost; the small native Android gear opens them. */
+html.ra2-android #vm-controls {
+  display: none !important;
+}
+html.ra2-android.ra2-settings-open #vm-controls {
+  display: flex !important;
+  box-sizing: border-box;
+  z-index: 120 !important;
+  position: fixed !important;
+  top: 6px !important;
+  left: 6px !important;
+  right: auto !important;
+  bottom: auto !important;
+  max-height: calc(100dvh - 12px) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  width: min(220px, 46vw) !important;
+  max-width: 46vw !important;
+  padding: 6px !important;
+}
+html.ra2-android #vm-debug {
+  display: none !important;
+}
+/* Hide VM keyboard buttons and virtual joystick, even when touching the game. */
+html.ra2-android #vm-touch-controls,
+html.ra2-android #vm-touch-joystick {
+  display: none !important;
+}
+html.ra2-android.ra2-touch-open #vm-touch-controls:not([hidden]) {
+  display: grid !important;
+}
+html.ra2-android.ra2-touch-open #vm-touch-joystick:not([hidden]) {
+  display: flex !important;
+}
+/* Do not conceal game UI error dialogs, loading and source selection. */
+html.ra2-android #ui {
+  inset: 0 !important;
+}

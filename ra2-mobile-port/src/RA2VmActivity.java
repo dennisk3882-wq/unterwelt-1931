@@ -7,11 +7,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -29,26 +30,60 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import java.util.ArrayDeque;
 
-/** Original executable inside RA2 VM's offline browser-based Win32 runtime. */
+/** Distraction-free RA2/Yuri fullscreen, local GPL VM engine, touch settings on demand. */
 public final class RA2VmActivity extends AppCompatActivity {
     private WebView browser;
-    private TextView notice;
     private RA2VmFiles files;
-    private final ArrayDeque<String> log=new ArrayDeque<>();
+    private final ArrayDeque<String> log = new ArrayDeque<>();
     private ValueCallback<android.net.Uri[]> pendingFiles;
-    private static final int PICK_RESOURCE=8824;
-    private String lastFailure="";
+    private static final int PICK_RESOURCE = 8824;
+    private boolean menuOpen;
+    private boolean settingsOpen;
+    private boolean touchOpen;
+    private LinearLayout menu;
+    private TextView gear;
+    private String lastFailure = "";
+
+    private int dp(float units) {
+        return Math.round(getResources().getDisplayMetrics().density * units);
+    }
+
+    private void immersive() {
+        // Android 16: hide system navigation/status bars but allow transient edge swipes.
+        getWindow().getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_FULLSCREEN |
+            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        );
+    }
+
+    @Override public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) immersive();
+    }
+
+    private GradientDrawable background(int color, int stroke, float radius) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(color);
+        bg.setCornerRadius(dp(radius));
+        if (stroke != Color.TRANSPARENT) bg.setStroke(dp(1),stroke);
+        return bg;
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        files=new RA2VmFiles(this);
-        FrameLayout root=new FrameLayout(this);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        immersive();
+        files = new RA2VmFiles(this);
+        FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
-        browser=new WebView(this);
-        browser.setBackgroundColor(Color.rgb(7,9,16));
+        browser = new WebView(this);
+        browser.setBackgroundColor(Color.BLACK);
         browser.getSettings().setJavaScriptEnabled(true);
         browser.getSettings().setDomStorageEnabled(true);
         browser.getSettings().setDatabaseEnabled(true);
@@ -58,30 +93,24 @@ public final class RA2VmActivity extends AppCompatActivity {
         browser.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         browser.getSettings().setLoadWithOverviewMode(true);
         browser.getSettings().setUseWideViewPort(true);
-        browser.setLayerType(View.LAYER_TYPE_HARDWARE,null);
+        browser.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         browser.setWebViewClient(new WebViewClient() {
-            @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request) {
+            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 return files.serve(request);
             }
-            @Override public void onReceivedError(WebView view,WebResourceRequest req,android.webkit.WebResourceError error) {
-                String url=req.getUrl().toString();
-                // Missing Windows loose files can legitimately return 404.
-                if(req.isForMainFrame()) showFailure("WebView-Start fehlgeschlagen: "+error.getDescription());
-                append("network-error "+url+": "+error.getDescription());
+            @Override public void onReceivedError(WebView view, WebResourceRequest req, android.webkit.WebResourceError error) {
+                append("network-error "+req.getUrl()+": "+error.getDescription());
+                if (req.isForMainFrame()) showFailure("VM-Start: "+error.getDescription());
             }
-            @Override public void onPageFinished(WebView view,String url) {
-                if(lastFailure.isEmpty()) {
-                    notice.setText(files.gameAvailable()
-                        ? "Spieldaten: "+(files.ra2Available()?"RA2 ":"")+
-                          (files.yuriAvailable()?"Yuri":"")+
-                          ". CD 2: "+(files.sovietCdReady()?"vorhanden":"NICHT GEFUNDEN")+
-                          ". Spiel unten auswählen; keine ISO auswählen."
-                        : "Kein vollständiger RA2-/Yuri-Spielordner erkannt. „LOG KOPIEREN“ zeigt den geprüften Pfad und die vorhandenen Dateien.");
-                }
+            @Override public void onPageFinished(WebView view, String url) {
+                applyEngineUi();
+                append("Ready: RA2="+files.ra2Available()+" Yuri="+files.yuriAvailable()+
+                    " CD2="+files.sovietCdReady());
+                if (!files.gameAvailable()) showFailure("Spieldateien nicht gefunden. ⚙ → Protokoll kopieren.");
             }
-            @Override public boolean onRenderProcessGone(WebView view,android.webkit.RenderProcessGoneDetail detail) {
-                showFailure("Android-WebView-Prozess beendet. Vermutlich Speicher- oder Enginefehler. Bitte Diagnose kopieren.");
-                append("render-gone didCrash="+(detail!=null && detail.didCrash()));
+            @Override public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                append("render-process-gone crashed="+(detail!=null&&detail.didCrash()));
+                showFailure("Spielengine wurde von Android beendet. ⚙ → Protokoll kopieren.");
                 return true;
             }
         });
@@ -103,63 +132,129 @@ public final class RA2VmActivity extends AppCompatActivity {
                     return true;
                 } catch(Exception e) {
                     pendingFiles.onReceiveValue(null);pendingFiles=null;
-                    showFailure("Dateiauswahl nicht verfügbar: "+e.getMessage());
+                    showFailure("Dateiauswahl: "+e.getMessage());
                     return false;
                 }
             }
         });
         root.addView(browser,new FrameLayout.LayoutParams(-1,-1));
 
-        LinearLayout bar=new LinearLayout(this);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setBackgroundColor(0xd91b2736);
-        notice=new TextView(this);
-        notice.setTextColor(Color.WHITE);
-        notice.setTextSize(12);
-        notice.setPadding(12,6,10,6);
-        notice.setText("RA2 VM wird gestartet …");
-        bar.addView(notice,new LinearLayout.LayoutParams(0,-2,1f));
-        Button copy=new Button(this);
-        copy.setText("Log kopieren");copy.setTextSize(11);
-        copy.setOnClickListener(v->copyLog());
-        bar.addView(copy,new LinearLayout.LayoutParams(-2,-2));
-        Button restart=new Button(this);
-        restart.setText("Neustart");restart.setTextSize(11);
-        restart.setOnClickListener(v->{lastFailure="";browser.reload();notice.setText("RA2 VM wird neu geladen …");});
-        bar.addView(restart,new LinearLayout.LayoutParams(-2,-2));
-        FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP);
-        root.addView(bar,p);
+        // One small floating gear replaces the permanent diagnostic banner.
+        gear = new TextView(this);
+        gear.setText("⚙");
+        gear.setTextSize(23);
+        gear.setTextColor(0xffe3d2a3);
+        gear.setGravity(Gravity.CENTER);
+        gear.setContentDescription("RA2 Einstellungen öffnen");
+        gear.setBackground(background(0x92212630,0x88a8a49a,10));
+        FrameLayout.LayoutParams gp=new FrameLayout.LayoutParams(dp(36),dp(36),Gravity.TOP|Gravity.RIGHT);
+        gp.topMargin=dp(6);
+        gp.rightMargin=dp(8);
+        root.addView(gear,gp);
+
+        menu=new LinearLayout(this);
+        menu.setOrientation(LinearLayout.VERTICAL);
+        menu.setPadding(dp(8),dp(8),dp(8),dp(8));
+        menu.setBackground(background(0xed11171e,0xff6b6050,9));
+        menu.setVisibility(View.GONE);
+        addMenuButton("⚙ Einstellungen", () -> {
+            settingsOpen=!settingsOpen;
+            applyEngineUi();
+            closeMenu();
+        });
+        addMenuButton("⌨ Tasten / Joystick", () -> {
+            touchOpen=!touchOpen;
+            applyEngineUi();
+            closeMenu();
+        });
+        addMenuButton("Protokoll kopieren", () -> {copyLog();closeMenu();});
+        addMenuButton("Spiel neu starten", () -> {
+            closeMenu();
+            lastFailure="";
+            if(browser!=null)browser.reload();
+        });
+        addMenuButton("Spiel verlassen", () -> finish());
+        FrameLayout.LayoutParams mp=new FrameLayout.LayoutParams(dp(168),-2,Gravity.TOP|Gravity.RIGHT);
+        mp.topMargin=dp(48);mp.rightMargin=dp(8);
+        root.addView(menu,mp);
+        gear.setOnClickListener(v->{
+            menuOpen=!menuOpen;
+            menu.setVisibility(menuOpen?View.VISIBLE:View.GONE);
+            gear.setAlpha(menuOpen?1f:0.65f);
+        });
         setContentView(root);
-        append("Engine=RA2 VM (GPL-3.0), origin="+RA2VmFiles.URL);
+        append("Engine=RA2 VM, origin="+RA2VmFiles.URL);
         append("DataDir="+files.originalDirectory()+" exists="+files.gameAvailable());
         append("GameDiscovery="+files.discoveryStatus());
         append("RA2ready="+files.ra2Available()+" YuriReady="+files.yuriAvailable());
         append("VirtualCD="+files.mediaStatus());
         browser.loadUrl(RA2VmFiles.URL);
     }
+
+    private void addMenuButton(String label, Runnable action) {
+        Button b=new Button(this);
+        b.setText(label);
+        b.setTextSize(11);
+        b.setAllCaps(false);
+        b.setTextColor(Color.WHITE);
+        b.setBackground(background(0xff303b43,0xff54565b,5));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(35));
+        lp.bottomMargin=dp(5);
+        menu.addView(b,lp);
+        b.setOnClickListener(v->action.run());
+    }
+
+    private void closeMenu() {
+        menuOpen=false;
+        if(menu!=null)menu.setVisibility(View.GONE);
+        if(gear!=null)gear.setAlpha(0.65f);
+    }
+
+    private void applyEngineUi() {
+        if(browser==null)return;
+        // Static class names, no untrusted string is interpolated into JavaScript.
+        browser.evaluateJavascript(
+            "document.documentElement.classList.add('ra2-android');" +
+            "document.documentElement.classList.toggle('ra2-settings-open',"+settingsOpen+");" +
+            "document.documentElement.classList.toggle('ra2-touch-open',"+touchOpen+");", null);
+    }
+
     private void showFailure(String error) {
         lastFailure=error;
-        runOnUiThread(()->{if(notice!=null){notice.setText(error);notice.setTextColor(0xffffc7a1);}});
+        append("ERROR "+error);
+        runOnUiThread(()->Toast.makeText(this,error,Toast.LENGTH_LONG).show());
     }
-    private void append(String line){
+
+    private void append(String line) {
         Log.d("RA2Vm",line);
-        synchronized(log){if(log.size()>=240)log.removeFirst();log.addLast(line);}
+        synchronized(log) {if(log.size()>=240)log.removeFirst();log.addLast(line);}
     }
-    private void copyLog(){
-        StringBuilder result=new StringBuilder("RA2 Android VM - Diagnose\n");
-        synchronized(log){for(String line:log)result.append(line).append('\n');}
+
+    private void copyLog() {
+        StringBuilder result=new StringBuilder("RA2 Android VM – Diagnose\n");
+        synchronized(log) {for(String line:log)result.append(line).append('\n');}
+        if(!lastFailure.isEmpty())result.append("LastFailure: ").append(lastFailure).append('\n');
         ClipboardManager clip=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
         if(clip!=null)clip.setPrimaryClip(ClipData.newPlainText("RA2 VM Diagnose",result.toString()));
-        Toast.makeText(this,"RA2-VM-Protokoll kopiert",Toast.LENGTH_LONG).show();
+        Toast.makeText(this,"VM-Protokoll kopiert",Toast.LENGTH_SHORT).show();
     }
+
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data) {
         super.onActivityResult(requestCode,resultCode,data);
-        if(requestCode==PICK_RESOURCE && pendingFiles!=null) {
+        if(requestCode==PICK_RESOURCE&&pendingFiles!=null) {
             ValueCallback<android.net.Uri[]> callback=pendingFiles;pendingFiles=null;
             callback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode,data));
         }
     }
+
+    @Override public void onBackPressed() {
+        if(menuOpen) {closeMenu();return;}
+        if(settingsOpen||touchOpen){
+            settingsOpen=false;touchOpen=false;applyEngineUi();return;
+        }
+        super.onBackPressed();
+    }
+
     @Override protected void onDestroy() {
         if(browser!=null){browser.stopLoading();browser.destroy();browser=null;}
         super.onDestroy();

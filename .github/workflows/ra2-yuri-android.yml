@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.39-ra2vm-virtual-original-cd2
+# build-version: 0.40-immersive-widescreen-ra2vm
 
 on:
   push:
@@ -135,11 +135,61 @@ jobs:
           s=s.replace("if (import.meta.env.PROD && 'serviceWorker' in navigator) {",
             "if (import.meta.env.PROD && window.location.hostname !== 'ra2.android.local' && 'serviceWorker' in navigator) {")
           p.write_text(s)
+          # Native Android landscape UI: widescreen options for real in-game
+          # viewport; keep classic 4:3 menu artwork aspect-correct.
+          p=Path("src/games/resolution.ts")
+          s=p.read_text()
+          original="  { width: 1920, height: 1080 },"
+          assert s.count(original)==1
+          s=s.replace(original,original+"\n  { width: 2080, height: 960 },\n  { width: 2340, height: 1080 },\n  { width: 3120, height: 1440 },")
+          p.write_text(s)
+          p=Path("src/ui/pages/game/components/RuntimeToolbarView.tsx")
+          s=p.read_text()
+          original="const resolutions = ['', '800x600', '1024x768', '1280x720', '1280x800', '1440x900', '1600x900', '1920x1080'];"
+          assert s.count(original)==1
+          s=s.replace(original,
+            "const resolutions = ['', '800x600', '1024x768', '1280x720', '1280x800', '1440x900', '1600x900', '1920x1080', '2080x960', '2340x1080', '3120x1440'];")
+          p.write_text(s)
+          # Only Android gets the full-width default; the user's own resolution
+          # choice persists, including an explicit "Use INI" sentinel.
+          p=Path("src/ui/pages/game/vmPageResolution.ts")
+          s=p.read_text()
+          start=s.index("export function loadStoredResolution(")
+          end=s.index("export function storeResolution(",start)
+          s=s[:start]+"""export function loadStoredResolution(gameId: SupportedGameId): GameResolution | null {
+  try {
+    const raw = window.localStorage.getItem(STORED_RESOLUTION_PREFIX + gameId);
+    if (raw === 'ini') return null;
+    const saved = parseGameResolution(raw);
+    if (saved) return saved;
+    return window.location.hostname === 'ra2.android.local' ? { width: 2080, height: 960 } : null;
+  } catch {
+    return null;
+  }
+}
+
+"""+s[end:]
+          original="    else window.localStorage.removeItem(key);"
+          assert s.count(original)==1
+          s=s.replace(original,
+            "    else if (window.location.hostname === 'ra2.android.local') window.localStorage.setItem(key, 'ini');\n" +
+            "    else window.localStorage.removeItem(key);")
+          p.write_text(s)
+          # Activate mobile-only rules at document creation, avoiding visible
+          # flashes of the PC diagnostics toolbar while the game is loading.
+          p=Path("index.html")
+          s=p.read_text()
+          assert s.count("</head>")==1
+          s=s.replace("</head>",
+            "<script>if(location.hostname==='ra2.android.local')document.documentElement.classList.add('ra2-android');</script></head>")
+          p.write_text(s)
           PY
+          cat ../ra2-mobile-port/resources/ra2vm-android.css >> src/ui/pages/game/styles.css
           pnpm install --frozen-lockfile
           pnpm run build
           cd ..
           test -s ra2vm-upstream/dist/index.html
+          grep -R -l '2080x960' ra2vm-upstream/dist/assets/*.js >/dev/null
           test -d ra2vm-upstream/dist/assets
           mkdir -p upstream/app/src/main/assets/ra2vm
           cp -a ra2vm-upstream/dist/. upstream/app/src/main/assets/ra2vm/
