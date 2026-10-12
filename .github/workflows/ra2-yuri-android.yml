@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.46-autonomous-skirmish-replay-and-house-diagnostics
+# build-version: 0.47-game-test-menu-readable
 
 on:
   push:
@@ -444,7 +444,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  publish-v046:
+  publish-v047:
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -464,15 +464,15 @@ jobs:
           set -euo pipefail
           apk=release/upstream/app/build/outputs/apk/debug/app-debug.apk
           test -s "$apk"
-          cp "$apk" RA2-Yuri-Android-v0.46.apk
-          unzip -t RA2-Yuri-Android-v0.46.apk >/dev/null
-          sha256sum RA2-Yuri-Android-v0.46.apk > RA2-Yuri-Android-v0.46.sha256
-          tag=ra2-yuri-android-v0.46
+          cp "$apk" RA2-Yuri-Android-v0.47.apk
+          unzip -t RA2-Yuri-Android-v0.47.apk >/dev/null
+          sha256sum RA2-Yuri-Android-v0.47.apk > RA2-Yuri-Android-v0.47.sha256
+          tag=ra2-yuri-android-v0.47
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" RA2-Yuri-Android-v0.46.apk RA2-Yuri-Android-v0.46.sha256 --clobber --repo "$GITHUB_REPOSITORY"
+            gh release upload "$tag" RA2-Yuri-Android-v0.47.apk RA2-Yuri-Android-v0.47.sha256 --clobber --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$tag" RA2-Yuri-Android-v0.46.apk RA2-Yuri-Android-v0.46.sha256 \
+            gh release create "$tag" RA2-Yuri-Android-v0.47.apk RA2-Yuri-Android-v0.47.sha256 \
               --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title 'RA2 / Yuri Android v0.46 – Autotest, Ablauf-Replay & Gefechtsanalyse' \
-              --notes 'Android RA2 Selbsttestlabor: 120 Sekunden autonomer Gefechtsstart mit echten Win32-Spielbefehlen, animierter Spiel-/Frame-Beobachtung, rein lesender House-Speicherprobe zur Erkennung lokaler Einheiten/Tod und anonymisierten CD/Registry-Protokollen. Eigene Spielbefehle aufzeichnen und zeitgesteuert auf dem gleichen Handy wiederholen, regelbasierte Ursachenanalyse, Niederlage markieren und Diagnose kopieren. Keine Originalspielinhalte oder CD-Keys in der APK. Der Autotest ist keine spielstarke KI und kann ein abweichendes Original-EXE-Speicherlayout nicht sicher interpretieren. Als Update installieren; Spielverhalten muss auf dem Gerät bestätigt werden.'
+              --title 'RA2 / Yuri Android v0.47 – Gefechtstest gut sichtbar, aufgeräumtes Menü' \
+              --notes 'Behebt unlesbare Buttons im v0.46-Zahnrad-Menue. Der 2-Minuten-Gefechts-Autotest steht ab sofort als klar beschrifteter erster Button. Breites, scrollbareres Querformat-Menue mit 48dp-Buttons, separatem Testlabor fuer Aufzeichnung, Wiederholung und Analyse. Originalmedien/Spielstaende bleiben erhalten. Die Explosionen im Gefecht werden weiterhin untersucht; Autotest bitte auf dem Galaxy S26 Ultra pruefen. Bestehende Version ohne Deinstallation aktualisieren.'
           fi

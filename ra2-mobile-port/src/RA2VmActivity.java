@@ -41,6 +41,7 @@ public final class RA2VmActivity extends AppCompatActivity {
     private boolean settingsOpen;
     private boolean touchOpen;
     private LinearLayout menu;
+    private android.widget.ScrollView menuScroll;
     private TextView gear;
     private String lastFailure = "";
     private long engineOpenedAt;
@@ -158,7 +159,11 @@ public final class RA2VmActivity extends AppCompatActivity {
         menu.setOrientation(LinearLayout.VERTICAL);
         menu.setPadding(dp(8),dp(8),dp(8),dp(8));
         menu.setBackground(background(0xed11171e,0xff6b6050,9));
-        menu.setVisibility(View.GONE);
+        // Fully visible buttons, with the most important troubleshooting action first.
+        addMenuButton("🤖 GEFECHTSTEST – 2 MINUTEN", () -> {
+            closeMenu();
+            runAutonomousBattleTest();
+        });
         addMenuButton("⚙ Einstellungen", () -> {
             settingsOpen=!settingsOpen;
             applyEngineUi();
@@ -193,49 +198,11 @@ public final class RA2VmActivity extends AppCompatActivity {
             applyEngineUi();
             closeMenu();
         });
-        addMenuButton("🤖 2-Minuten-Gefechts-Autotest", () -> {
+        addMenuButton("🧪 Testlabor & Aufzeichnungen", () -> {
             closeMenu();
-            new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("RA2 – automatischer Gefechtstest")
-                .setMessage("Die Spielengine startet mit deinen vorhandenen Originaldaten direkt " +
-                    "auf dem Schlachtfeld und sendet zwei Minuten lang Testbefehle. " +
-                    "Spielerstatus, Einheiten und native Spiel-Frames werden beobachtet. " +
-                    "Bei einer Spielauswahl bitte Red Alert 2 auswählen. " +
-                    "Dies ist ein Funktionstest, kein selbstständig gewinnender KI-Spieler. " +
-                    "Deine originalen Spieldateien bleiben unverändert.")
-                .setNegativeButton("Abbrechen",null)
-                .setPositiveButton("Test starten",(dialog,which)->{
-                    append("AUTOTEST angefordert – RA2 Gefecht mit Originaldateien");
-                    browser.loadUrl(RA2VmFiles.URL+"?start-page=battle&ra2-autotest=1");
-                }).show();
+            openTestLabMenu();
         });
-        addMenuButton("⏺ Spielablauf aufzeichnen", () -> {
-            closeMenu();
-            browser.evaluateJavascript(
-                "String(window.ra2AndroidLab?.startRecording?.() ?? false)",
-                result -> Toast.makeText(this,
-                    result.contains("true") ? "Aufzeichnung läuft – jetzt spielen." :
-                    "Zuerst ein Spiel in der RA2-VM starten.",Toast.LENGTH_LONG).show());
-        });
-        addMenuButton("⏹ Aufzeichnung speichern", () -> {
-            closeMenu();
-            browser.evaluateJavascript(
-                "String(window.ra2AndroidLab?.stopRecording?.() ?? 'Kein Spiel geladen')",
-                result -> Toast.makeText(this,result,Toast.LENGTH_LONG).show());
-        });
-        addMenuButton("▶ Ablauf automatisch wiederholen", () -> {
-            closeMenu();
-            new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Aufgezeichneten Ablauf wiederholen")
-                .setMessage("Die RA2-VM wird neu gestartet und führt die zuletzt auf diesem " +
-                    "Gerät aufgezeichneten Maus- und Tastaturbefehle erneut aus. " +
-                    "Eine andere Karte oder Spielauflösung kann zu Abweichungen führen.")
-                .setNegativeButton("Abbrechen",null)
-                .setPositiveButton("Wiederholen",(dialog,which)->
-                    browser.loadUrl(RA2VmFiles.URL+"?ra2-replay=1"))
-                .show();
-        });
-        addMenuButton("📋 Intelligente Analyse + Log kopieren", () -> {
+        addMenuButton("📋 Analyse und Protokoll", () -> {
             closeMenu();
             copyLog();
             new androidx.appcompat.app.AlertDialog.Builder(this)
@@ -243,7 +210,7 @@ public final class RA2VmActivity extends AppCompatActivity {
                 .setMessage(buildReasonedAnalysis())
                 .setPositiveButton("OK",null).show();
         });
-        addMenuButton("💥 Niederlage markieren + Log kopieren", () -> {
+        addMenuButton("💥 Niederlage markieren", () -> {
             append("PLAYER_EVENT=UNITS_EXPLODED_DEFEAT");
             copyLog();
             closeMenu();
@@ -255,12 +222,23 @@ public final class RA2VmActivity extends AppCompatActivity {
             if(browser!=null)browser.reload();
         });
         addMenuButton("Spiel verlassen", () -> finish());
-        FrameLayout.LayoutParams mp=new FrameLayout.LayoutParams(dp(168),-2,Gravity.TOP|Gravity.RIGHT);
-        mp.topMargin=dp(48);mp.rightMargin=dp(8);
-        root.addView(menu,mp);
+        // Use actual landscape bounds; long labels should never collapse to just an emoji.
+        int screenWidth=getResources().getDisplayMetrics().widthPixels;
+        int screenHeight=getResources().getDisplayMetrics().heightPixels;
+        int menuWidth=Math.min(dp(305),Math.max(dp(200),screenWidth-dp(86)));
+        int menuHeight=Math.max(dp(160),screenHeight-dp(70));
+        menuScroll=new android.widget.ScrollView(this);
+        menuScroll.setFillViewport(false);
+        menuScroll.setVerticalScrollBarEnabled(true);
+        menuScroll.setBackground(background(0xed11171e,0xff6b6050,9));
+        menuScroll.setVisibility(View.GONE);
+        menuScroll.addView(menu,new android.widget.ScrollView.LayoutParams(-1,-2));
+        FrameLayout.LayoutParams mp=new FrameLayout.LayoutParams(menuWidth,menuHeight,Gravity.TOP|Gravity.RIGHT);
+        mp.topMargin=dp(47);mp.rightMargin=dp(8);
+        root.addView(menuScroll,mp);
         gear.setOnClickListener(v->{
             menuOpen=!menuOpen;
-            menu.setVisibility(menuOpen?View.VISIBLE:View.GONE);
+            menuScroll.setVisibility(menuOpen?View.VISIBLE:View.GONE);
             gear.setAlpha(menuOpen?1f:0.65f);
         });
         setContentView(root);
@@ -278,19 +256,98 @@ public final class RA2VmActivity extends AppCompatActivity {
     private void addMenuButton(String label, Runnable action) {
         Button b=new Button(this);
         b.setText(label);
-        b.setTextSize(11);
+        b.setTextSize(14);
         b.setAllCaps(false);
         b.setTextColor(Color.WHITE);
-        b.setBackground(background(0xff303b43,0xff54565b,5));
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(35));
-        lp.bottomMargin=dp(5);
+        b.setGravity(Gravity.CENTER);
+        b.setMaxLines(2);
+        b.setSingleLine(false);
+        b.setPadding(dp(8),0,dp(8),0);
+        b.setContentDescription(label);
+        b.setBackground(background(0xff303b43,0xff54565b,6));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(48));
+        lp.bottomMargin=dp(6);
         menu.addView(b,lp);
         b.setOnClickListener(v->action.run());
     }
 
+
+    /** Plain German test button – kept separate from the general settings menu. */
+    private void runAutonomousBattleTest() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("2-Minuten-Gefechts-Autotest")
+            .setMessage("Die RA2-Engine startet mit deinen Originaldaten ein Gefecht und " +
+                "überwacht zwei Minuten lang Spielzustand, Einheiten und Testbefehle. " +
+                "Falls eine Auswahl erscheint, Red Alert 2 auswählen. " +
+                "Dies ist ein Funktionstest, kein eigenständig gewinnender KI-Spieler. " +
+                "Nicht gespeicherter Spielfortschritt geht beim Neustart verloren.")
+            .setNegativeButton("Abbrechen",null)
+            .setPositiveButton("2-Minuten-Test starten",(dialog,which)->{
+                append("AUTOTEST angefordert – RA2 Gefecht mit Originaldateien");
+                if(browser!=null)browser.loadUrl(RA2VmFiles.URL+"?start-page=battle&ra2-autotest=1");
+            }).show();
+    }
+
+    private void openTestLabMenu() {
+        final String[] actions={
+            "🤖 2-Minuten-Gefechts-Autotest",
+            "⏺ Spielablauf aufzeichnen",
+            "⏹ Aufzeichnung speichern",
+            "▶ Aufzeichnung wiederholen",
+            "📋 Intelligente Analyse & Log",
+            "💥 Niederlage markieren & Log"
+        };
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("RA2 – Testlabor")
+            .setItems(actions,(dialog,which)->{
+                switch(which) {
+                    case 0:
+                        runAutonomousBattleTest();
+                        break;
+                    case 1:
+                        if(browser!=null)browser.evaluateJavascript(
+                            "String(window.ra2AndroidLab?.startRecording?.() ?? false)",
+                            result->Toast.makeText(this,
+                                result.contains("true")?"Spielablauf wird aufgezeichnet.":
+                                "Zuerst RA2 in der VM starten.",Toast.LENGTH_LONG).show());
+                        break;
+                    case 2:
+                        if(browser!=null)browser.evaluateJavascript(
+                            "String(window.ra2AndroidLab?.stopRecording?.() ?? 'Kein Spiel geladen')",
+                            result->Toast.makeText(this,result,Toast.LENGTH_LONG).show());
+                        break;
+                    case 3:
+                        new androidx.appcompat.app.AlertDialog.Builder(this)
+                            .setTitle("Aufgezeichneten Spielablauf wiederholen")
+                            .setMessage("Die Engine startet neu und führt die zuletzt " +
+                                "aufgezeichneten Befehle aus. Die gleiche Karte und " +
+                                "Auflösung verbessern die Vergleichbarkeit.")
+                            .setNegativeButton("Abbrechen",null)
+                            .setPositiveButton("Wiederholen",(d,w)->{
+                                if(browser!=null)browser.loadUrl(RA2VmFiles.URL+"?ra2-replay=1");
+                            }).show();
+                        break;
+                    case 4:
+                        copyLog();
+                        new androidx.appcompat.app.AlertDialog.Builder(this)
+                            .setTitle("Intelligente Ursachenanalyse")
+                            .setMessage(buildReasonedAnalysis())
+                            .setPositiveButton("OK",null).show();
+                        break;
+                    case 5:
+                        append("PLAYER_EVENT=UNITS_EXPLODED_DEFEAT");
+                        copyLog();
+                        break;
+                    default: break;
+                }
+            })
+            .setNegativeButton("Schließen",null)
+            .show();
+    }
+
     private void closeMenu() {
         menuOpen=false;
-        if(menu!=null)menu.setVisibility(View.GONE);
+        if(menuScroll!=null)menuScroll.setVisibility(View.GONE);
         if(gear!=null)gear.setAlpha(0.65f);
     }
 
