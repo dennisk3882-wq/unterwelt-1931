@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.41-original-registration-and-real-widescreen
+# build-version: 0.42-native-key-dialog-with-auto-vm-registry
 
 on:
   push:
@@ -423,3 +423,35 @@ jobs:
             ra2-yuri-mobile.sha256
           if-no-files-found: error
           retention-days: 14
+
+  publish-v042:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Download verified APK from current build
+        uses: actions/download-artifact@v4
+        with:
+          name: ra2-yuri-android-debug
+          path: release
+      - name: Publish direct-download APK and checksum
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=release/upstream/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          cp "$apk" RA2-Yuri-Android-v0.42.apk
+          unzip -t RA2-Yuri-Android-v0.42.apk >/dev/null
+          sha256sum RA2-Yuri-Android-v0.42.apk > RA2-Yuri-Android-v0.42.sha256
+          tag=ra2-yuri-android-v0.42
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" RA2-Yuri-Android-v0.42.apk RA2-Yuri-Android-v0.42.sha256 --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$tag" RA2-Yuri-Android-v0.42.apk RA2-Yuri-Android-v0.42.sha256 \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title 'RA2 / Yuri Android v0.42 – CD-Schlüssel direkt im Spiel' \
+              --notes 'Direkt im Zahnrad-Menü kann der eigene Original-CD-Schlüssel lokal eingegeben werden. Beim Neustart wird er automatisch in die virtuelle Windows-Registrierung übernommen. Auf der Startseite ist der Knopf zusätzlich direkt oberhalb des RA2-VM-Starts. Keine fremden Seriennummern oder Originalspieldaten in der APK. Gefechtsverhalten muss auf dem Gerät getestet werden. In-place aktualisieren, nicht deinstallieren.'

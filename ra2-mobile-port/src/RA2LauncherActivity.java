@@ -170,7 +170,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.41 · Original-Registry + echtes Breitbild");
+        version.setText("v0.42 · CD-Schlüssel direkt im Spiel eingeben");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
@@ -276,6 +276,9 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         TextView vmHint = label(13, Color.LTGRAY);
         vmHint.setText("Experimenteller GPL-Client RA2 VM: nutzt Original-EXEs mit einer eigenen x86-/Win32-Laufzeit. Kampagnen noch nicht vollständig geprüft. Originaldateien bleiben erhalten.");
         root.addView(vmHint, matchWrap(dp(7)));
+        Button vmKeyEntry = button("🔑 Original-CD-Schlüssel für die neue Engine");
+        root.addView(vmKeyEntry, matchWrap(dp(8)));
+        vmKeyEntry.setOnClickListener(v -> editOriginalKeys());
         Button vmLaunch = accentButton("RA2 / YURI MIT NEUER ENGINE TESTEN");
         root.addView(vmLaunch, matchWrap(dp(12)));
         vmLaunch.setOnClickListener(v -> startActivity(new Intent(this, RA2VmActivity.class)));

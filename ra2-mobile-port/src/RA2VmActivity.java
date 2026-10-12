@@ -162,6 +162,10 @@ public final class RA2VmActivity extends AppCompatActivity {
             applyEngineUi();
             closeMenu();
         });
+        addMenuButton("🔑 Original-CD-Schlüssel", () -> {
+            closeMenu();
+            editOriginalKeys();
+        });
         addMenuButton("⌨ Tasten / Joystick", () -> {
             touchOpen=!touchOpen;
             applyEngineUi();
@@ -208,6 +212,109 @@ public final class RA2VmActivity extends AppCompatActivity {
         menuOpen=false;
         if(menu!=null)menu.setVisibility(View.GONE);
         if(gear!=null)gear.setAlpha(0.65f);
+    }
+
+    /**
+     * Keep original serials only in the existing per-app preferences.
+     * RA2VmFiles exposes the selected game's serial to the local private VM
+     * origin at next startup; never bundle keys in the publicly distributed APK.
+     */
+    private void editOriginalKeys() {
+        final android.content.SharedPreferences prefs =
+            getSharedPreferences("ra2_mobile", Context.MODE_PRIVATE);
+        final String[] prefKeys = {"original_cd_key_ra2", "original_cd_key_yuri"};
+        final String[] gameNames = {"Alarmstufe Rot 2", "Yuri’s Rache"};
+        final LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(16), dp(12), dp(16), dp(8));
+        form.setBackgroundColor(0xff182027);
+
+        TextView intro = new TextView(this);
+        intro.setText("Gib deinen Original-CD-Schlüssel ein. Bereits gespeicherte Schlüssel " +
+            "bleiben erhalten, wenn das Feld leer bleibt. Die Prüfung kontrolliert " +
+            "nur das Format, nicht die Echtheit. Deine Schlüssel werden nicht " +
+            "in die APK eingebaut oder im Protokoll ausgegeben.");
+        intro.setTextColor(Color.WHITE);
+        intro.setTextSize(14);
+        form.addView(intro, new LinearLayout.LayoutParams(-1, -2));
+
+        final android.widget.EditText[] inputs = new android.widget.EditText[2];
+        for (int i=0; i<2; i++) {
+            TextView label = new TextView(this);
+            boolean saved = RA2SerialPolicy.acceptableInput(prefs.getString(prefKeys[i], ""));
+            label.setText(gameNames[i] + (saved ? " – hinterlegt (Format OK)" : " – noch nicht hinterlegt"));
+            label.setTextColor(0xffe3d2a3);
+            label.setTextSize(14);
+            LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1,-2);
+            labelParams.topMargin = dp(14);
+            form.addView(label, labelParams);
+
+            android.widget.EditText input = new android.widget.EditText(this);
+            input.setSingleLine(true);
+            input.setTextColor(Color.WHITE);
+            input.setHintTextColor(0xffaab4bb);
+            input.setHint("Originalschlüssel eingeben (optional)");
+            input.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            input.setFilters(new android.text.InputFilter[] {
+                new android.text.InputFilter.LengthFilter(80)
+            });
+            inputs[i] = input;
+            form.addView(input, new LinearLayout.LayoutParams(-1,-2));
+        }
+
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.setBackgroundColor(0xff182027);
+        scroll.addView(form);
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Original-CD-Schlüssel")
+            .setView(scroll)
+            .setNegativeButton("Abbrechen", null)
+            .setPositiveButton("Speichern", null)
+            .create();
+        final boolean hadSecure = (getWindow().getAttributes().flags &
+            WindowManager.LayoutParams.FLAG_SECURE) != 0;
+        dialog.setOnDismissListener(d -> {
+            if (!hadSecure) getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        });
+        dialog.setOnShowListener(d -> {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                String ra2 = inputs[0].getText().toString().trim();
+                String yuri = inputs[1].getText().toString().trim();
+                String[] values = {ra2, yuri};
+                for(int i=0; i<2; i++) {
+                    if (!values[i].isEmpty() && !RA2SerialPolicy.acceptableInput(values[i])) {
+                        inputs[i].setError("Ungültiges Format: vollständigen Originalschlüssel eingeben.");
+                        inputs[i].requestFocus();
+                        return;
+                    }
+                }
+                if (ra2.isEmpty() && yuri.isEmpty()) {
+                    dialog.dismiss();
+                    Toast.makeText(this,"Keine neuen Schlüssel eingegeben.",Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                android.content.SharedPreferences.Editor edit = prefs.edit();
+                if(!ra2.isEmpty()) edit.putString(prefKeys[0], RA2SerialPolicy.normalize(ra2));
+                if(!yuri.isEmpty()) edit.putString(prefKeys[1], RA2SerialPolicy.normalize(yuri));
+                if (!edit.commit()) {
+                    Toast.makeText(this,"Schlüssel konnten nicht gespeichert werden.",Toast.LENGTH_LONG).show();
+                    return;
+                }
+                dialog.dismiss();
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Schlüssel hinterlegt")
+                    .setMessage("Die Schlüssel werden bei einem Neustart automatisch an die " +
+                        "lokale RA2-/Yuri-Engine übergeben. Spiel jetzt neu starten? " +
+                        "Nicht gespeicherter Spielfortschritt geht verloren.")
+                    .setNegativeButton("Später",null)
+                    .setPositiveButton("Jetzt neu starten",(ignore,which)->{
+                        if(browser!=null)browser.reload();
+                    }).show();
+            });
+        });
+        dialog.show();
     }
 
     private void applyEngineUi() {
