@@ -124,6 +124,22 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         setContentView(buildUi());
         applyLanguage();
         ensureRuntimeAndContainer();
+        // Once per upgrade: no button presses required on an already installed RA2.
+        // Do not launch if original game files are missing.
+        handler.postDelayed(()->{
+            if(isFinishing()||isDestroyed()||prefs==null)return;
+            if(prefs.getBoolean("ra2_autopsy_v049_triggered",false))return;
+            try{
+                RA2VmFiles installed=new RA2VmFiles(this);
+                if(!installed.ra2Available())return;
+                prefs.edit().putBoolean("ra2_autopsy_v049_triggered",true).apply();
+                Intent intent=new Intent(this,RA2VmActivity.class);
+                intent.putExtra("ra2.autopsy_once",true);
+                startActivity(intent);
+            }catch(Exception e){
+                android.util.Log.w("RA2Autopsy","Auto analysis boot skipped",e);
+            }
+        },1900);
     }
 
     @Override
@@ -204,9 +220,19 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         root.addView(subtitle, matchWrap(0));
 
         TextView version = label(11, 0xff859397);
-        version.setText("v0.48 · Gefechtsende korrekt erkennen + Registry-Anfragen");
+        version.setText("v0.49 · Autopilot: zwei komplette Vergleichsgefechte + Blackbox");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
+
+        Button autopsyLaunch = accentButton("🤖 AUTOMATISCHE FEHLERSUCHE – STARTET ALLES SELBST");
+        autopsyLaunch.setTextSize(16);
+        autopsyLaunch.setMinHeight(dp(58));
+        root.addView(autopsyLaunch,matchWrap(dp(12)));
+        autopsyLaunch.setOnClickListener(v->{
+            Intent autopsyIntent=new Intent(this,RA2VmActivity.class);
+            autopsyIntent.putExtra("ra2.autopsy_once",true);
+            startActivity(autopsyIntent);
+        });
 
         Button vmLaunch = accentButton("▶  JETZT SPIELEN – ALARMSTUFE ROT 2 / YURI");
         vmLaunch.setTextSize(18);

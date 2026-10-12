@@ -45,6 +45,9 @@ public final class RA2VmActivity extends AppCompatActivity {
     private TextView gear;
     private String lastFailure = "";
     private long engineOpenedAt;
+    private RA2AutopsySupervisor autopsy;
+    private boolean autopsyPendingOnFirstPage;
+    private String autopsyResult="";
 
     private int dp(float units) {
         return Math.round(getResources().getDisplayMetrics().density * units);
@@ -83,6 +86,16 @@ public final class RA2VmActivity extends AppCompatActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         immersive();
         files = new RA2VmFiles(this);
+        autopsyPendingOnFirstPage=getIntent().getBooleanExtra("ra2.autopsy_once",false);
+        autopsy=new RA2AutopsySupervisor(this,new RA2AutopsySupervisor.Reporter() {
+            @Override public void write(String line){append(line);}
+            @Override public void finished(String result){
+                autopsyResult=result;
+                append("AUTOPSY FINAL REPORT READY – private ZIP gespeichert; Analyse in Zwischenablage");
+                Toast.makeText(RA2VmActivity.this,
+                    "Automatische Analyse fertig – Bericht gespeichert",Toast.LENGTH_LONG).show();
+            }
+        });
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
         browser = new WebView(this);
@@ -110,6 +123,10 @@ public final class RA2VmActivity extends AppCompatActivity {
                 append("Ready: RA2="+files.ra2Available()+" Yuri="+files.yuriAvailable()+
                     " CD2="+files.sovietCdReady());
                 if (!files.gameAvailable()) showFailure("Spieldateien nicht gefunden. ⚙ → Protokoll kopieren.");
+                else if(autopsyPendingOnFirstPage) {
+                    autopsyPendingOnFirstPage=false;
+                    view.postDelayed(()->{if(autopsy!=null&&!isFinishing())autopsy.start(browser);},900);
+                }
             }
             @Override public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
                 append("render-process-gone crashed="+(detail!=null&&detail.didCrash()));
@@ -120,6 +137,7 @@ public final class RA2VmActivity extends AppCompatActivity {
         browser.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onConsoleMessage(ConsoleMessage msg) {
                 append("JS "+msg.messageLevel()+" "+msg.message()+" @"+msg.sourceId()+":"+msg.lineNumber());
+                if(autopsy!=null)autopsy.observe(msg.message());
                 if(msg.messageLevel()==ConsoleMessage.MessageLevel.ERROR)
                     showFailure("Engine-Fehler: "+msg.message());
                 return true;
@@ -160,6 +178,21 @@ public final class RA2VmActivity extends AppCompatActivity {
         menu.setPadding(dp(8),dp(8),dp(8),dp(8));
         menu.setBackground(background(0xed11171e,0xff6b6050,9));
         // Fully visible buttons, with the most important troubleshooting action first.
+        addMenuButton("🤖 AUTOPILOT – KOMPLETTANALYSE STARTEN", () -> {
+            closeMenu();
+            if(autopsy!=null)autopsy.start(browser);
+        });
+        addMenuButton("⏹ Autopilot stoppen", () -> {
+            closeMenu();
+            if(autopsy!=null&&autopsy.isRunning()) {
+                autopsy.cancel();
+                if(browser!=null)browser.loadUrl(RA2VmFiles.URL);
+            } else Toast.makeText(this,"Keine laufende Autopsie.",Toast.LENGTH_SHORT).show();
+        });
+        addMenuButton("📦 Vollständigen Analysebericht teilen", () -> {
+            closeMenu();
+            shareAutopsyArchive();
+        });
         addMenuButton("🤖 GEFECHTSTEST – 2 MINUTEN", () -> {
             closeMenu();
             runAutonomousBattleTest();
@@ -273,6 +306,26 @@ public final class RA2VmActivity extends AppCompatActivity {
 
 
     /** Plain German test button – kept separate from the general settings menu. */
+    private void shareAutopsyArchive(){
+        java.io.File archive=autopsy==null?null:autopsy.latestArchive();
+        if(archive==null||!archive.isFile()){
+            Toast.makeText(this,"Noch kein fertiger Autopsie-Bericht vorhanden.",Toast.LENGTH_LONG).show();
+            return;
+        }
+        try{
+            android.net.Uri uri=androidx.core.content.FileProvider.getUriForFile(
+                this,"com.winlator.ra2diag.fileprovider",archive);
+            Intent send=new Intent(Intent.ACTION_SEND);
+            send.setType("application/zip");
+            send.putExtra(Intent.EXTRA_STREAM,uri);
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(send,"RA2-Spielanalyse als ZIP teilen"));
+        }catch(Exception e){
+            append("AUTOPSY SHARE_ERROR type="+e.getClass().getSimpleName());
+            Toast.makeText(this,"Archiv konnte nicht geteilt werden.",Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void runAutonomousBattleTest() {
         new androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("2-Minuten-Gefechts-Autotest")
@@ -526,6 +579,7 @@ public final class RA2VmActivity extends AppCompatActivity {
     private void copyLog() {
         StringBuilder result=new StringBuilder("RA2 Android VM – Diagnose\n");
         result.append("Automatische Ursachenanalyse:\n").append(buildReasonedAnalysis()).append("\n\n");
+        if(!autopsyResult.isEmpty())result.append("Autopilot-Blackbox:\n").append(autopsyResult).append("\n");
         synchronized(log) {for(String line:log)result.append(line).append('\n');}
         if(!lastFailure.isEmpty())result.append("LastFailure: ").append(lastFailure).append('\n');
         ClipboardManager clip=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
@@ -550,6 +604,7 @@ public final class RA2VmActivity extends AppCompatActivity {
     }
 
     @Override protected void onDestroy() {
+        if(autopsy!=null){autopsy.close();autopsy=null;}
         if(browser!=null){browser.stopLoading();browser.destroy();browser=null;}
         super.onDestroy();
     }
