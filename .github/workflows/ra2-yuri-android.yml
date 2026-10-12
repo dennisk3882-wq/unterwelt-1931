@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.37-ra2vm-offline-experimental
+# build-version: 0.38-ra2vm-file-discovery
 
 on:
   push:
@@ -212,6 +212,8 @@ jobs:
           java -cp test-launch RA2VolumeLabelTest
           javac -d test-launch ra2-mobile-port/src/RA2XwisClient.java ra2-mobile-port/tests/RA2XwisClientTest.java
           java -cp test-launch RA2XwisClientTest
+          javac -d test-launch ra2-mobile-port/src/RA2VmGameDiscovery.java ra2-mobile-port/tests/RA2VmGameDiscoveryTest.java
+          java -cp test-launch RA2VmGameDiscoveryTest
           java -cp test-launch RA2LaunchBatchTest
           java -cp test-launch RA2DiagnosticEvidenceTest
           java -cp test-launch RA2SerialPolicyTest

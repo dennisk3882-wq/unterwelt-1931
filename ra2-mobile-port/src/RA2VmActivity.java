@@ -72,8 +72,9 @@ public final class RA2VmActivity extends AppCompatActivity {
             @Override public void onPageFinished(WebView view,String url) {
                 if(lastFailure.isEmpty()) {
                     notice.setText(files.gameAvailable()
-                        ? "RA2 VM bereit. In der Engine „Installierte RA2-/Yuri-Dateien laden“ auswählen."
-                        : "RA2-Dateien nicht gefunden. Zuerst die drei ISOs in der alten Einrichtung installieren.");
+                        ? "Spieldaten erkannt: "+(files.ra2Available()?"RA2 ":"")+
+                          (files.yuriAvailable()?"Yuri":"")+". In der Engine „SPIELDATEIEN LADEN“ wählen."
+                        : "Kein vollständiger RA2-/Yuri-Spielordner erkannt. „LOG KOPIEREN“ zeigt den geprüften Pfad und die vorhandenen Dateien.");
                 }
             }
             @Override public boolean onRenderProcessGone(WebView view,android.webkit.RenderProcessGoneDetail detail) {
@@ -130,6 +131,8 @@ public final class RA2VmActivity extends AppCompatActivity {
         setContentView(root);
         append("Engine=RA2 VM (GPL-3.0), origin="+RA2VmFiles.URL);
         append("DataDir="+files.originalDirectory()+" exists="+files.gameAvailable());
+        append("GameDiscovery="+files.discoveryStatus());
+        append("RA2ready="+files.ra2Available()+" YuriReady="+files.yuriAvailable());
         browser.loadUrl(RA2VmFiles.URL);
     }
     private void showFailure(String error) {

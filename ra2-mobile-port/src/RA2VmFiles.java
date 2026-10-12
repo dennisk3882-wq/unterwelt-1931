@@ -11,12 +11,30 @@ public final class RA2VmFiles {
   public static final String URL="https://"+HOST+"/index.html";
   private final Context ctx;
   private final File base;
+  private final RA2VmGameDiscovery.Result discovery;
   public RA2VmFiles(Context context) {
     ctx=context.getApplicationContext();
-    base=new File(context.getFilesDir(),"imagefs/home/xuser-1/.wine/drive_c/Westwood/RA2");
+    ArrayList<File> roots=new ArrayList<>();
+    int requested=ctx.getSharedPreferences("ra2_mobile",Context.MODE_PRIVATE).getInt("container_id",1);
+    try {
+      com.winlator.container.ContainerManager manager=new com.winlator.container.ContainerManager(ctx);
+      com.winlator.container.Container preferred=manager.getContainerById(requested);
+      if(preferred!=null)roots.add(preferred.getRootDir());
+      for(com.winlator.container.Container candidate:manager.getContainers())
+        if(preferred==null || candidate.id!=preferred.id)roots.add(candidate.getRootDir());
+    } catch (Exception ignored) {
+      // Legacy install metadata may be unavailable before the first container load.
+    }
+    roots.add(new File(ctx.getFilesDir(),"imagefs/home/xuser-"+requested));
+    roots.add(new File(ctx.getFilesDir(),"imagefs/home/xuser-1"));
+    discovery=RA2VmGameDiscovery.find(roots);
+    base=discovery.directory;
   }
   public File originalDirectory(){return base;}
-  public boolean gameAvailable(){return new File(base,"game.exe").isFile();}
+  public boolean gameAvailable(){return discovery.ra2Ready || discovery.yuriReady;}
+  public String discoveryStatus(){return discovery.status;}
+  public boolean ra2Available(){return discovery.ra2Ready;}
+  public boolean yuriAvailable(){return discovery.yuriReady;}
   public WebResourceResponse serve(WebResourceRequest request) {
     Uri uri=request.getUrl();
     if(!HOST.equalsIgnoreCase(uri.getHost()) || !"https".equals(uri.getScheme()))return null;
@@ -43,9 +61,7 @@ public final class RA2VmFiles {
     for(String part:path.split("/")){
       if(part.isEmpty() || part.equals("."))continue;
       if(part.equals(".."))throw new IOException("Invalid path");
-      File[] items=current.listFiles(); File found=null;
-      if(items!=null)for(File f:items)if(f.getName().equalsIgnoreCase(part)){found=f;break;}
-      current=found!=null?found:new File(current,part);
+      current=RA2VmGameDiscovery.directChildIgnoreCase(current,part);
     }
     String root=base.getCanonicalPath(),actual=current.getCanonicalPath();
     if(!actual.equals(root)&&!actual.startsWith(root+File.separator))throw new IOException("Outside game directory");
