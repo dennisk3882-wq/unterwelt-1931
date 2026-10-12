@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.38-ra2vm-file-discovery
+# build-version: 0.39-ra2vm-virtual-original-cd2
 
 on:
   push:
@@ -102,6 +102,41 @@ jobs:
           new="{window.location.hostname === 'ra2.android.local' ? 'Installierte RA2-/Yuri-Dateien laden' : t('开发测试')}"
           assert s.count(original)==1, 'Could not label offline local game picker'
           s=s.replace(original,new)
+          # On Android no ISO is selectable through the generic EXE/ZIP picker.
+          # The already-extracted original discs are automatically virtualized.
+          original="""              <Ra2MenuButton disabled={actionsDisabled} onClick={() => props.pick('archive')}>
+                {t('选择文件…')}
+              </Ra2MenuButton>
+              <Ra2MenuButton disabled={actionsDisabled} onClick={() => props.pick('folder')}>
+                {t('选择文件夹…')}
+              </Ra2MenuButton>"""
+          new="""              {window.location.hostname !== 'ra2.android.local' && (
+                <>
+                  <Ra2MenuButton disabled={actionsDisabled} onClick={() => props.pick('archive')}>
+                    {t('选择文件…')}
+                  </Ra2MenuButton>
+                  <Ra2MenuButton disabled={actionsDisabled} onClick={() => props.pick('folder')}>
+                    {t('选择文件夹…')}
+                  </Ra2MenuButton>
+                </>
+              )}"""
+          assert s.count(original)==1, 'File import buttons changed upstream'
+          s=s.replace(original,new)
+          original="{t('导入 ZIP / EXE 压缩包或完整游戏目录。')}"
+          new="{window.location.hostname === 'ra2.android.local' ? 'Original-ISOs sind bereits installiert. Spielversion oben auswählen; CD 2 wird virtuell eingebunden.' : t('导入 ZIP / EXE 压缩包或完整游戏目录。')}"
+          assert s.count(original)==1, 'Resource guide changed upstream'
+          s=s.replace(original,new)
+          p.write_text(s)
+          # Enable Wine-free Win32 CD emulation for actual original CD game.exe:
+          # The stock RA2 VM catalog only advertises C:, causing the retail
+          # executable to ask for its second original disc.
+          p=Path("src/games/catalog.ts")
+          s=p.read_text()
+          assert "import { DRIVE_FIXED } from '../vm86/win32';" in s
+          s=s.replace("import { DRIVE_FIXED } from '../vm86/win32';",
+                      "import { DRIVE_CDROM, DRIVE_FIXED } from '../vm86/win32';")
+          assert s.count("// D: DRIVE_CDROM,")==2, 'Expected CD setting in RA2 + Yuri profiles'
+          s=s.replace("// D: DRIVE_CDROM,","D: DRIVE_CDROM,")
           p.write_text(s)
           # The Android offline origin should not register an independent
           # service worker that could cache stale user files.
@@ -214,6 +249,8 @@ jobs:
           java -cp test-launch RA2XwisClientTest
           javac -d test-launch ra2-mobile-port/src/RA2VmGameDiscovery.java ra2-mobile-port/tests/RA2VmGameDiscoveryTest.java
           java -cp test-launch RA2VmGameDiscoveryTest
+          javac -d test-launch ra2-mobile-port/src/RA2VmGameDiscovery.java ra2-mobile-port/src/RA2VmMediaOverlay.java ra2-mobile-port/tests/RA2VmMediaOverlayTest.java
+          java -cp test-launch RA2VmMediaOverlayTest
           java -cp test-launch RA2LaunchBatchTest
           java -cp test-launch RA2DiagnosticEvidenceTest
           java -cp test-launch RA2SerialPolicyTest

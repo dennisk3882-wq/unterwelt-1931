@@ -12,6 +12,7 @@ public final class RA2VmFiles {
   private final Context ctx;
   private final File base;
   private final RA2VmGameDiscovery.Result discovery;
+  private final RA2VmMediaOverlay media;
   public RA2VmFiles(Context context) {
     ctx=context.getApplicationContext();
     ArrayList<File> roots=new ArrayList<>();
@@ -29,12 +30,15 @@ public final class RA2VmFiles {
     roots.add(new File(ctx.getFilesDir(),"imagefs/home/xuser-1"));
     discovery=RA2VmGameDiscovery.find(roots);
     base=discovery.directory;
+    media=new RA2VmMediaOverlay(base);
   }
   public File originalDirectory(){return base;}
   public boolean gameAvailable(){return discovery.ra2Ready || discovery.yuriReady;}
   public String discoveryStatus(){return discovery.status;}
   public boolean ra2Available(){return discovery.ra2Ready;}
   public boolean yuriAvailable(){return discovery.yuriReady;}
+  public boolean sovietCdReady(){return media.ra2DiscReady();}
+  public String mediaStatus(){return "RA2-CD2="+media.ra2DiscReady()+" cdFiles="+media.discFileCount()+" cdPath="+media.ra2Disc().getAbsolutePath();}
   public WebResourceResponse serve(WebResourceRequest request) {
     Uri uri=request.getUrl();
     if(!HOST.equalsIgnoreCase(uri.getHost()) || !"https".equals(uri.getScheme()))return null;
@@ -57,15 +61,8 @@ public final class RA2VmFiles {
       catch(Exception e){return text(500,e.toString());}
   }
   private File resolve(String path)throws IOException {
-    File current=base;
-    for(String part:path.split("/")){
-      if(part.isEmpty() || part.equals("."))continue;
-      if(part.equals(".."))throw new IOException("Invalid path");
-      current=RA2VmGameDiscovery.directChildIgnoreCase(current,part);
-    }
-    String root=base.getCanonicalPath(),actual=current.getCanonicalPath();
-    if(!actual.equals(root)&&!actual.startsWith(root+File.separator))throw new IOException("Outside game directory");
-    return current;
+    // Original game and extracted ISO media share one read-only virtual namespace.
+    return media.resolve(path);
   }
   private WebResourceResponse game(Uri uri,String path,WebResourceRequest request)throws IOException {
     if(path.startsWith("ra2/"))path=path.substring(4);
@@ -73,11 +70,8 @@ public final class RA2VmFiles {
     if(path.equals(".list")){
       String dir=uri.getQueryParameter("dir");
       if(dir==null || dir.equals("ra2")||dir.equals("yr"))dir="";
-      File folder=resolve(dir);
-      if(!folder.isDirectory())return text(404,"[]");
       JSONArray files=new JSONArray();
-      File[] entries=folder.listFiles();
-      if(entries!=null)for(File f:entries)if(!f.getName().startsWith("."))files.put(f.getName());
+      for(String name:media.listing(dir))files.put(name);
       return reply(200,"application/json",new ByteArrayInputStream(files.toString().getBytes("UTF-8")),new HashMap<>());
     }
     File file=resolve(path);

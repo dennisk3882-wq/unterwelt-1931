@@ -170,7 +170,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         subtitle.setPadding(0, dp(4), 0, dp(18));
         root.addView(subtitle, matchWrap(0));
         TextView version = label(12, Color.LTGRAY);
-        version.setText("v0.38 · Spielordner automatisch erkennen");
+        version.setText("v0.39 · Virtuelle Original-CD 2");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 

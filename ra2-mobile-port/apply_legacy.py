@@ -16,7 +16,7 @@ APP_ID = "com.winlator"
 def copy_sources_legacy(root: Path) -> None:
     dst = root / "app/src/main/java/com/winlator"
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java", "RA2DiagnosticEvidence.java", "RA2CdForensics.java", "RA2ZipExport.java", "RA2XwisClient.java", "RA2VmFiles.java", "RA2VmGameDiscovery.java", "RA2VmActivity.java", "RA2SerialPolicy.java"]:
+    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java", "RA2DiagnosticEvidence.java", "RA2CdForensics.java", "RA2ZipExport.java", "RA2XwisClient.java", "RA2VmFiles.java", "RA2VmGameDiscovery.java", "RA2VmMediaOverlay.java", "RA2VmActivity.java", "RA2SerialPolicy.java"]:
         require(SRC / name)
         text = read(SRC / name)
 
@@ -189,8 +189,8 @@ def patch_build_gradle(root: Path) -> None:
     require(p)
     s = read(p)
     s = s.replace("android {\n", "android {\n    namespace 'com.winlator'\n", 1)
-    s = s.replace("versionCode 16", "versionCode 238")
-    s = s.replace('versionName "7.1"', 'versionName "0.38.0-ra2vm-file-discovery"')
+    s = s.replace("versionCode 16", "versionCode 239")
+    s = s.replace('versionName "7.1"', 'versionName "0.39.0-ra2vm-virtual-cd2"')
     s = s.replace("abiFilters 'arm64-v8a', 'armeabi-v7a'", "abiFilters 'arm64-v8a'")
     s = s.replace("    lintOptions {\n        checkReleaseBuilds false\n    }\n",
                   "    lintOptions {\n        checkReleaseBuilds false\n    }\n\n    aaptOptions {\n        noCompress 'txz', 'tzst'\n    }\n")
@@ -893,7 +893,7 @@ def patch_xserver(root: Path) -> None:
         try {
             metadata.put("runId", java.util.UUID.randomUUID().toString());
             metadata.put("startedAt", System.currentTimeMillis());
-            metadata.put("appVersion", "0.38");
+            metadata.put("appVersion", "0.39");
             metadata.put("launchMode", getIntent().getBooleanExtra("ra2_community_client", false) ? "xwis-community-client" : (getIntent().getBooleanExtra("ra2_launcher_probe", false) ? "original-launcher-probe" : "direct-engine"));
             metadata.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
             metadata.put("android", android.os.Build.VERSION.RELEASE);

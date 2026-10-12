@@ -72,8 +72,10 @@ public final class RA2VmActivity extends AppCompatActivity {
             @Override public void onPageFinished(WebView view,String url) {
                 if(lastFailure.isEmpty()) {
                     notice.setText(files.gameAvailable()
-                        ? "Spieldaten erkannt: "+(files.ra2Available()?"RA2 ":"")+
-                          (files.yuriAvailable()?"Yuri":"")+". In der Engine „SPIELDATEIEN LADEN“ wählen."
+                        ? "Spieldaten: "+(files.ra2Available()?"RA2 ":"")+
+                          (files.yuriAvailable()?"Yuri":"")+
+                          ". CD 2: "+(files.sovietCdReady()?"vorhanden":"NICHT GEFUNDEN")+
+                          ". Spiel unten auswählen; keine ISO auswählen."
                         : "Kein vollständiger RA2-/Yuri-Spielordner erkannt. „LOG KOPIEREN“ zeigt den geprüften Pfad und die vorhandenen Dateien.");
                 }
             }
@@ -133,6 +135,7 @@ public final class RA2VmActivity extends AppCompatActivity {
         append("DataDir="+files.originalDirectory()+" exists="+files.gameAvailable());
         append("GameDiscovery="+files.discoveryStatus());
         append("RA2ready="+files.ra2Available()+" YuriReady="+files.yuriAvailable());
+        append("VirtualCD="+files.mediaStatus());
         browser.loadUrl(RA2VmFiles.URL);
     }
     private void showFailure(String error) {
