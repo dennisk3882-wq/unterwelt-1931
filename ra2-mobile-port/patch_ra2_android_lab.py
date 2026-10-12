@@ -12,17 +12,22 @@ def once(path: str, before: str, after: str, desc: str) -> None:
 
 dest = Path("src/ui/pages/game/ra2AndroidAutotest.ts")
 dest.write_text(Path("../ra2-mobile-port/resources/ra2AndroidAutotest.ts").read_text())
+Path("src/ui/pages/game/ra2AndroidAutopilot.ts").write_text(
+    Path("../ra2-mobile-port/resources/ra2AndroidAutopilot.ts").read_text())
 
 once("src/ui/pages/game/page.ts",
      "import { installCanvasFit, installGameInput, toggleImmersiveFullscreen } from './gameInput';",
      "import { installCanvasFit, installGameInput, toggleImmersiveFullscreen } from './gameInput';\n"
-     "import { installAndroidAutotest } from './ra2AndroidAutotest';",
+     "import { installAndroidAutotest } from './ra2AndroidAutotest';\n"
+     "import { installRa2AndroidAutopilot } from './ra2AndroidAutopilot';",
      "autotest page import")
 once("src/ui/pages/game/page.ts",
      "  activeVm = vm;\n  toolbar.setMapsAvailable(status.phase === 'running');",
      "  activeVm = vm;\n"
      "  if (window.location.hostname === 'ra2.android.local')\n"
      "    installAndroidAutotest(vm, canvas, () => generation === pageGeneration && !exitHandled);\n"
+     "  if (window.location.hostname === 'ra2.android.local')\n"
+     "    installRa2AndroidAutopilot(vm, canvas, () => generation === pageGeneration && !exitHandled);\n"
      "  toolbar.setMapsAvailable(status.phase === 'running');",
      "install autonomous test controller")
 

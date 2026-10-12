@@ -84,7 +84,14 @@ public final class RA2AutopsySupervisor {
         web.loadUrl(RA2VmFiles.URL+"?start-page=battle&ra2-superdiag=1&scenario="+mode);
     }
     public void observe(String msg){
-        if(!running||!msg.startsWith("[RA2-AUTO] "))return;
+        if(!running)return;
+        if(msg.startsWith("[RA2-FORENSIK] ") || msg.startsWith("[RA2-HOUSE] ") ||
+           msg.startsWith("[RA2-ANDROID] ")){
+            // Values and serial data are omitted by the existing native logger.
+            record("WIN32_TRACE "+msg.substring(0,Math.min(msg.length(),250)));
+            return;
+        }
+        if(!msg.startsWith("[RA2-AUTO] "))return;
         final String event=msg.substring("[RA2-AUTO] ".length());
         record(event);
         if(event.startsWith("FIRST_FRAME")||event.startsWith("BATTLEFIELD_REACHED"))

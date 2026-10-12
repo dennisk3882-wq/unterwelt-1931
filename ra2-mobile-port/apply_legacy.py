@@ -16,7 +16,7 @@ APP_ID = "com.winlator"
 def copy_sources_legacy(root: Path) -> None:
     dst = root / "app/src/main/java/com/winlator"
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java", "RA2DiagnosticEvidence.java", "RA2CdForensics.java", "RA2ZipExport.java", "RA2XwisClient.java", "RA2VmFiles.java", "RA2VmGameDiscovery.java", "RA2VmMediaOverlay.java", "RA2VmActivity.java", "RA2SerialPolicy.java"]:
+    for name in ["RA2LauncherActivity.java", "RA2TouchDock.java", "RA2DisplayController.java", "Iso9660Extractor.java", "RA2DiagnosticsActivity.java", "CabExtractor.java", "RA2LaunchBatch.java", "RA2DiagnosticEvidence.java", "RA2CdForensics.java", "RA2ZipExport.java", "RA2XwisClient.java", "RA2VmFiles.java", "RA2VmGameDiscovery.java", "RA2VmMediaOverlay.java", "RA2VmActivity.java", "RA2AutopsySupervisor.java", "RA2SerialPolicy.java"]:
         require(SRC / name)
         text = read(SRC / name)
 
