@@ -67,11 +67,15 @@ export function installAndroidAutotest(vm: VmShell, canvas: HTMLCanvasElement,
   const ready = async (battle: boolean, deadline = 90_000): Promise<boolean> => {
     const until = performance.now() + deadline;
     let stable = 0;
+    let sawSkirmish = false;
     while (performance.now() < until && fresh()) {
       const currentPhase = phase();
       const page = shell().toLowerCase();
+      if (page.includes('skirmish')) sawSkirmish = true;
+      // A blank shell during early initialization is NOT an active battlefield.
+      const nativeFrame = battle ? (await vm.getGamePerformance().catch(() => null))?.frame ?? 0 : 1;
       const ok = battle
-        ? currentPhase === 'running' && !page
+        ? currentPhase === 'running' && !page && nativeFrame > 0 && sawSkirmish
         : currentPhase === 'running' && page.includes('mainmenu');
       if (ok && ++stable >= 3) return true;
       if (!ok) stable = 0;
@@ -152,19 +156,28 @@ export function installAndroidAutotest(vm: VmShell, canvas: HTMLCanvasElement,
     let samples = 0;
     let orders = 0;
     let failed = false;
+    let scoreReached = false;
     while (fresh() && performance.now() - started < RUN_MS) {
       const elapsed = Math.round((performance.now() - started) / 1000);
       const state = phase();
+      const page = shell();
       const perf = await vm.getGamePerformance().catch(() => null);
       const frame = perf?.frame ?? -1;
       samples++;
       if (frame === lastFrame && frame >= 0) stale++; else stale = 0;
       if (samples <= 3 || samples % 4 === 0 || stale === 4)
         log('AUTO STATUS t=' + elapsed + 's VM=' + state + ' nativeFrame=' + frame +
-          ' Aufloesung=' + frameSize() + ' Shell=' + (shell() || 'Gefecht'));
+          ' Aufloesung=' + frameSize() + ' Shell=' + (page || 'Gefecht'));
+      if (/multiplayerscore|gameover|victory|defeat/i.test(page)) {
+        scoreReached = true;
+        log('AUTOTEST GEFECHT BEENDET: Ergebnisfenster erreicht nach ' + elapsed +
+          's; letzte nativeFrame=' + frame + '. Keine weiteren Befehle.');
+        break;
+      }
       if (['error','blocked','exited'].includes(state) || stale >= 5) {
         failed = true;
-        log('AUTOTEST FEHLER: Frame/VM angehalten, t=' + elapsed + 's, Phase=' + state);
+        log('AUTOTEST FEHLER: Engine oder Gefecht pausiert, t=' + elapsed +
+          's, Phase=' + state + ' Shell=' + (page || 'Gefecht'));
         break;
       }
       // Every 15s issue harmless native unit-selection/move orders.
@@ -181,9 +194,13 @@ export function installAndroidAutotest(vm: VmShell, canvas: HTMLCanvasElement,
       lastFrame = frame;
       await delay(5000);
     }
-    log('AUTOTEST ENDE: ' + (failed ? 'ENGINE_ANHALT' : '120s_DURCHGELAUFEN') +
+    const verdict = scoreReached ? 'GEFECHT_BEENDET' :
+      failed ? 'ENGINE_ANHALT' :
+      !fresh() ? 'MANUELL_GESTOPPT' : '120s_DURCHGELAUFEN';
+    log('AUTOTEST ENDE: ' + verdict +
       ' nativeAbfragen=' + samples + ' Spielbefehle=' + orders +
-      ' Phase=' + phase() + ' (Niederlage anhand RA2-House-Snapshot gesondert pruefen)');
+      ' Phase=' + phase() + ' Shell=' + (shell() || 'Gefecht') +
+      ' (Ergebnisseite allein beweist keinen Kopierschutzfehler)');
     running = false;
   }
 

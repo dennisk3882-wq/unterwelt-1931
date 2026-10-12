@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.47-game-test-menu-readable
+# build-version: 0.48-battle-end-and-registry-value-diagnostics
 
 on:
   push:
@@ -444,7 +444,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  publish-v047:
+  publish-v048:
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -464,15 +464,15 @@ jobs:
           set -euo pipefail
           apk=release/upstream/app/build/outputs/apk/debug/app-debug.apk
           test -s "$apk"
-          cp "$apk" RA2-Yuri-Android-v0.47.apk
-          unzip -t RA2-Yuri-Android-v0.47.apk >/dev/null
-          sha256sum RA2-Yuri-Android-v0.47.apk > RA2-Yuri-Android-v0.47.sha256
-          tag=ra2-yuri-android-v0.47
+          cp "$apk" RA2-Yuri-Android-v0.48.apk
+          unzip -t RA2-Yuri-Android-v0.48.apk >/dev/null
+          sha256sum RA2-Yuri-Android-v0.48.apk > RA2-Yuri-Android-v0.48.sha256
+          tag=ra2-yuri-android-v0.48
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" RA2-Yuri-Android-v0.47.apk RA2-Yuri-Android-v0.47.sha256 --clobber --repo "$GITHUB_REPOSITORY"
+            gh release upload "$tag" RA2-Yuri-Android-v0.48.apk RA2-Yuri-Android-v0.48.sha256 --clobber --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$tag" RA2-Yuri-Android-v0.47.apk RA2-Yuri-Android-v0.47.sha256 \
+            gh release create "$tag" RA2-Yuri-Android-v0.48.apk RA2-Yuri-Android-v0.48.sha256 \
               --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title 'RA2 / Yuri Android v0.47 – Gefechtstest gut sichtbar, aufgeräumtes Menü' \
-              --notes 'Behebt unlesbare Buttons im v0.46-Zahnrad-Menue. Der 2-Minuten-Gefechts-Autotest steht ab sofort als klar beschrifteter erster Button. Breites, scrollbareres Querformat-Menue mit 48dp-Buttons, separatem Testlabor fuer Aufzeichnung, Wiederholung und Analyse. Originalmedien/Spielstaende bleiben erhalten. Die Explosionen im Gefecht werden weiterhin untersucht; Autotest bitte auf dem Galaxy S26 Ultra pruefen. Bestehende Version ohne Deinstallation aktualisieren.'
+              --title 'RA2 / Yuri Android v0.48 – Korrekte Gefechtsende- und Registry-Diagnose' \
+              --notes 'Diagnose 0.48: Aus den letzten zwei Gefechtstests wurde erkannt, dass die Engine zum Ergebnisbildschirm wechselt, nicht abstuerzt. Der Autotest beendet sich jetzt beim Score-Fenster als GEFECHT_BEENDET statt faelschlich ENGINE_ANHALT und schickt dort keine weiteren Befehle. Die Win32-Registry-Pruefung protokolliert nur die fehlenden Wertnamen (niemals deren Inhalt), den 32-/64-Bit-Pfad sowie ob im Spielprofil ein Default vorhanden ist. Die House-Probe meldet bei nicht lesbarer originaler GAME.EXE einen konkreten Grund. Originaldateien und Schluessel bleiben erhalten. Das Explosionen-Problem ist noch nicht behoben und muss auf dem Geraet weiter untersucht werden. Bestehende APK ohne Deinstallation aktualisieren.'
           fi

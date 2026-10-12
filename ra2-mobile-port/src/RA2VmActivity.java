@@ -488,26 +488,37 @@ public final class RA2VmActivity extends AppCompatActivity {
         boolean houseObserved=value.contains("[RA2-HOUSE] Battle");
         boolean autoStarted=value.contains("AUTOTEST gestartet");
         boolean autoFinished=value.contains("AUTOTEST ENDE");
+        boolean matchEnded=value.contains("AUTOTEST ENDE: GEFECHT_BEENDET") ||
+            value.contains("AUTOTEST GEFECHT BEENDET");
         boolean autoFailed=value.contains("AUTOTEST FEHLER") || value.contains("AUTOTEST ABBRUCH");
-        boolean stale=value.contains("ENGINE_ANHALT");
+        boolean stale=value.contains("AUTOTEST ENDE: ENGINE_ANHALT");
         StringBuilder out=new StringBuilder();
         out.append("Original-CD erkannt: ").append(mediaOk?"JA":"NOCH NICHT BESTAETIGT").append('\n');
         out.append("CD-ROM im Windows-Gast: ").append(guestCD?"JA":"NOCH NICHT BESTAETIGT").append('\n');
         out.append("Registrierung uebertragen: ").append(registry?"JA":"NOCH NICHT BESTAETIGT").append('\n');
         out.append("Windows-Registry im Spiel abgefragt: ").append(registryRead?"JA":"NICHT BEOBACHTET").append('\n');
         out.append("House-Speicherzustand lesbar: ").append(houseObserved?"JA":"NICHT BESTAETIGT").append('\n');
-        out.append("Gefechts-Autotest: ").append(autoFailed?"START/LAUFZEITFEHLER":
+        out.append("Gefechts-Autotest: ").append(matchEnded?"GEFECHT_BEENDET":
+            autoFailed?"START/LAUFZEITFEHLER":
             autoFinished?"BEENDET":autoStarted?"LAEUFT":"NICHT GESTARTET").append("\n\n");
         if(houseDeath) out.append("BERECHNETES ERGEBNIS: RA2 markiert den lokalen Spieler als tot. " +
             "Die Niederlage ist in der Spielsimulation messbar; die ausloesende Routine muss noch untersucht werden.");
         else if(noUnits) out.append("VERDACHT: Der lokale Spieler hat keine Einheiten mehr. " +
             "Bitte Zeitpunkt zur Niederlage vergleichen, da auch normaler Spielverlauf moeglich ist.");
-        else if(stale) out.append("VERDACHT: Die native Spiellogik/Frameausgabe stoppt. " +
-            "Bitte das Zeitfenster und die letzten Win32-Aufrufe vergleichen.");
+        else if(matchEnded) out.append("GEFECHT BEENDET: Die Ergebnisseite wurde erreicht. " +
+            "Ein anschliessend unveraenderter Framezaehler ist KEIN Engine-Absturz. " +
+            "Auf den genauen Zeitpunkt der Einheitenverluste und fehlende Registry-Werte achten."); 
+        else if(stale) out.append("VERDACHT: Die native Spiellogik/Frameausgabe stoppt, " +
+            "ohne dass eine Ergebnisseite erkannt wurde.");
         else if(!houseObserved) out.append("DATENLUECKE: Keine gueltige House-Speicherprobe. " +
             "Moeglicherweise abweichende GAME.EXE-Version oder Spiel noch nicht auf dem Schlachtfeld.");
         else out.append("Bisher kein gemessener Uebergang zum Verliererstatus. " +
             "Automatischen Test laufen lassen und nach der Explosion direkt markieren.");
+        if(value.contains("RegQuery") && value.contains("Ergebnis=FEHLT"))
+            out.append("\nHINWEIS: Mindestens eine Win32-Registry-Abfrage ist fehlgeschlagen. " +
+                "Erst mit dem abgefragten Wertnamen ist ihre Bedeutung bestimmbar.");
+        if(value.contains("STATUS=NICHT_LESBAR"))
+            out.append("\nHINWEIS: House-Daten der vorhandenen GAME.EXE sind nicht sicher lesbar.");
         out.append("\nKein CD-Schluessel oder Spielinhalt wird fuer diese Analyse hochgeladen.");
         return out.toString();
     }

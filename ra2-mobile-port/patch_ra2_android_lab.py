@@ -48,6 +48,8 @@ once(worker,
     let ra2HouseProbePrevious = '';
     let ra2HouseFirstSeen = 0;
     let ra2HouseUnsupportedReported = false;
+    let ra2HouseNoPointerLogged = false;
+    let ra2HouseNoShimLogged = false;
     const ra2HouseProbe = () => {
       if (globalThis.location?.hostname !== 'ra2.android.local' || source.game.id !== 'ra2') return;
       // Limit to one probe per ~150 guest logic frames; read only, never change RAM.
@@ -55,10 +57,23 @@ once(worker,
       const shim = (this.core as unknown as {
         shim?: { readU32(ptr: number): number; readU8(ptr: number): number };
       } | null)?.shim;
-      if (!shim) return;
+      if (!shim) {
+        if (!ra2HouseNoShimLogged) {
+          ra2HouseNoShimLogged = true;
+          console.info('[RA2-HOUSE] STATUS=NICHT_LESBAR Grund=VM_Shim_noch_nicht_verfuegbar');
+        }
+        return;
+      }
       try {
         const house = shim.readU32(0x00a35db4) >>> 0;
-        if (house < 0x00100000 || house >= 0x07f00000) return;
+        if (house < 0x00100000 || house >= 0x07f00000) {
+          if (!ra2HouseNoPointerLogged) {
+            ra2HouseNoPointerLogged = true;
+            console.info('[RA2-HOUSE] STATUS=NICHT_LESBAR Grund=House_Zeiger_ungueltig ' +
+              ' Vermutung=abweichendes_GAME_EXE_Speicherlayout');
+          }
+          return;
+        }
         const human = shim.readU8(house + 0x134);
         const dead = shim.readU8(house + 0x13d);
         const members = shim.readU32(house + 0x5434) >>> 0;
@@ -66,7 +81,8 @@ once(worker,
         if (human !== 1 || size > 4096 || dead > 8) {
           if (!ra2HouseUnsupportedReported) {
             ra2HouseUnsupportedReported = true;
-            console.info('[RA2-HOUSE] Nicht kompatibler Spielstand/EXE-ABI; House-Zaehlung uebersprungen');
+            console.info('[RA2-HOUSE] STATUS=NICHT_LESBAR Grund=ABI_inkompatibel ' +
+            ' localHuman=' + human + ' deadFlag=' + dead + ' slots=' + size);
           }
           return;
         }

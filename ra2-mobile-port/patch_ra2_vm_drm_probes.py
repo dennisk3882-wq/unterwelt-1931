@@ -33,6 +33,10 @@ query_trace = """          if (globalThis.location?.hostname === 'ra2.android.lo
             console.info('[RA2-FORENSIK] Win32 RegQuery #' + ra2RegistryQueryCount +
               ' Kategorie=' + (id.includes('westwood') ? 'Westwood' :
                 id.includes('wchat') ? 'WChat' : 'Andere') +
+              ' Wertname=' + (id.includes('westwood') ?
+                valueName.replace(/[^a-z0-9_-]/g, '_').slice(0, 48) : 'REDACTED') +
+              ' Struktur=' + (path.includes('wow6432node') ? 'WoW6432' : 'Native') +
+              ' Vorlage=' + (this.gameProfile.registryDefaults?.[id] ? 'JA' : 'NEIN') +
               ' Ergebnis=' + (data ? 'OK' : 'FEHLT'));
           }
 """

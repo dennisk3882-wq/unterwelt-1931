@@ -204,7 +204,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         root.addView(subtitle, matchWrap(0));
 
         TextView version = label(11, 0xff859397);
-        version.setText("v0.47 · Testlabor mit lesbarer Menüführung");
+        version.setText("v0.48 · Gefechtsende korrekt erkennen + Registry-Anfragen");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 
