@@ -204,7 +204,7 @@ public final class RA2LauncherActivity extends AppCompatActivity {
         root.addView(subtitle, matchWrap(0));
 
         TextView version = label(11, 0xff859397);
-        version.setText("v0.44 · Original-CD-Erkennung & Gefechtsdiagnose");
+        version.setText("v0.45 · Ursachenanalyse des Gefechts");
         version.setGravity(Gravity.CENTER);
         root.addView(version, matchWrap(0));
 

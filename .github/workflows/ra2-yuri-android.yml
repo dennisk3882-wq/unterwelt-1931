@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.44-guest-physical-cd-and-forensics
+# build-version: 0.45-skirmish-loss-forensics
 
 on:
   push:
@@ -265,6 +265,7 @@ jobs:
           p.write_text(s)
           PY
           python3 ../ra2-mobile-port/patch_ra2_vm_forensics.py
+          python3 ../ra2-mobile-port/patch_ra2_vm_drm_probes.py
           cat ../ra2-mobile-port/resources/ra2vm-android.css >> src/ui/pages/game/styles.css
           pnpm install --frozen-lockfile
           pnpm run build
@@ -442,7 +443,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  publish-v044:
+  publish-v045:
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -462,15 +463,15 @@ jobs:
           set -euo pipefail
           apk=release/upstream/app/build/outputs/apk/debug/app-debug.apk
           test -s "$apk"
-          cp "$apk" RA2-Yuri-Android-v0.44.apk
-          unzip -t RA2-Yuri-Android-v0.44.apk >/dev/null
-          sha256sum RA2-Yuri-Android-v0.44.apk > RA2-Yuri-Android-v0.44.sha256
-          tag=ra2-yuri-android-v0.44
+          cp "$apk" RA2-Yuri-Android-v0.45.apk
+          unzip -t RA2-Yuri-Android-v0.45.apk >/dev/null
+          sha256sum RA2-Yuri-Android-v0.45.apk > RA2-Yuri-Android-v0.45.sha256
+          tag=ra2-yuri-android-v0.45
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" RA2-Yuri-Android-v0.44.apk RA2-Yuri-Android-v0.44.sha256 --clobber --repo "$GITHUB_REPOSITORY"
+            gh release upload "$tag" RA2-Yuri-Android-v0.45.apk RA2-Yuri-Android-v0.45.sha256 --clobber --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$tag" RA2-Yuri-Android-v0.44.apk RA2-Yuri-Android-v0.44.sha256 \
+            gh release create "$tag" RA2-Yuri-Android-v0.45.apk RA2-Yuri-Android-v0.45.sha256 \
               --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title 'RA2 / Yuri Android v0.44 – CD2-Prüfung und Gefechtsdiagnose' \
-              --notes 'Aus v0.43 mit vereinfachtem Hauptmenü: Original Sowjet-CD wird bei vorhandenem ra2.dsk jetzt im RA2-Win32-Gast als optisches Laufwerk D: bereitgestellt. Neue Forensik prüft anonymisiert tatsächlich gelesene Registry-Werte und CD-Laufwerkserkennung. Im ⚙ Menü lässt sich der CD-Modus ausschalten, falls die Originalvariante damit Probleme macht. Bestehende APK ohne Deinstallation aktualisieren. Keine Seriennummern in Diagnose oder APK. Ob Gefechte nun dauerhaft laufen, muss auf dem Gerät geprüft werden.'
+              --title 'RA2 / Yuri Android v0.45 – Kopierschutz-/Gefechts-Forensik' \
+              --notes 'Gezielte Gefechtsdiagnose für Red Alert 2: Zeitstempel in allen Diagnosezeilen, SHA-256 der originalen lokalen GAME.EXE und RA2.DSK, anonyme RegOpen/RegQuery-, CD- und AutoDet-Abfragen, Spielmenü-Meilensteine sowie Menüoption zum Markieren der Explosion/Niederlage. Keine Seriennummern werden ausgegeben oder eingebaut. Dies ist eine Diagnoseversion, keine bestätigte Lösung für die Explosionen. Direkt über die bestehende Installation aktualisieren; die Originaldateien bleiben erhalten.'
           fi
