@@ -166,6 +166,26 @@ public final class RA2VmActivity extends AppCompatActivity {
             closeMenu();
             editOriginalKeys();
         });
+        addMenuButton("📀 CD-Laufwerk D: ändern", () -> {
+            closeMenu();
+            android.content.SharedPreferences pref =
+                getSharedPreferences("ra2_mobile",Context.MODE_PRIVATE);
+            boolean enabled = pref.getBoolean("vm_virtual_cd_enabled",true);
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("RA2 Original-CD-Prüfmodus")
+                .setMessage("Das Original-Sowjet-CD-Abbild ist " +
+                    (files.sovietCdReady()?"vorhanden.":"nicht vorhanden.") +
+                    "\nVirtuelles CD-Laufwerk D: ist derzeit " + (enabled?"EIN.":"AUS.") +
+                    "\n\nWenn das Gefecht weiterhin automatisch endet oder der Start " +
+                    "nach dieser Änderung eine CD verlangt, kannst du hier zurückschalten.")
+                .setNegativeButton("Abbrechen",null)
+                .setPositiveButton(enabled?"D: deaktivieren":"D: aktivieren",(d,which)->{
+                    pref.edit().putBoolean("vm_virtual_cd_enabled",!enabled).apply();
+                    append("CD-Pruefmodus D: "+(!enabled?"EIN":"AUS")+
+                        " (originale Medien bleiben unveraendert)");
+                    if(browser!=null)browser.reload();
+                }).show();
+        });
         addMenuButton("⌨ Tasten / Joystick", () -> {
             touchOpen=!touchOpen;
             applyEngineUi();
@@ -192,6 +212,8 @@ public final class RA2VmActivity extends AppCompatActivity {
         append("GameDiscovery="+files.discoveryStatus());
         append("RA2ready="+files.ra2Available()+" YuriReady="+files.yuriAvailable());
         append("VirtualCD="+files.mediaStatus());
+        append("CD-Guest-Modus-D="+(getSharedPreferences("ra2_mobile",Context.MODE_PRIVATE)
+            .getBoolean("vm_virtual_cd_enabled",true)?"EIN":"AUS")+" (falls CD2 vorhanden)");
         browser.loadUrl(RA2VmFiles.URL);
     }
 

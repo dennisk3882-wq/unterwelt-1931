@@ -97,6 +97,8 @@ public final class RA2VmFiles {
     try {
       json.put("ra2Serial",ra2);
       json.put("yuriSerial",yuri);
+      json.put("ra2Cd2Ready",media.ra2DiscReady());
+      json.put("cdEmulationEnabled",pref.getBoolean("vm_virtual_cd_enabled",true));
       json.put("ra2Valid",!ra2.isEmpty());
       json.put("yuriValid",!yuri.isEmpty());
     } catch(org.json.JSONException failure){throw new IOException("Cannot prepare registration metadata",failure);}
