@@ -104,24 +104,14 @@ jobs:
           s=s.replace(original,new)
           # On Android no ISO is selectable through the generic EXE/ZIP picker.
           # The already-extracted original discs are automatically virtualized.
-          original="""              <Ra2MenuButton disabled={actionsDisabled} onClick={() => props.pick('archive')}>
-                {t('选择文件…')}
-              </Ra2MenuButton>
-              <Ra2MenuButton disabled={actionsDisabled} onClick={() => props.pick('folder')}>
-                {t('选择文件夹…')}
-              </Ra2MenuButton>"""
-          new="""              {window.location.hostname !== 'ra2.android.local' && (
-                <>
-                  <Ra2MenuButton disabled={actionsDisabled} onClick={() => props.pick('archive')}>
-                    {t('选择文件…')}
-                  </Ra2MenuButton>
-                  <Ra2MenuButton disabled={actionsDisabled} onClick={() => props.pick('folder')}>
-                    {t('选择文件夹…')}
-                  </Ra2MenuButton>
-                </>
-              )}"""
-          assert s.count(original)==1, 'File import buttons changed upstream'
-          s=s.replace(original,new)
+          start=s.index("              <Ra2MenuButton disabled={actionsDisabled} onClick={() => props.pick('archive')}>")
+          folder=s.index("props.pick('folder')", start)
+          close="</Ra2MenuButton>"
+          end=s.index(close, folder)+len(close)
+          buttons=s[start:end]
+          before="              {window.location.hostname !== 'ra2.android.local' && (\n                <>\n"
+          after="\n                </>\n              )}"
+          s=s[:start]+before+buttons+after+s[end:]
           original="{t('导入 ZIP / EXE 压缩包或完整游戏目录。')}"
           new="{window.location.hostname === 'ra2.android.local' ? 'Original-ISOs sind bereits installiert. Spielversion oben auswählen; CD 2 wird virtuell eingebunden.' : t('导入 ZIP / EXE 压缩包或完整游戏目录。')}"
           assert s.count(original)==1, 'Resource guide changed upstream'
