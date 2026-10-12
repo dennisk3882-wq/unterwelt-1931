@@ -1,5 +1,5 @@
 name: Build RA2 Yuri Android
-# build-version: 0.40-immersive-widescreen-ra2vm
+# build-version: 0.41-original-registration-and-real-widescreen
 
 on:
   push:
@@ -180,8 +180,71 @@ jobs:
           p=Path("index.html")
           s=p.read_text()
           assert s.count("</head>")==1
-          s=s.replace("</head>",
-            "<script>if(location.hostname==='ra2.android.local')document.documentElement.classList.add('ra2-android');</script></head>")
+          # One-time upgrade from stored 4:3 settings; never overwrite user-selected 16:9/21:9 or subsequent choices.
+          wide_bootstrap="""<script>
+          if(location.hostname==='ra2.android.local'){
+            document.documentElement.classList.add('ra2-android');
+            try{
+              const migrationKey='ra2-android-widescreen-v041';
+              if(localStorage.getItem(migrationKey)!=='1'){
+                for(const game of ['ra2','yr']){
+                  const key='vm-resolution-'+game;
+                  const old=localStorage.getItem(key);
+                  if(!old||['800x600','1024x768','1280x960'].includes(old)){
+                    localStorage.setItem(key,'2080x960');
+                  }
+                }
+                localStorage.setItem(migrationKey,'1');
+              }
+            }catch(error){}
+          }
+          </script>"""
+          s=s.replace("</head>",wide_bootstrap+"</head>")
+          p.write_text(s)
+          # Load the actual CD-installation values already present in the
+          # user's private Android Winlator registry/preferences. Never ship
+          # serials in the APK, logs, network requests, or build products.
+          p=Path("src/adapter/vmWorkerController.ts")
+          s=p.read_text()
+          anchor="    this.sourceTemplate = source.files;"
+          assert s.count(anchor)==1
+          injection="""    if (globalThis.location?.hostname === 'ra2.android.local') {
+      try {
+        const answer = await fetch('/android-installation.json', { cache: 'no-store' });
+        if (answer.ok) {
+          const installation = await answer.json() as { ra2Serial?: string; yuriSerial?: string };
+          const serial = (source.game.id === 'yr' ? installation.yuriSerial : installation.ra2Serial) ?? '';
+          if (/^[A-Z0-9]{10,40}$/.test(serial)) {
+            const name = source.game.id === 'yr' ? "yuri's revenge" : 'red alert 2';
+            const regSz = (input: string) => ({ type: 1, bytes: [...new TextEncoder().encode(input), 0] });
+            const regDword = (num: number) => ({ type: 4, bytes: [num & 255, (num >> 8) & 255, (num >> 16) & 255, (num >> 24) & 255] });
+            const defaults: Record<string, { type: number; bytes: readonly number[] }> = { ...source.game.shimProfile.registryDefaults };
+            for (const prefix of [
+              'hklm\\\\software\\\\westwood\\\\' + name,
+              'hklm\\\\software\\\\wow6432node\\\\westwood\\\\' + name,
+            ]) {
+              defaults[prefix + '\\\\serial'] = regSz(serial);
+              defaults[prefix + '\\\\name'] = regSz(source.game.id === 'yr' ? "Yuri's Revenge" : 'Red Alert 2');
+              defaults[prefix + '\\\\folderpath'] = regSz('C:\\\\GAME');
+              defaults[prefix + '\\\\installpath'] = regSz('C:\\\\GAME');
+              defaults[prefix + '\\\\version'] = regDword(source.game.id === 'yr' ? 0x00010001 : 0x00010006);
+              defaults[prefix + '\\\\sku'] = regDword(source.game.id === 'yr' ? 0x00000901 : 0x00000801);
+            }
+            source.game = {
+              ...source.game,
+              shimProfile: { ...source.game.shimProfile, registryDefaults: defaults },
+            };
+            console.info('[RA2-ANDROID] Original installation registration connected (key not logged).');
+          } else {
+            console.warn('[RA2-ANDROID] Original installation serial not available, legacy protection may terminate games.');
+          }
+        }
+      } catch (error) {
+        console.warn('[RA2-ANDROID] Unable to read original installation registration, key not logged.');
+      }
+    }
+"""
+          s=s.replace(anchor,injection+anchor)
           p.write_text(s)
           PY
           cat ../ra2-mobile-port/resources/ra2vm-android.css >> src/ui/pages/game/styles.css

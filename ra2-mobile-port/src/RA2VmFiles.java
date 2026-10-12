@@ -4,6 +4,7 @@ import android.net.Uri;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import org.json.JSONArray;
+import org.json.JSONObject;
 import java.io.*;
 import java.util.*;
 public final class RA2VmFiles {
@@ -46,6 +47,7 @@ public final class RA2VmFiles {
     try {
       if(path==null || path.equals("/"))path="/index.html";
       if(path.contains("..") || path.indexOf('\\')>=0)return text(403,"Invalid path");
+      if(path.equals("/android-installation.json")) return installationProfile();
       if(path.startsWith("/game/"))return game(uri,path.substring(6),request);
       InputStream stream=ctx.getAssets().open("ra2vm/"+path.substring(1));
       String mime="application/octet-stream";
@@ -60,6 +62,57 @@ public final class RA2VmFiles {
     } catch(FileNotFoundException e){return text(404,"File not found: "+path);}
       catch(Exception e){return text(500,e.toString());}
   }
+  /**
+   * Exposes the locally registered original CD credentials only to the APK's
+   * private https://ra2.android.local WebView origin. The response is never
+   * stored, logged, cached, sent to GitHub, or bundled with the APK.
+   * The worker uses this to reproduce the legitimate Windows installation
+   * registry, not to synthesize a license or accept a placeholder key.
+   */
+  private WebResourceResponse installationProfile() throws IOException {
+    android.content.SharedPreferences pref=ctx.getSharedPreferences("ra2_mobile",Context.MODE_PRIVATE);
+    String ra2=validatedKey(pref.getString("original_cd_key_ra2",""));
+    String yuri=validatedKey(pref.getString("original_cd_key_yuri",""));
+    if(ra2.isEmpty()||yuri.isEmpty()) {
+      File driveC=base.getParentFile()==null?null:base.getParentFile().getParentFile();
+      File wine=driveC==null?null:driveC.getParentFile();
+      if(wine!=null) {
+        File registryFile=new File(wine,"system.reg");
+        if(registryFile.isFile()) {
+          try (WineRegistryEditor registry=new WineRegistryEditor(registryFile)) {
+            if(ra2.isEmpty())ra2=validatedKey(
+              firstPresent(registry.getStringValue("Software\\Wow6432Node\\Westwood\\Red Alert 2","Serial"),
+                           registry.getStringValue("Software\\Westwood\\Red Alert 2","Serial")));
+            if(yuri.isEmpty())yuri=validatedKey(
+              firstPresent(registry.getStringValue("Software\\Wow6432Node\\Westwood\\Yuri's Revenge","Serial"),
+                           registry.getStringValue("Software\\Westwood\\Yuri's Revenge","Serial")));
+          } catch(Exception ignored) {
+            // Do not block the engine if the original registry is absent.
+          }
+        }
+      }
+    }
+    JSONObject json=new JSONObject();
+    try {
+      json.put("ra2Serial",ra2);
+      json.put("yuriSerial",yuri);
+      json.put("ra2Valid",!ra2.isEmpty());
+      json.put("yuriValid",!yuri.isEmpty());
+    } catch(org.json.JSONException failure){throw new IOException("Cannot prepare registration metadata",failure);}
+    byte[] bytes=json.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    Map<String,String> headers=new HashMap<>();
+    headers.put("Cache-Control","no-store, private");
+    headers.put("X-Content-Type-Options","nosniff");
+    headers.put("Cross-Origin-Resource-Policy","same-origin");
+    return new WebResourceResponse("application/json","UTF-8",200,"OK",headers,new ByteArrayInputStream(bytes));
+  }
+  private static String firstPresent(String first,String second){
+    return RA2SerialPolicy.acceptableInput(first)?first:second;
+  }
+  private static String validatedKey(String input){
+    return RA2SerialPolicy.acceptableInput(input)?RA2SerialPolicy.normalize(input):"";
+  }
+
   private File resolve(String path)throws IOException {
     // Original game and extracted ISO media share one read-only virtual namespace.
     return media.resolve(path);
