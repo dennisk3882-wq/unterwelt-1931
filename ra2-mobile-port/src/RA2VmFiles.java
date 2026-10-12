@@ -5,6 +5,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import com.winlator.core.WineRegistryEditor;
 import java.io.*;
 import java.util.*;
 public final class RA2VmFiles {
