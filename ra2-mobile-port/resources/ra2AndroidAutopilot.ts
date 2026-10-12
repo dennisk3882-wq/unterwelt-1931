@@ -117,7 +117,7 @@ export function installRa2AndroidAutopilot(vm: VmShell, canvas: HTMLCanvasElemen
     if (!emitted) runEnd(now()>=MAX_RUNTIME_MS ? 'TIME_LIMIT':'INTERRUPTED',
       'GAME_STILL_RUNNING_OR_NOT_READY');
   };
-  void periodic().catch(e => {
+  void periodic().catch(() => {
     log('EXCEPTION category=TEST_CONTROLLER');
     runEnd('TEST_FAILURE','SCRIPT_ERROR');
   });

@@ -242,6 +242,11 @@ public final class RA2AutopsySupervisor {
                     out.closeEntry();
                 }
             }catch(Exception e){Log.w("RA2Autopsy","zip write failed",e);}
+            if(zip.isFile()&&zip.length()>0L){
+                for(File file:captures)file.delete();
+                summary.delete();timeline.delete();
+                sessionDir.delete();
+            }
             File[] zipFiles=sessionDir.getParentFile().listFiles(f->f.getName().endsWith(".zip"));
             if(zipFiles!=null&&zipFiles.length>3){
                 java.util.Arrays.sort(zipFiles,java.util.Comparator.comparingLong(File::lastModified));
