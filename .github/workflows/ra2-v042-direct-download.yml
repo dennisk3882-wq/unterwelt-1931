@@ -1,0 +1,41 @@
+name: RA2 v0.42 – direct APK download
+on:
+  push:
+    branches: [ra2-yuri-android]
+    paths:
+      - '.github/workflows/ra2-v042-direct-download.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve successfully built and signed v0.42 APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p package
+          gh run download 38280776706 -R dennisk3882-wq/unterwelt-1931 -n ra2-yuri-android-debug -D package
+          test -s package/upstream/app/build/outputs/apk/debug/app-debug.apk
+          cp package/upstream/app/build/outputs/apk/debug/app-debug.apk RA2-Yuri-Android-v0.42.apk
+          unzip -t RA2-Yuri-Android-v0.42.apk >/dev/null
+          sha256sum RA2-Yuri-Android-v0.42.apk > RA2-Yuri-Android-v0.42.sha256
+      - name: Publish GitHub Release for direct downloads
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=ra2-yuri-android-v0.42
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" RA2-Yuri-Android-v0.42.apk RA2-Yuri-Android-v0.42.sha256 --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$tag" RA2-Yuri-Android-v0.42.apk RA2-Yuri-Android-v0.42.sha256 \
+              --repo "$GITHUB_REPOSITORY" --target '2919ab28c7f51afa23dcbaffb64edbe0e834622b' \
+              --title 'RA2 / Yuri Android v0.42 – CD-Schlüssel direkt im Spiel' \
+              --notes 'RA2-v0.42-APK: CD-Key-Eingabe direkt im Zahnrad-Menü und auf der Startseite vor dem VM-Start. Speicherung lokal. Automatische Übergabe des vorhandenen Originalschlüssels an die VM beim Neustart. Keine fremden Keys in der APK. Gefechtsverhalten auf dem Gerät noch zu prüfen. Bestehende App ohne Deinstallation aktualisieren.'
+          fi

@@ -455,3 +455,4 @@ jobs:
               --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title 'RA2 / Yuri Android v0.42 – CD-Schlüssel direkt im Spiel' \
               --notes 'Direkt im Zahnrad-Menü kann der eigene Original-CD-Schlüssel lokal eingegeben werden. Beim Neustart wird er automatisch in die virtuelle Windows-Registrierung übernommen. Auf der Startseite ist der Knopf zusätzlich direkt oberhalb des RA2-VM-Starts. Keine fremden Seriennummern oder Originalspieldaten in der APK. Gefechtsverhalten muss auf dem Gerät getestet werden. In-place aktualisieren, nicht deinstallieren.'
+          fi
