@@ -41,6 +41,24 @@ public final class RA2VmFiles {
   public boolean yuriAvailable(){return discovery.yuriReady;}
   public boolean sovietCdReady(){return media.ra2DiscReady();}
   public String mediaStatus(){return "RA2-CD2="+media.ra2DiscReady()+" cdFiles="+media.discFileCount()+" cdPath="+media.ra2Disc().getAbsolutePath();}
+  /** SHA-256 of local original game assets; no CD license values are read. */
+  public String gameFingerprint(){
+    File executable=RA2VmGameDiscovery.directChildIgnoreCase(base,"GAME.EXE");
+    File discMarker=RA2VmGameDiscovery.directChildIgnoreCase(media.ra2Disc(),"RA2.DSK");
+    return sha256Description("GAME.EXE",executable)+" | "+sha256Description("CD2/RA2.DSK",discMarker);
+  }
+  private String sha256Description(String label,File file){
+    if(!file.isFile())return label+"=MISSING";
+    try(InputStream stream=new FileInputStream(file)){
+      java.security.MessageDigest digest=java.security.MessageDigest.getInstance("SHA-256");
+      byte[] buffer=new byte[65536];
+      int size;
+      while((size=stream.read(buffer))!=-1)digest.update(buffer,0,size);
+      StringBuilder out=new StringBuilder();
+      for(byte b:digest.digest())out.append(String.format(Locale.ROOT,"%02x",b & 0xff));
+      return label+" size="+file.length()+" sha256="+out;
+    }catch(Exception e){return label+" SHA256_UNAVAILABLE";}
+  }
   public WebResourceResponse serve(WebResourceRequest request) {
     Uri uri=request.getUrl();
     if(!HOST.equalsIgnoreCase(uri.getHost()) || !"https".equals(uri.getScheme()))return null;

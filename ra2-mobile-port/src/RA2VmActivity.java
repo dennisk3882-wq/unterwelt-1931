@@ -43,6 +43,7 @@ public final class RA2VmActivity extends AppCompatActivity {
     private LinearLayout menu;
     private TextView gear;
     private String lastFailure = "";
+    private long engineOpenedAt;
 
     private int dp(float units) {
         return Math.round(getResources().getDisplayMetrics().density * units);
@@ -76,6 +77,7 @@ public final class RA2VmActivity extends AppCompatActivity {
     @SuppressLint("SetJavaScriptEnabled")
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        engineOpenedAt=android.os.SystemClock.elapsedRealtime();
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         immersive();
@@ -191,6 +193,11 @@ public final class RA2VmActivity extends AppCompatActivity {
             applyEngineUi();
             closeMenu();
         });
+        addMenuButton("💥 Niederlage markieren + Log kopieren", () -> {
+            append("PLAYER_EVENT=UNITS_EXPLODED_DEFEAT");
+            copyLog();
+            closeMenu();
+        });
         addMenuButton("Protokoll kopieren", () -> {copyLog();closeMenu();});
         addMenuButton("Spiel neu starten", () -> {
             closeMenu();
@@ -212,6 +219,7 @@ public final class RA2VmActivity extends AppCompatActivity {
         append("GameDiscovery="+files.discoveryStatus());
         append("RA2ready="+files.ra2Available()+" YuriReady="+files.yuriAvailable());
         append("VirtualCD="+files.mediaStatus());
+        append("FileFingerprint="+files.gameFingerprint());
         append("CD-Guest-Modus-D="+(getSharedPreferences("ra2_mobile",Context.MODE_PRIVATE)
             .getBoolean("vm_virtual_cd_enabled",true)?"EIN":"AUS")+" (falls CD2 vorhanden)");
         browser.loadUrl(RA2VmFiles.URL);
@@ -355,8 +363,9 @@ public final class RA2VmActivity extends AppCompatActivity {
     }
 
     private void append(String line) {
-        Log.d("RA2Vm",line);
-        synchronized(log) {if(log.size()>=240)log.removeFirst();log.addLast(line);}
+        String stamped="[t+"+(android.os.SystemClock.elapsedRealtime()-engineOpenedAt)+"ms] "+line;
+        Log.d("RA2Vm",stamped);
+        synchronized(log) {if(log.size()>=300)log.removeFirst();log.addLast(stamped);}
     }
 
     private void copyLog() {
