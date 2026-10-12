@@ -263,57 +263,8 @@ jobs:
           """
           s=s.replace(anchor,injection+anchor)
           p.write_text(s)
-          # Android-only forensic instrumentation. No key contents are logged.
-          p=Path("src/vm86/shim/winmm.ts")
-          s=p.read_text()
-          s=s.replace(
-            "type User32Chain = InstanceType<ReturnType<typeof withUser32>>;",
-            "const ra2RegistryEvidence = new Set<string>();\n"
-            "type User32Chain = InstanceType<ReturnType<typeof withUser32>>;",
-            1)
-          marker="          if (!data) return { eax: 2 }; // ERROR_FILE_NOT_FOUND lets the game use defaults."
-          assert s.count(marker)==1
-          instrument="""          if (globalThis.location?.hostname === 'ra2.android.local') {
-            const registryClass = id.includes('wchat\\\\sysid') ? 'AutoDet-SysID' :
-              id.includes('westwood') && valueName === 'serial' ? 'Westwood-Serial' :
-              id.includes('westwood') && ['installpath','folderpath','sku','version'].includes(valueName)
-                ? 'Westwood-' + valueName : '';
-            const view = path.includes('wow6432node') ? 'Wow6432Node' : 'nativ';
-            const evidence = registryClass + ':' + view + ':' + (data ? 'OK' : 'FEHLT');
-            if (registryClass && !ra2RegistryEvidence.has(evidence)) {
-              ra2RegistryEvidence.add(evidence);
-              console.info('[RA2-FORENSIK] Win32 RegQuery ' + registryClass +
-                ' View=' + view + ' Ergebnis=' + (data ? 'OK' : 'FEHLT') +
-                ' Typ=' + (data ? type : '-') + ' Bytes=' + (data?.length ?? 0));
-            }
-          }
-          """
-          s=s.replace(marker,instrument+marker)
-          p.write_text(s)
-
-          p=Path("src/vm86/shim/kernel32.ts")
-          s=p.read_text()
-          marker="        case 'KERNEL32.DLL!GetDriveTypeA':\n          return { eax: this.getDriveType(a[0] ?? 0) };"
-          assert s.count(marker)==1
-          instrumentation="""        case 'KERNEL32.DLL!GetDriveTypeA': {
-          const drive = this.readCString(a[0] ?? 0);
-          const result = this.getDriveType(a[0] ?? 0);
-          if (globalThis.location?.hostname === 'ra2.android.local' &&
-              drive.toUpperCase().startsWith('D:') &&
-              !ra2GuestCdTypeEvidence.has(result)) {
-            ra2GuestCdTypeEvidence.add(result);
-            console.info('[RA2-FORENSIK] Win32 GetDriveTypeA D:=' +
-              (result === DRIVE_CDROM ? 'CDROM' : result === 1 ? 'NICHT_VORHANDEN' : result));
-          }
-          return { eax: result };
-        }"""
-          s=s.replace(marker,instrumentation)
-          # The set is module-local; each VM load reports each result at most once.
-          marker="import type {"
-          # Prefer an insertion before the first import, independent of import order.
-          s="const ra2GuestCdTypeEvidence = new Set<number>();\n"+s
-          p.write_text(s)
           PY
+          python3 ../ra2-mobile-port/patch_ra2_vm_forensics.py
           cat ../ra2-mobile-port/resources/ra2vm-android.css >> src/ui/pages/game/styles.css
           pnpm install --frozen-lockfile
           pnpm run build
