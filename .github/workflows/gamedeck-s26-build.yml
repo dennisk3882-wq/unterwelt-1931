@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - gamedeck-s26-build
+      - gamedeck-s26-v3-build
     paths:
       - "gamedeck-s26/**"
       - ".github/workflows/gamedeck-s26-build.yml"
