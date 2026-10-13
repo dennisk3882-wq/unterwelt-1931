@@ -11,6 +11,12 @@ res_dir.mkdir(parents=True, exist_ok=True)
 
 text = activity.read_text(encoding="utf-8")
 
+package_marker = "package org.yuzu.yuzu_emu.gamedeck\\n"
+if package_marker not in text:
+    raise SystemExit("GameDeck package marker not found")
+if "import org.yuzu.yuzu_emu.R\\n" not in text:
+    text = text.replace(package_marker, package_marker + "\\nimport org.yuzu.yuzu_emu.R\\n", 1)
+
 marker = """        root.addView(buildBottomNavigation())
         setContentView(root)
 """
