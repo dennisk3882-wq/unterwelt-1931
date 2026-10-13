@@ -11,11 +11,11 @@ res_dir.mkdir(parents=True, exist_ok=True)
 
 text = activity.read_text(encoding="utf-8")
 
-if "import org.yuzu.yuzu_emu.R\\n" not in text:
+if "import org.yuzu.yuzu_emu.R\n" not in text:
     first_import = text.find("import ")
     if first_import < 0:
         raise SystemExit("GameDeck import block not found")
-    text = text[:first_import] + "import org.yuzu.yuzu_emu.R\\n" + text[first_import:]
+    text = text[:first_import] + "import org.yuzu.yuzu_emu.R\n" + text[first_import:]
 
 marker = """        root.addView(buildBottomNavigation())
         setContentView(root)
