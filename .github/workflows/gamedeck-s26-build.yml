@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - gamedeck-s26-v5-build
+      - gamedeck-s26-v6-build
     paths:
       - "gamedeck-s26/**"
       - ".github/workflows/gamedeck-s26-build.yml"
@@ -61,6 +61,7 @@ jobs:
           python3 gamedeck-s26/patch-v3.py gd
           python3 gamedeck-s26/patch-v4.py gd
           python3 gamedeck-s26/patch-v5.py gd
+          python3 gamedeck-s26/patch-v6.py gd
           test -f gd/tools/apply_to_eden.py
           test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckMetadataRepository.kt
@@ -70,6 +71,8 @@ jobs:
           grep -q 'onBackPressedDispatcher.addCallback' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           grep -q 'WindowInsetsCompat.Type.navigationBars' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           grep -q 'showScreenshotViewer' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
+          test -f gd/overlay/src/main/res/drawable-nodpi/gamedeck_menu_bg.webp
+          grep -q 'gamedeck_menu_bg' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
 
       - name: Clone current Eden source
         shell: bash
