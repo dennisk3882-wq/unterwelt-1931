@@ -57,8 +57,11 @@ jobs:
           mkdir -p gd
           cat gamedeck-s26/parts/overlay.b64.* | tr -d '\n\r' | base64 -d > /tmp/gamedeck-overlay.tgz
           tar -xzf /tmp/gamedeck-overlay.tgz -C gd
+          python3 gamedeck-s26/patch-v2.py gd
           test -f gd/tools/apply_to_eden.py
           test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
+          test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckMetadataRepository.kt
+          grep -q 'Über das Spiel' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
 
       - name: Clone current Eden source
         shell: bash
