@@ -76,6 +76,15 @@ jobs:
           cd ..
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > eden/src/android/local.properties
 
+          # Eden's CI SDL package currently does not always materialize the Java
+          # bridge before Kotlin compilation. Seed the matching SDL 3.4.14 Java
+          # sources explicitly so NativeLibrary can resolve org.libsdl.app.SDL.
+          rm -rf /tmp/gamedeck-sdl
+          git clone --depth 1 --branch release-3.4.14 https://github.com/libsdl-org/SDL.git /tmp/gamedeck-sdl
+          mkdir -p eden/externals/generated/sdl/java
+          cp -a /tmp/gamedeck-sdl/android-project/app/src/main/java/. eden/externals/generated/sdl/java/
+          test -f eden/externals/generated/sdl/java/org/libsdl/app/SDL.java
+
       - name: Apply GameDeck integration
         shell: bash
         run: |
