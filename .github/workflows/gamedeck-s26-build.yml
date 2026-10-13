@@ -67,7 +67,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/eden-emulator/mirror.git eden
+          mkdir eden
+          cd eden
+          git init
+          git remote add origin https://github.com/eden-emulator/mirror.git
+          git fetch --depth 1 origin d16735f5b618942136d6ab53466e3be0a382c30a
+          git checkout --detach FETCH_HEAD
+          cd ..
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > eden/src/android/local.properties
 
       - name: Apply GameDeck integration
