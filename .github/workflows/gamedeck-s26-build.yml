@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - gamedeck-s26-v6-build
+      - gamedeck-s26-v7-build
     paths:
       - "gamedeck-s26/**"
       - ".github/workflows/gamedeck-s26-build.yml"
@@ -62,6 +62,7 @@ jobs:
           python3 gamedeck-s26/patch-v4.py gd
           python3 gamedeck-s26/patch-v5.py gd
           python3 gamedeck-s26/patch-v6.py gd
+          python3 gamedeck-s26/patch-v7.py gd
           test -f gd/tools/apply_to_eden.py
           test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckMetadataRepository.kt
