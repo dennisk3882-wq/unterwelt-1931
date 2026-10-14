@@ -98,6 +98,7 @@ object GameDeckAutoTester {
     private var startedAt=0L
     private var coreAt=0L
     private var readings=mutableListOf<Double>()
+    private var stepRecorded=false
     private var results=JSONArray()
     private var logFile:File?=null
     private var firstWall=0L
@@ -129,13 +130,13 @@ object GameDeckAutoTester {
 
     /** Called from real Eden EmulationActivity callback, not guessed from FPS. */
     fun onNativeStarted() {
-        if(active && index in games.indices && waiting) {
+        if(active && index in games.indices && waiting && !stepRecorded) {
             waiting=false; coreConfirmed=true; coreAt=SystemClock.elapsedRealtime()
         }
     }
 
     fun onNativeStopped(code:Int) {
-        if(active && index in games.indices && !waiting && coreConfirmed) {
+        if(active && index in games.indices && !waiting && coreConfirmed && !stepRecorded) {
             record("CORE_VORZEITIG_BEENDET","Eden hat den Core beendet: Status "+code)
         }
     }
@@ -155,7 +156,7 @@ object GameDeckAutoTester {
             return
         }
         val game=games[index]
-        waiting=true; coreConfirmed=false; readings=mutableListOf()
+        waiting=true; coreConfirmed=false; stepRecorded=false; readings=mutableListOf()
         startedAt=SystemClock.elapsedRealtime(); coreAt=0L
         save("LAEUFT")
         io.execute {
@@ -226,7 +227,8 @@ object GameDeckAutoTester {
     }
 
     private fun record(status:String,detail:String) {
-        if(!active || index !in games.indices) return
+        if(!active || index !in games.indices || stepRecorded) return
+        stepRecorded=true
         ui.removeCallbacks(tick)
         val sorted=readings.sorted()
         val median=if(sorted.isEmpty()) 0.0 else sorted[sorted.size/2]
@@ -284,4 +286,14 @@ object GameDeckAutoTester {
     }
 }
 ''',encoding="utf-8")
+runtime=d/"GameDeckRuntime.kt"
+r=runtime.read_text()
+if r.count('const val BUILD = "GameDeck v21"')!=1: raise RuntimeError("GameDeck v22 release label missing")
+runtime.write_text(r.replace('const val BUILD = "GameDeck v21"','const val BUILD = "GameDeck v22"'))
+updater=d/"GameDeckUpdateChecker.kt"
+u=updater.read_text()
+if "private const val LOCAL_VERSION = 21" not in u: raise RuntimeError("Updater version missing")
+updater.write_text(u.replace("private const val LOCAL_VERSION = 21","private const val LOCAL_VERSION = 22"))
+code=d/"GameDeckAutoTester.kt"
+code.write_text(code.read_text().replace(r"\\n", r"\n"))
 print("v22 sequential tester ready")
