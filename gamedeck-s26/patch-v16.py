@@ -35,7 +35,7 @@ replace_once("""        root.addView(infoPanel("🔋 Systemmonitor", "Akku ${sta
         })""","devices check")
 replace_once("""    private fun externalModeText(): String {""","""    private fun consoleReadinessReport(): String {
         val status = statusProvider.snapshot()
-        val controllers = InputDevice.getDeviceIds().mapNotNull { InputDevice.getDevice(it) }
+        val controllers = InputDevice.getDeviceIds().toList().mapNotNull { InputDevice.getDevice(it) }
             .filter { org.yuzu.yuzu_emu.utils.InputHandler.isPhysicalGameController(it) }
         val display = status.externalDisplay
         val mode = runCatching { display?.mode }.getOrNull()
