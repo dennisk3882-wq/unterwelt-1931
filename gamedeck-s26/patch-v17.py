@@ -33,7 +33,7 @@ replace_one("""    private fun matchingReports() = GameDeckRuntime.reports().fil
         check("App") { packageName + " · Android " + android.os.Build.VERSION.SDK_INT }
         check("Build") { GameDeckRuntime.BUILD + " · Core " + GameDeckRuntime.CORE.take(12) }
         check("Controller") {
-            val devices = InputDevice.getDeviceIds().mapNotNull { InputDevice.getDevice(it) }
+            val devices = InputDevice.getDeviceIds().toList().mapNotNull { InputDevice.getDevice(it) }
                 .filter { InputHandler.isPhysicalGameController(it) }
             if (devices.isEmpty()) "Kein physischer Gamecontroller erkannt" else
                 devices.joinToString { it.name }
