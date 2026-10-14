@@ -205,11 +205,11 @@ class GameDeckTvPresentation(
         setContentView(root)
         first?.requestFocus()
     }
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BUTTON_B || keyCode == KeyEvent.KEYCODE_BACK) {
             dismiss(); return true
         }
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_A && event?.repeatCount == 0) {
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_A && event.repeatCount == 0) {
             currentFocus?.performClick(); return true
         }
         return super.onKeyDown(keyCode, event)
