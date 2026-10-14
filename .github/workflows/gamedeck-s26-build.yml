@@ -9,7 +9,7 @@ on:
         type: string
   push:
     branches:
-      - gamedeck-s26-v21-build
+      - gamedeck-s26-v22-build
     paths:
       - "gamedeck-s26/**"
 
@@ -91,6 +91,9 @@ jobs:
           python3 gamedeck-s26/patch-v19.py gd
           python3 gamedeck-s26/patch-v20.py gd
           python3 gamedeck-s26/patch-v21.py gd
+          python3 gamedeck-s26/patch-v22.py gd
+          grep -q 'GameDeck v22' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckTvPresentation.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckPerformanceAdvisor.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckUpdateChecker.kt
@@ -148,6 +151,9 @@ jobs:
         run: |
           set -euo pipefail
           python3 gd/tools/apply_to_eden.py eden
+          python3 gamedeck-s26/patch-v22-eden.py eden
+          grep -q 'GameDeckAutoTester.onNativeStarted' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
+          grep -q 'GameDeckAutoTester.onNativeStopped' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
           grep -q 'de.gamedeck.s26' eden/src/android/app/build.gradle.kts
           grep -q 'GameDeckActivity' eden/src/android/app/src/main/AndroidManifest.xml
           test -s eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckTvPresentation.kt
