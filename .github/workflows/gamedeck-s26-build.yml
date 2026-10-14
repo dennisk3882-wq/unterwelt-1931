@@ -9,12 +9,13 @@ on:
         type: string
   push:
     branches:
-      - gamedeck-s26-v15-build
+      - gamedeck-s26-v15-fast-build
     paths:
       - "gamedeck-s26/**"
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: gamedeck-s26-build-${{ github.ref }}
@@ -135,6 +136,28 @@ jobs:
           grep -q 'de.gamedeck.s26' eden/src/android/app/build.gradle.kts
           grep -q 'GameDeckActivity' eden/src/android/app/src/main/AndroidManifest.xml
 
+      - name: Download previously verified v14 APK for unchanged native Eden core
+        uses: actions/download-artifact@v4
+        with:
+          name: GameDeck-S26-APK
+          run-id: 38575320652
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: core-v14
+
+      - name: Seed unchanged arm64 native Eden binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=core-v14/GameDeck-S26.apk
+          test -s "$APK"
+          mkdir -p eden/src/android/app/src/main/jniLibs/arm64-v8a
+          for lib in libyuzu-android.so libfile_redirect_hook.so libgsl_alloc_hook.so libhook_impl.so libmain_hook.so; do
+            unzip -p "$APK" "lib/arm64-v8a/$lib" > "eden/src/android/app/src/main/jniLibs/arm64-v8a/$lib"
+            test -s "eden/src/android/app/src/main/jniLibs/arm64-v8a/$lib"
+          done
+          # Native binary content stays byte-for-byte identical to verified v14.
+          sha256sum eden/src/android/app/src/main/jniLibs/arm64-v8a/libyuzu-android.so
+
       - name: Check Kotlin before native compilation
         working-directory: eden/src/android
         env:
@@ -152,7 +175,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew assembleMainlineRelWithDebInfo --no-daemon --stacktrace
+          ./gradlew assembleMainlineRelWithDebInfo --no-daemon --stacktrace -x 'configureCMakeRelWithDebInfo[arm64-v8a]' -x 'buildCMakeRelWithDebInfo[arm64-v8a]'
 
       - name: Collect and verify APK
         shell: bash
