@@ -5,7 +5,7 @@ folder=root/"overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck"
 p=folder/"GameDeckActivity.kt"
 s=p.read_text(encoding="utf-8")
 old='        root.addView(sectionTitle("Spielinfos & Bilder"))'
-new='''        val advisor = GameDeckPerformanceAdvisor.analyze(game)
+new='''        val advisor = GameDeckPerformanceAdvisor.analyze(this, game)
         root.addView(infoPanel("Automatische Leistungsanalyse", advisor.details))
         val candidate = advisor.recommended
         if (candidate != null && candidate != selectedMode) {
@@ -49,7 +49,7 @@ object GameDeckPerformanceAdvisor {
         val mid = sorted.size/2
         return if (sorted.size%2==1) sorted[mid] else (sorted[mid-1]+sorted[mid])/2
     }
-    fun analyze(game: Game): Result {
+    fun analyze(context: android.content.Context, game: Game): Result {
         val records = GameDeckRuntime.reports().mapNotNull { file ->
             runCatching {
                 val report = JSONObject(file.readText())
@@ -84,7 +84,7 @@ object GameDeckPerformanceAdvisor {
         val byMode=records.groupBy { it.mode }.mapValues { (_,v) ->
             Recorded(v.first().mode,median(v.map { it.median }),median(v.map { it.low10 }),v.sumOf { it.samples })
         }
-        val current=GameDeckProfileEngine.selectedMode(GameDeckRuntime.appContext(),game)
+        val current=GameDeckProfileEngine.selectedMode(context,game)
         val descriptions=byMode.values.sortedBy { it.mode.ordinal }.joinToString("\n") {
             it.mode.label + ": Median " + it.median.roundToInt() + " FPS · " +
                 "10%-Untergrenze " + it.low10.roundToInt() + " FPS · " +
