@@ -9,7 +9,7 @@ on:
         type: string
   push:
     branches:
-      - gamedeck-s26-v22-build
+      - gamedeck-s26-v23-build
     tags:
       - gamedeck-s26-v*
     paths:
@@ -94,7 +94,10 @@ jobs:
           python3 gamedeck-s26/patch-v20.py gd
           python3 gamedeck-s26/patch-v21.py gd
           python3 gamedeck-s26/patch-v22.py gd
-          grep -q 'GameDeck v22' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          python3 gamedeck-s26/patch-v23.py gd
+          grep -q 'GameDeck v23' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckVisualProbe.kt
+          test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckSmartAnalyzer.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckTvPresentation.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckPerformanceAdvisor.kt
@@ -153,6 +156,8 @@ jobs:
           set -euo pipefail
           python3 gd/tools/apply_to_eden.py eden
           python3 gamedeck-s26/patch-v22-eden.py eden
+          python3 gamedeck-s26/patch-v23-eden.py eden
+          grep -q 'GameDeckAutoTester.onNativeStarted(this)' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
           grep -q 'GameDeckAutoTester.onNativeStarted' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
           grep -q 'GameDeckAutoTester.onNativeStopped' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
           grep -q 'de.gamedeck.s26' eden/src/android/app/build.gradle.kts
