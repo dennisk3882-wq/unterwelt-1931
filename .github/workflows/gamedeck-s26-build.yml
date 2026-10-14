@@ -148,7 +148,7 @@ jobs:
       - name: Download previously verified v14 APK for unchanged native Eden core
         uses: actions/download-artifact@v4
         with:
-          name: GameDeck-S26-v18-APK
+          name: GameDeck-S26-APK
           run-id: 38575320652
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: core-v14
