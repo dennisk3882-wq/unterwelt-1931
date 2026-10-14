@@ -9,7 +9,7 @@ on:
         type: string
   push:
     branches:
-      - gamedeck-s26-v14-build
+      - gamedeck-s26-v15-build
     paths:
       - "gamedeck-s26/**"
 
@@ -80,6 +80,9 @@ jobs:
           python3 gamedeck-s26/patch-v12.py gd
           python3 gamedeck-s26/patch-v13.py gd
           python3 gamedeck-s26/patch-v14.py gd
+          python3 gamedeck-s26/patch-v15.py gd
+          grep -q 'exportLocalSettings' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
+          grep -q 'filter_favorites_only' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           test -f gd/tools/apply_to_eden.py
           test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckMetadataRepository.kt
