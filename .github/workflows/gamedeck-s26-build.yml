@@ -151,7 +151,7 @@ jobs:
           APK=core-v14/GameDeck-S26.apk
           test -s "$APK"
           mkdir -p eden/src/android/app/src/main/jniLibs/arm64-v8a
-          for lib in libyuzu-android.so libfile_redirect_hook.so libgsl_alloc_hook.so libhook_impl.so libmain_hook.so; do
+          for lib in libyuzu-android.so libfile_redirect_hook.so libgsl_alloc_hook.so libhook_impl.so libmain_hook.so libVkLayer_khronos_validation.so; do
             unzip -p "$APK" "lib/arm64-v8a/$lib" > "eden/src/android/app/src/main/jniLibs/arm64-v8a/$lib"
             test -s "eden/src/android/app/src/main/jniLibs/arm64-v8a/$lib"
           done
