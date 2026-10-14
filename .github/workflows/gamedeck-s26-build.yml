@@ -97,7 +97,6 @@ jobs:
           grep -q 'GameDeck v21' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
           grep -q 'consoleReadinessReport' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           grep -q 'fullSystemCheck' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckTechnicalActivity.kt
-          grep -q 'GameDeck v18' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
           grep -q 'exportLocalSettings' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           grep -q 'filter_favorites_only' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           test -f gd/tools/apply_to_eden.py
