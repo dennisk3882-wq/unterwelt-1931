@@ -12,7 +12,6 @@ on:
       - gamedeck-s26-v12-build
     paths:
       - "gamedeck-s26/**"
-      - ".github/workflows/gamedeck-s26-build.yml"
 
 permissions:
   contents: read
@@ -92,10 +91,12 @@ jobs:
           grep -q 'gamedeck_menu_bg' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
 
       - name: Clone current Eden source
+        env:
+          EDEN_SOURCE_REF: ${{ inputs.eden_ref || 'd16735f5b618942136d6ab53466e3be0a382c30a' }}
         shell: bash
         run: |
           set -euo pipefail
-          EDEN_REF="${{ inputs.eden_ref || 'd16735f5b618942136d6ab53466e3be0a382c30a' }}"
+          EDEN_REF="$EDEN_SOURCE_REF"
           if [[ ! "$EDEN_REF" =~ ^[0-9a-f]{40}$ ]]; then exit 1; fi
           python3 - "$EDEN_REF" <<'PY'
           from pathlib import Path
