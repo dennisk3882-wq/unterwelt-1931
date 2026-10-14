@@ -9,3 +9,5 @@
 * Unveränderter nativer Emulatorcore (Hashvergleich mit v14)
 
 Die tatsächliche Funktionsprüfung aller Spiele benötigt ein echtes Android-Gerät mit den legal vorhandenen Spieldateien und gegebenenfalls zugehöriger Firmware.
+
+Build-Konfiguration v22 korrigiert; Start-/Stoppsignale werden im Kotlin-Testlauf separat validiert.
