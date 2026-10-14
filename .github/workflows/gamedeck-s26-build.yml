@@ -9,7 +9,7 @@ on:
         type: string
   push:
     branches:
-      - gamedeck-s26-v13-build
+      - gamedeck-s26-v14-build
     paths:
       - "gamedeck-s26/**"
 
@@ -79,6 +79,7 @@ jobs:
           python3 gamedeck-s26/patch-v11.py gd
           python3 gamedeck-s26/patch-v12.py gd
           python3 gamedeck-s26/patch-v13.py gd
+          python3 gamedeck-s26/patch-v14.py gd
           test -f gd/tools/apply_to_eden.py
           test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckMetadataRepository.kt
