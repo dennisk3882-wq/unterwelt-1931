@@ -9,7 +9,7 @@ on:
         type: string
   push:
     branches:
-      - gamedeck-s26-v18-build
+      - gamedeck-s26-v21-build
     paths:
       - "gamedeck-s26/**"
 
@@ -88,6 +88,13 @@ jobs:
           python3 gamedeck-s26/patch-v16.py gd
           python3 gamedeck-s26/patch-v17.py gd
           python3 gamedeck-s26/patch-v18.py gd
+          python3 gamedeck-s26/patch-v19.py gd
+          python3 gamedeck-s26/patch-v20.py gd
+          python3 gamedeck-s26/patch-v21.py gd
+          test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckTvPresentation.kt
+          test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckPerformanceAdvisor.kt
+          test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckUpdateChecker.kt
+          grep -q 'GameDeck v21' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
           grep -q 'consoleReadinessReport' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           grep -q 'fullSystemCheck' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckTechnicalActivity.kt
           grep -q 'GameDeck v18' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
@@ -144,6 +151,9 @@ jobs:
           python3 gd/tools/apply_to_eden.py eden
           grep -q 'de.gamedeck.s26' eden/src/android/app/build.gradle.kts
           grep -q 'GameDeckActivity' eden/src/android/app/src/main/AndroidManifest.xml
+          test -s eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckTvPresentation.kt
+          test -s eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckPerformanceAdvisor.kt
+          test -s eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckUpdateChecker.kt
 
       - name: Download previously verified v14 APK for unchanged native Eden core
         uses: actions/download-artifact@v4
