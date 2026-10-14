@@ -123,6 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
+          ./gradlew compileMainlineRelWithDebInfoKotlin --no-daemon --stacktrace -x 'configureCMakeRelWithDebInfo[arm64-v8a]' -x 'buildCMakeRelWithDebInfo[arm64-v8a]'
           ./gradlew assembleMainlineRelWithDebInfo --no-daemon --stacktrace
 
       - name: Collect and verify APK
