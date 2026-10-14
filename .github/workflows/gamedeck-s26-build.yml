@@ -10,11 +10,13 @@ on:
   push:
     branches:
       - gamedeck-s26-v22-build
+    tags:
+      - gamedeck-s26-v*
     paths:
       - "gamedeck-s26/**"
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 concurrency:
@@ -226,6 +228,20 @@ jobs:
                   assert hashlib.sha256(base.read(path)).digest()==hashlib.sha256(release.read(path)).digest(), f'Changed native core: {path}'
               print('Seven arm64 libraries retained byte-for-byte from v14')
           PY
+
+      - name: Publish verified GameDeck APK on signed release tag
+        if: startsWith(github.ref, 'refs/tags/gamedeck-s26-v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="$GITHUB_REF_NAME"
+          test -s artifacts/GameDeck-S26.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
+          cp artifacts/GameDeck-S26.apk "artifacts/GameDeck-S26-${TAG#gamedeck-s26-}.apk"
+          sha256sum "artifacts/GameDeck-S26-${TAG#gamedeck-s26-}.apk" > artifacts/SHA256SUMS.txt
+          gh release create "$TAG"             "artifacts/GameDeck-S26-${TAG#gamedeck-s26-}.apk"             artifacts/SHA256SUMS.txt             --repo "$GITHUB_REPOSITORY"             --title "GameDeck S26 ${TAG#gamedeck-s26-}"             --notes "Signiertes GameDeck-Update; manuelle Installation über Android. Gameplay- und HDMI-Tests müssen auf dem Zielgerät geprüft werden."             --verify-tag
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
