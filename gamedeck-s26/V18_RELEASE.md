@@ -13,3 +13,5 @@ Native upgrade based on the existing Eden integration and original package, with
 - Native v14 Eden binary files retained and hash-checked. No automatic core rollback.
 - Release requires successful signed APK build and S26 Ultra real-device smoke tests.
 - A full secondary-display console library, automatic game benchmark and remote emulator control require additional integrations and are not claimed complete.
+
+Rebuild: fixed source artifact download name; native parity check enabled.
