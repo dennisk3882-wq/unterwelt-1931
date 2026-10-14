@@ -2,9 +2,14 @@ name: Build GameDeck S26 APK
 
 on:
   workflow_dispatch:
+    inputs:
+      eden_ref:
+        description: 'Optional: full official Eden commit SHA for a candidate build'
+        required: false
+        type: string
   push:
     branches:
-      - gamedeck-s26-v11-build
+      - gamedeck-s26-v12-build
     paths:
       - "gamedeck-s26/**"
       - ".github/workflows/gamedeck-s26-build.yml"
@@ -73,6 +78,7 @@ jobs:
           python3 gamedeck-s26/patch-v9.py gd
           python3 gamedeck-s26/patch-v10.py gd
           python3 gamedeck-s26/patch-v11.py gd
+          python3 gamedeck-s26/patch-v12.py gd
           test -f gd/tools/apply_to_eden.py
           test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           test -f gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckMetadataRepository.kt
@@ -89,11 +95,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          EDEN_REF="${{ inputs.eden_ref || 'd16735f5b618942136d6ab53466e3be0a382c30a' }}"
+          if [[ ! "$EDEN_REF" =~ ^[0-9a-f]{40}$ ]]; then exit 1; fi
+          python3 - "$EDEN_REF" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path('gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt')
+          p.write_text(p.read_text().replace('d16735f5b618942136d6ab53466e3be0a382c30a', sys.argv[1]))
+          PY
           mkdir eden
           cd eden
           git init
           git remote add origin https://github.com/eden-emulator/mirror.git
-          git fetch --depth 1 origin d16735f5b618942136d6ab53466e3be0a382c30a
+          git fetch --depth 1 origin "$EDEN_REF"
           git checkout --detach FETCH_HEAD
           cd ..
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > eden/src/android/local.properties
@@ -115,7 +129,7 @@ jobs:
           grep -q 'de.gamedeck.s26' eden/src/android/app/build.gradle.kts
           grep -q 'GameDeckActivity' eden/src/android/app/src/main/AndroidManifest.xml
 
-      - name: Build GameDeck APK
+      - name: Check Kotlin before native compilation
         working-directory: eden/src/android
         env:
           ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
@@ -124,6 +138,14 @@ jobs:
           set -euo pipefail
           chmod +x gradlew
           ./gradlew compileMainlineRelWithDebInfoKotlin --no-daemon --stacktrace -x 'configureCMakeRelWithDebInfo[arm64-v8a]' -x 'buildCMakeRelWithDebInfo[arm64-v8a]'
+      
+      - name: Build GameDeck APK and Eden core
+        working-directory: eden/src/android
+        env:
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+        shell: bash
+        run: |
+          set -euo pipefail
           ./gradlew assembleMainlineRelWithDebInfo --no-daemon --stacktrace
 
       - name: Collect and verify APK
