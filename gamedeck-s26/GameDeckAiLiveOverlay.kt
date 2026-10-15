@@ -126,7 +126,7 @@ object GameDeckAiLiveOverlay {
                 setStroke(dp(screen, 1), 0xFF5E7186.toInt())
             }
             visibility = View.GONE
-            setOnClickListener { hidden = false; card.visibility = View.VISIBLE; show.visibility = View.GONE; panel?.visibility = View.VISIBLE }
+            setOnClickListener { hidden = false; cardView?.visibility = View.VISIBLE; minimized?.visibility = View.GONE; panel?.visibility = View.VISIBLE }
         }
         // Use a single full-width overlay container so the minimized chip remains tappable.
         val wrapper = FrameLayout(screen)
