@@ -183,12 +183,12 @@ s=patch(s,'            .put("visual_classification",frameClass)',
 p.write_text(s,encoding="utf-8")
 
 p=d/"GameDeckActivity.kt";s=p.read_text(encoding="utf-8")
-s=patch(s,'        root.addView(actionCard("Autonomer Spiele-Stabilitätstest",',
+s=patch(s,'        root.addView(actionCard("Intelligenter KI-Spieletester",',
 '''        root.addView(actionCard("Letzten KI-Testbericht",
             "Bild, Texterkennung, Fehler und Controlleraktionen") {
             showAutoTestReport()
         })
-        root.addView(actionCard("Autonomer Spiele-Stabilitätstest",''',"report UI")
+        root.addView(actionCard("Intelligenter KI-Spieletester",''',"report UI")
 s=patch(s,'                .setMessage("Die KI sendet reale Emulator-Eingaben und beobachtet Bildveränderungen. Ein laufendes Spiel darf nicht aktiv sein. Bitte Spielstand vorher sichern; echte Eingaben können Fortschritte und Einstellungen ändern.")',
 '''                .setMessage("Bis zu 3 Minuten aktiver KI-Einzeltest: GameDeck erkennt Start-, Lade- und Fehlertexte lokal und plant begrenzte Testaktionen zur Spielart. Kein garantiertes Durchspielen. Vorher Spielstände sichern!")''',"AI consent")
 p.write_text(s,encoding="utf-8")
