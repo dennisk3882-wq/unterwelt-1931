@@ -103,7 +103,7 @@ p=d/"GameDeckHardwareAudit.kt";s=p.read_text(encoding="utf-8")
 s=once(s,"import org.yuzu.yuzu_emu.utils.InputHandler",
 '''import org.yuzu.yuzu_emu.utils.InputHandler
 import org.yuzu.yuzu_emu.features.input.NativeInput''',"native input readiness")
-s=once(s,'''            append("Physische Gamepads: ").append(controllers.size).append("\\n")''',
+s=once(s,r'''            append("Physische Gamepads: ").append(controllers.size).append("\\n")''',
 '''            val nativeInputDevices=runCatching { NativeInput.getInputDevices().toList() }
             append("Eden registrierte Eingabegeräte: ")
                 .append(nativeInputDevices.getOrNull()?.size ?: "NICHT LESBAR")
