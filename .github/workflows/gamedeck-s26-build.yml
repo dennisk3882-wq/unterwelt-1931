@@ -9,7 +9,7 @@ on:
         type: string
   push:
     branches:
-      - gamedeck-s26-v25-build
+      - gamedeck-s26-v26-build
     tags:
       - gamedeck-s26-v*
     paths:
@@ -97,7 +97,10 @@ jobs:
           python3 gamedeck-s26/patch-v23.py gd
           python3 gamedeck-s26/patch-v24.py gd
           python3 gamedeck-s26/patch-v25.py gd
-          grep -q 'GameDeck v25' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          python3 gamedeck-s26/patch-v26.py gd
+          grep -q 'GameDeck v26' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          grep -q 'GameDeckAutoPilot.configure' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
+          test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckHardwareAudit.kt
           grep -q 'KI aktiv spielen lassen' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           grep -q 'NativeInput.onGamePadButtonEvent' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'recoverInterruptedRun' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
@@ -254,8 +257,8 @@ jobs:
           sha256sum "artifacts/GameDeck-S26-${TAG#gamedeck-s26-}.apk" > artifacts/SHA256SUMS.txt
           gh release create "$TAG"             "artifacts/GameDeck-S26-${TAG#gamedeck-s26-}.apk"             artifacts/SHA256SUMS.txt             --repo "$GITHUB_REPOSITORY"             --title "GameDeck S26 ${TAG#gamedeck-s26-}"             --notes "Signiertes GameDeck-Update; manuelle Installation über Android. Gameplay- und HDMI-Tests müssen auf dem Zielgerät geprüft werden."             --verify-tag
 
-      - name: Publish opt-in GameDeck v25 AI preview release
-        if: github.ref == 'refs/heads/gamedeck-s26-v25-build'
+      - name: Publish opt-in GameDeck v26 hardware and AI preview
+        if: github.ref == 'refs/heads/gamedeck-s26-v26-build'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -263,17 +266,17 @@ jobs:
           set -euo pipefail
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
           test -s artifacts/GameDeck-S26.apk
-          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v25.apk
-          sha256sum artifacts/GameDeck-S26-v25.apk > artifacts/GameDeck-S26-v25.sha256
-          gh release create gamedeck-s26-v25 \
-            artifacts/GameDeck-S26-v25.apk \
-            artifacts/GameDeck-S26-v25.sha256 \
+          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v26.apk
+          sha256sum artifacts/GameDeck-S26-v26.apk > artifacts/GameDeck-S26-v26.sha256
+          gh release create gamedeck-s26-v26 \
+            artifacts/GameDeck-S26-v26.apk \
+            artifacts/GameDeck-S26-v26.sha256 \
             --repo "$GITHUB_REPOSITORY" \
-            --title "GameDeck S26 v25 · KI-Spieltester Preview" \
+            --title "GameDeck S26 v26 · Adaptive Agent Preview" \
             --target "$GITHUB_SHA" \
             --prerelease \
-            --notes "Experimentelle KI-Spielsteuerung: echte Eden-Controlleraktionen nach expliziter Zustimmung. Bildreaktion wird gemessen, kein autonomes Durchspielen beliebiger Spiele bewiesen. Vorher Spielfortschritt sichern, da reale Eingaben Spielstände ändern können."
-
+            --notes "Experimentelle native KI-Spielsteuerung mit Controllerzuordnung und lokalem Bildfeedback-Lernen. HDMI-/Controller-Check zeigt Android-Hardware-Evidenz. Keine garantierte Spielbarkeit oder vollständige KI-Spielhandlung; vorher Spielstände sichern."
+ 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
