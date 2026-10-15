@@ -5,3 +5,5 @@ Der experimentelle KI-Spieltester verwendet jetzt bei angeschlossenem physischen
 Neue Funktionen: einzelner KI-Test direkt auf einer Spieleseite; verbesserter Bericht zu Eingabekanal und Beobachtungen; lokaler Überblick der echten Android-/DeX-Displays und Gamepads mit Auflösung und Bildwiederholrate. Keine erfundenen HDMI-Handshakes oder Controllerbestätigungen.
 
 Grenzen: kein universelles trainiertes KI-Spielmodell, kein automatischer vollständiger Story-Abschluss; Hardwaretests auf Samsung Galaxy S26 Ultra sind erforderlich. Weiterhin unveränderte Native-Core-Bibliotheken und bestehende APK-Signatur, experimentelle Vorabversion.
+
+- Ergänzung: echter nativer Profilwechsel vor jedem automatisierten Start; kontrollierter Dreifachvergleich Performance/Empfohlen/Qualität (75s je Profil) mit Messwerten und evidenzgebundener Auswahl für nächsten Start; andernfalls Profil-Wiederherstellung.
