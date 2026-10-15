@@ -64,6 +64,8 @@ s=change(s,'''    fun setEnabled(enabled:Boolean) {
     }''',"dynamic port routing")
 s=s.replace("NativeInput.onGamePadButtonEvent(GUID,PORT,","NativeInput.onGamePadButtonEvent(controlGuid,controlPort,")
 s=s.replace("NativeInput.onGamePadAxisEvent(GUID,PORT,","NativeInput.onGamePadAxisEvent(controlGuid,controlPort,")
+s=s.replace("GUID,PORT,choice.button,NativeInput.ButtonState.RELEASED",
+            "controlGuid,controlPort,choice.button,NativeInput.ButtonState.RELEASED")
 s=change(s,'''        if(stepCount>0 && captures>previousCaptures) {
             val change=totalMotion-previousMotion
             if(change>0.014) {
@@ -189,7 +191,7 @@ object GameDeckHardwareAudit {
     fun report(context:Context):String {
         val displays=(context.getSystemService(Context.DISPLAY_SERVICE)
             as DisplayManager).displays
-        val controllers=InputDevice.getDeviceIds()
+        val controllers=InputDevice.getDeviceIds().toList()
             .mapNotNull { InputDevice.getDevice(it) }
             .filter { InputHandler.isPhysicalGameController(it) }
         val external=displays.filter { it.displayId!=Display.DEFAULT_DISPLAY }
