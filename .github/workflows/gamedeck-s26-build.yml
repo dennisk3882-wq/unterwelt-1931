@@ -98,6 +98,9 @@ jobs:
           python3 gamedeck-s26/patch-v24.py gd
           python3 gamedeck-s26/patch-v25.py gd
           python3 gamedeck-s26/patch-v26.py gd
+          python3 gamedeck-s26/patch-v26b.py gd
+          grep -q 'startBenchmark' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
+          grep -q 'GameDeckProfileEngine.apply(activity,game,mode).getOrThrow()' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
           grep -q 'GameDeck v26' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
           grep -q 'GameDeckAutoPilot.configure' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckHardwareAudit.kt
