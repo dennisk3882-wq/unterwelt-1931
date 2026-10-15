@@ -108,7 +108,7 @@ s=one(s,'''            val recovery=j.optString("recovery_note")''',
             if(benchmark.isNotBlank()) append("Profilvergleich: ")
                 .append(benchmark).append("\\n\\n")
             val recovery=j.optString("recovery_note")''',"benchmark report")
-s=one(s,'''                append("  ").append(item.optString("detail")).append("\\n")''',
+s=one(s,'''                append("\\n").append("  ").append(item.optString("detail")).append("\\n")''',
 '''                append("  ").append(item.optString("detail"))
                     .append(" · Profil: ").append(item.optString("profile_mode","unbekannt"))
                     .append("\\n")''',"show modes in each report")
