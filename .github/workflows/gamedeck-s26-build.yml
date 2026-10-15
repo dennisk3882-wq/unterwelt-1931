@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - gamedeck-s26-v28-build
+      - gamedeck-s26-v29-build
     tags:
       - gamedeck-s26-v*
     paths:
@@ -101,7 +102,10 @@ jobs:
           python3 gamedeck-s26/patch-v26b.py gd
           python3 gamedeck-s26/patch-v27.py gd
           python3 gamedeck-s26/patch-v28.py gd
-          grep -q 'GameDeck v28' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          python3 gamedeck-s26/patch-v29.py gd
+          grep -q 'GameDeck v29' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAiLiveOverlay.kt
+          grep -q 'live_step_count' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'GameDeckSceneObserver' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckVisualProbe.kt
           grep -q 'GameDeckSceneObserver' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckSceneObserver.kt
           grep -q 'AI_SINGLE_WINDOW' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
@@ -178,10 +182,13 @@ jobs:
           python3 gamedeck-s26/patch-v22-eden.py eden
           python3 gamedeck-s26/patch-v23-eden.py eden
           python3 gamedeck-s26/patch-v28-eden.py eden
+          python3 gamedeck-s26/patch-v29-eden.py eden
           grep -q 'com.google.mlkit:text-recognition' eden/src/android/app/build.gradle.kts
           grep -q 'GameDeckAutoTester.onNativeStarted(this)' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
           grep -q 'GameDeckAutoTester.onNativeStarted' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
           grep -q 'GameDeckAutoTester.onNativeStopped' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
+          grep -q 'GameDeckAiLiveOverlay.attach(this)' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
+          grep -q 'GameDeckAiLiveOverlay.detach()' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
           grep -q 'de.gamedeck.s26' eden/src/android/app/build.gradle.kts
           grep -q 'GameDeckActivity' eden/src/android/app/src/main/AndroidManifest.xml
           test -s eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckTvPresentation.kt
@@ -289,6 +296,27 @@ jobs:
             --target "$GITHUB_SHA" \
             --prerelease \
             --notes "Lokale OCR von Spielszenen (Startmenü, Game Over, Laden, Fehler, möglicher Levelabschluss) und begrenzte kontextabhängige Controllersteuerung. Maximal 3 Minuten je KI-Einzeltest. Nicht in allen Spielen validiert; kein universelles trainiertes Gameplay-Modell. Vor aktivem Test Spielstände sichern."
+
+
+      - name: Publish GameDeck v29 visible AI test preview
+        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
+          test -s artifacts/GameDeck-S26.apk
+          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v29.apk
+          sha256sum artifacts/GameDeck-S26-v29.apk > artifacts/GameDeck-S26-v29.sha256
+          gh release create gamedeck-s26-v29 \\
+            artifacts/GameDeck-S26-v29.apk \\
+            artifacts/GameDeck-S26-v29.sha256 \\
+            --repo "$GITHUB_REPOSITORY" \\
+            --title "GameDeck S26 v29 · Visible AI Test HUD" \\
+            --target "$GITHUB_SHA" \\
+            --prerelease \\
+            --notes "Live-Overlay während des aktiven KI-Tests: Strategie, Ziel, Aktionszähler, letzte Aktion, Bildreaktion und OCR-Szene. Anzeige wird beim Beenden der Emulation entfernt. Noch kein universell trainiertes Gameplay-Modell; echtes Zielgerät-Testing erforderlich."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
