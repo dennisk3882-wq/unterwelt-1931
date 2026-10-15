@@ -23,7 +23,9 @@ import java.lang.ref.WeakReference
 object GameDeckAiLiveOverlay {
     private val handler = Handler(Looper.getMainLooper())
     private var activity = WeakReference<Activity>(null)
-    private var panel: LinearLayout? = null
+    private var panel: FrameLayout? = null
+    private var cardView: LinearLayout? = null
+    private var minimized: TextView? = null
     private var status: TextView? = null
     private var hidden = false
     private var attached = false
@@ -36,9 +38,10 @@ object GameDeckAiLiveOverlay {
                 return
             }
             val active = runCatching { GameDeckAutoPilot.isRunning() }.getOrDefault(false)
-            val card = panel
-            if (active && card == null) createPanel(screen)
-            panel?.visibility = if (active && !hidden) View.VISIBLE else View.GONE
+            if (active && panel == null) createPanel(screen)
+            panel?.visibility = if (active) View.VISIBLE else View.GONE
+            cardView?.visibility = if (hidden) View.GONE else View.VISIBLE
+            minimized?.visibility = if (hidden) View.VISIBLE else View.GONE
             if (active) updateStatus()
             handler.postDelayed(this, 700L)
         }
@@ -59,6 +62,8 @@ object GameDeckAiLiveOverlay {
         val parent = view?.parent as? ViewGroup
         if (parent != null) parent.removeView(view)
         panel = null
+        cardView = null
+        minimized = null
         status = null
         activity.clear()
         attached = false
@@ -97,7 +102,7 @@ object GameDeckAiLiveOverlay {
             minHeight = dp(screen, 30)
             minimumHeight = dp(screen, 30)
             setPadding(0, 0, 0, 0)
-            setOnClickListener { hidden = true; card.visibility = View.GONE }
+            setOnClickListener { hidden = true; card.visibility = View.GONE; show.visibility = View.VISIBLE }
         }
         header.addView(hide, LinearLayout.LayoutParams(dp(screen, 38), dp(screen, 32)))
         card.addView(header)
@@ -121,7 +126,7 @@ object GameDeckAiLiveOverlay {
                 setStroke(dp(screen, 1), 0xFF5E7186.toInt())
             }
             visibility = View.GONE
-            setOnClickListener { hidden = false; panel?.visibility = View.VISIBLE }
+            setOnClickListener { hidden = false; card.visibility = View.VISIBLE; show.visibility = View.GONE; panel?.visibility = View.VISIBLE }
         }
         // Use a single full-width overlay container so the minimized chip remains tappable.
         val wrapper = FrameLayout(screen)
@@ -135,14 +140,10 @@ object GameDeckAiLiveOverlay {
         decor.addView(wrapper, params)
         // Store wrapper as the removable root; card remains the status target.
         wrapper.tag = "gamedeck-ai-live-overlay"
-        panel = wrapper as? LinearLayout ?: run {
-            // Keep the wrapper as a ViewGroup, while status references its child card.
-            wrapper.setTag(android.R.id.content, card)
-            card
-        }
+        panel = wrapper
+        cardView = card
+        minimized = show
         status = body
-        // Retain the wrapper explicitly through the card's parent for clean teardown.
-        card.setTag(android.R.id.custom, wrapper)
         updateStatus()
     }
 
