@@ -7,3 +7,5 @@
 - Keine Behauptung, dass Bildbewegung einem erfolgreichen Spielzug oder ein erkannter Sieg einem vollständigen Levelabschluss entspricht.
 
 **Einschränkung:** Das ist eine sichtbare Statusanzeige über dem tatsächlich laufenden Emulator, kein Beweis für universelle KI-Spielkompetenz. Die konkrete Spielsteuerung und Anzeige müssen auf dem Zielgerät getestet werden.
+
+Build-Prüfung: Kotlin-Kompilierung und APK-Integrität werden im CI-Workflow verifiziert.
