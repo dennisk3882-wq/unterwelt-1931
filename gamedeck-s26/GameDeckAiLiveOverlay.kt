@@ -102,7 +102,7 @@ object GameDeckAiLiveOverlay {
             minHeight = dp(screen, 30)
             minimumHeight = dp(screen, 30)
             setPadding(0, 0, 0, 0)
-            setOnClickListener { hidden = true; card.visibility = View.GONE; show.visibility = View.VISIBLE }
+            setOnClickListener { hidden = true; card.visibility = View.GONE }
         }
         header.addView(hide, LinearLayout.LayoutParams(dp(screen, 38), dp(screen, 32)))
         card.addView(header)
