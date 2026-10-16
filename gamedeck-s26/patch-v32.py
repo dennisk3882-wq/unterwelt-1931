@@ -134,6 +134,17 @@ s = once(s, '''        .put("live_last_outcome",lastOutcome)
 
 p.write_text(s, encoding="utf-8")
 
+# Surface anti-loop state in the existing live HUD so recovery is observable.
+p = d / "GameDeckAiLiveOverlay.kt"
+s = p.read_text(encoding="utf-8")
+s = once(s, '''        val step = agent?.optInt("live_step_count", 0) ?: 0''', '''        val step = agent?.optInt("live_step_count", 0) ?: 0
+        val recoveries = agent?.optInt("episode_recoveries", 0) ?: 0
+        val noResponseStreak = agent?.optInt("no_response_streak", 0) ?: 0''', "HUD episode telemetry")
+s = once(s, '''            "Bildreaktion: $outcome\\nSzene: $sceneName" +''', '''            "Bildreaktion: $outcome\\n" +
+            "Episode-Recovery: $recoveries · ohne Reaktion: $noResponseStreak\\n" +
+            "Szene: $sceneName" +''', "HUD recovery line")
+p.write_text(s, encoding="utf-8")
+
 p = d / "GameDeckRuntime.kt"
 s = p.read_text(encoding="utf-8")
 s = once(s, 'const val BUILD = "GameDeck v31"', 'const val BUILD = "GameDeck v32"', "runtime version")
