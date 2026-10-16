@@ -105,7 +105,11 @@ jobs:
           python3 gamedeck-s26/patch-v29.py gd
           python3 gamedeck-s26/patch-v30.py gd
           python3 gamedeck-s26/patch-v31.py gd
-          grep -q 'GameDeck v31' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          python3 gamedeck-s26/patch-v32.py gd
+          grep -q 'GameDeck v32' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          grep -q 'chooseWithEpisodeMemory' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
+          grep -q 'episode_recoveries' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
+          grep -q 'recent_action_memory' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'goalHint(savedGoal)' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
           grep -q 'current_goal' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
@@ -347,6 +351,26 @@ jobs:
             --target "$GITHUB_SHA" \
             --prerelease \
             --notes "Co-op-Coach mit lokal gespeicherter Zielbeschreibung und vorsichtigen zielbezogenen Hinweisen für Bosskämpfe, Rätsel, Plattformlevel, Rennen und Suche. Die Hinweise kombinieren die Nutzereingabe mit lokaler OCR. Keine Eingaben durch den Coach; noch kein autonomer zweiter Spieler oder universeller Game-Solver."
+
+      - name: Publish GameDeck v32 episode-memory AI preview
+        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
+          test -s artifacts/GameDeck-S26.apk
+          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v32.apk
+          sha256sum artifacts/GameDeck-S26-v32.apk > artifacts/GameDeck-S26-v32.sha256
+          gh release create gamedeck-s26-v32 \
+            artifacts/GameDeck-S26-v32.apk \
+            artifacts/GameDeck-S26-v32.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "GameDeck S26 v32 · Episode Memory and Anti-loop Recovery" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --notes "Pro Spiel persistierte Aktionshistorie und begrenzte Anti-Loop-Erholung nach wiederholter fehlender Bildreaktion. Die Reaktion basiert auf visueller Veränderung und beweist weder Fortschritt noch Sieg. Kein universeller Game-Solver; Co-op-Coach steuert keinen zweiten Spieler."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
