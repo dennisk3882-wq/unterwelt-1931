@@ -1,4 +1,4 @@
-# GameDeck v33: OCR scene-aware action gate for loading, pause, terminal/error states.
+# GameDeck v33: OCR scene-aware action gate for loading, pause, terminal/error states.\n# Re-trigger build after workflow wiring; HUD patch follows v32 episode telemetry.
 from pathlib import Path
 import sys
 
@@ -51,7 +51,7 @@ p = d / "GameDeckAiLiveOverlay.kt"
 s = p.read_text(encoding="utf-8")
 s = once(s, '''        val outcome = agent?.optString("live_last_outcome", "noch keine Rückmeldung") ?: "noch keine Rückmeldung"''', '''        val outcome = agent?.optString("live_last_outcome", "noch keine Rückmeldung") ?: "noch keine Rückmeldung"
         val sceneGate = agent?.optString("scene_gate", "NONE") ?: "NONE"''', "HUD gate value")
-s = once(s, '''            "Bildreaktion: $outcome\\nSzene: $sceneName" +''', '''            "Bildreaktion: $outcome\\nSzene: $sceneName · Eingabesperre: $sceneGate" +''', "HUD gate display")
+s = once(s, '''            "Szene: $sceneName" +''', '''            "Szene: $sceneName · Eingabesperre: $sceneGate" +''', "HUD gate display")
 p.write_text(s, encoding="utf-8")
 
 p = d / "GameDeckRuntime.kt"
