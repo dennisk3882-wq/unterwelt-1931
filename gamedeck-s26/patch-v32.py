@@ -124,7 +124,11 @@ s = once(s, '''        .put("learning_feedback_samples",learningEvidence)''', ''
         .put("no_response_streak",consecutiveNoResponse)
         .put("recent_action_memory",org.json.JSONArray(recentEpisodeActions))''', "episode telemetry")
 
-s = once(s, '''        .put("goal",goal)''', '''        .put("goal",goal)
+s = once(s, '''        .put("live_last_outcome",lastOutcome)
+        .put("strategy",strategy)
+        .put("goal",goal)''', '''        .put("live_last_outcome",lastOutcome)
+        .put("strategy",strategy)
+        .put("goal",goal)
         .put("episode_recoveries",episodeRecoveryCount)
         .put("no_response_streak",consecutiveNoResponse)''', "live HUD telemetry")
 
