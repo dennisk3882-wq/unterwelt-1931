@@ -103,8 +103,7 @@ p.write_text(s, encoding="utf-8")
 p = d / "GameDeckAutoTester.kt"
 s = p.read_text(encoding="utf-8")
 s = once(s, "private const val AI_SINGLE_WINDOW=180000L", "private const val AI_SINGLE_WINDOW=1200000L", "20 minute session")
-s = once(s, "Bis zu 3 Minuten aktiver KI-Einzeltest: GameDeck erkennt Start-, Lade- und Fehlertexte lokal und plant begrenzte Testaktionen zur Spielart. Kein garantiertes Durchspielen. Vorher Spielstände sichern!",
-'''Bis zu 20 Minuten aktiver KI-Einzelspielversuch: GameDeck nutzt szenengesteuerte Eingabesperren, längere Genre-Aktionsfolgen, frische Bildrückmeldungen und Anti-Wiederholungs-Erholung. Rätsel werden erkundend bearbeitet; eine abgeschlossene Runde/ein Level ist nicht garantiert. Vorher Spielstände sichern!''', "session consent text")
+# Keep the existing accurate consent wording; session duration is updated above.
 p.write_text(s, encoding="utf-8")
 
 p = d / "GameDeckRuntime.kt"
