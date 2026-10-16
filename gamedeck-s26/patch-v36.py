@@ -130,3 +130,5 @@ s = once(s, "private const val LOCAL_VERSION = 35", "private const val LOCAL_VER
 p.write_text(s, encoding="utf-8")
 
 print("GameDeck v36 long-running autonomous control loop integrated")
+
+# Trigger the v36 build after workflow integration.
