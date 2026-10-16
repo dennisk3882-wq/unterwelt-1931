@@ -149,7 +149,7 @@ object GameDeckAiLiveOverlay {
 
     private fun updateStatus() {
         val body = status ?: return
-        val agent = runCatching { GameDeckAutoPilot.snapshot() }.getOrNull()
+        val agent = runCatching { GameDeckAutoPilot.liveSnapshot() }.getOrNull()
         val scene = runCatching { GameDeckSceneObserver.snapshot() }.getOrNull()
         val strategy = agent?.optString("strategy", "unbekannt") ?: "unbekannt"
         val goal = agent?.optString("goal", "unbekannt") ?: "unbekannt"
