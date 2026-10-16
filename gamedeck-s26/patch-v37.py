@@ -1,4 +1,5 @@
 # GameDeck v37: let observed per-game action feedback influence genre policies.
+# Build validation also checks that this learned policy compiles in the Android app.
 # Pixel/image response is a weak signal, not proof of objective progress or victory.
 from pathlib import Path
 import sys
