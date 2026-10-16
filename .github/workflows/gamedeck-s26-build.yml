@@ -108,7 +108,11 @@ jobs:
           python3 gamedeck-s26/patch-v32.py gd
           python3 gamedeck-s26/patch-v33.py gd
           python3 gamedeck-s26/patch-v34.py gd
-          grep -q 'GameDeck v34' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          python3 gamedeck-s26/patch-v35.py gd
+          grep -q 'GameDeck v35' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          grep -q 'scene_transition_count' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckSceneObserver.kt
+          grep -q 'scene_stable_age_ms' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckSceneObserver.kt
+          grep -q 'sceneTransitions' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAiLiveOverlay.kt
           grep -q 'capture_interval_ms' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckSceneObserver.kt
           grep -q 'capture_age_ms' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckSceneObserver.kt
           grep -q 'sceneGate' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
@@ -422,6 +426,26 @@ jobs:
             --target "$GITHUB_SHA" \
             --prerelease \
             --notes "Lokale OCR-Szenenproben alle 2,8 Sekunden statt 7,2 Sekunden; Telemetrie zeigt Alter der letzten Aufnahme. Weiterhin experimentell: keine universelle Spiel-Lösung, manuelle Tests erforderlich."
+
+      - name: Publish GameDeck v35 scene transition feedback preview
+        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
+          test -s artifacts/GameDeck-S26.apk
+          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v35.apk
+          sha256sum artifacts/GameDeck-S26-v35.apk > artifacts/GameDeck-S26-v35.sha256
+          gh release create gamedeck-s26-v35 \
+            artifacts/GameDeck-S26-v35.apk \
+            artifacts/GameDeck-S26-v35.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "GameDeck S26 v35 · Scene Transition Feedback" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --notes "Zeigt stabile Szenenwechsel und Verweildauer zusätzlich zur Aktualität der OCR-Aufnahme. Das liefert Feedback für spätere geschlossene Aktionsschleifen, beweist aber weder Missionsfortschritt noch Sieg. Experimentell; auf Zielgerät testen."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
