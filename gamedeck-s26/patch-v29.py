@@ -1,3 +1,4 @@
+# v29 release pipeline fix: ensure workflow rebuilds after release-command correction.
 # GameDeck v29: visible live AI test HUD and explicit agent telemetry.
 from pathlib import Path
 import sys
