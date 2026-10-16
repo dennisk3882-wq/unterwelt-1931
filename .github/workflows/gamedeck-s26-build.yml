@@ -410,8 +410,8 @@ jobs:
             --notes "Stabile lokale OCR-Szenenerkennung pausiert automatische Eingaben bei Laden, Pause, möglichem Abschluss, Game Over und Ladefehlern. Der erkannte Abschluss gilt ausdrücklich nicht als bestätigter Sieg. Nicht universell validiert; manuelle Spieltests erforderlich."
 
 
-      - name: Publish GameDeck v34 faster OCR and scene freshness preview
-        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+      - name: Skip already-published GameDeck v34 release
+        if: false
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -430,8 +430,8 @@ jobs:
             --prerelease \
             --notes "Lokale OCR-Szenenproben alle 2,8 Sekunden statt 7,2 Sekunden; Telemetrie zeigt Alter der letzten Aufnahme. Weiterhin experimentell: keine universelle Spiel-Lösung, manuelle Tests erforderlich."
 
-      - name: Publish GameDeck v35 scene transition feedback preview
-        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+      - name: Skip already-published GameDeck v35 release
+        if: false
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
