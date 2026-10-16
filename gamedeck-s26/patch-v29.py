@@ -17,6 +17,15 @@ s=once(s,"    fun setEnabled(enabled:Boolean) {",
 '''    /** Public read-only state for the in-game live status HUD. */
     fun isRunning():Boolean = running
 
+    /** Structured telemetry for the in-game live HUD; no success is inferred. */
+    fun liveSnapshot():org.json.JSONObject = org.json.JSONObject()
+        .put("live_running",running)
+        .put("live_step_count",stepCount)
+        .put("live_last_action",lastLabel)
+        .put("live_last_outcome",lastOutcome)
+        .put("strategy",strategy)
+        .put("goal",goal)
+
     fun setEnabled(enabled:Boolean) {''',"public running state")
 s=once(s,'.put("controller_source",controlSource)',
 ''' .put("controller_source",controlSource)
