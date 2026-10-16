@@ -56,3 +56,5 @@ s = once(s, '''            "Szene: $sceneName · Sperre: $sceneGate · Bildalter
 p.write_text(s, encoding="utf-8")
 
 print("GameDeck v35 scene-transition and stable-duration telemetry integrated")
+
+# Trigger the v35 workflow after wiring the release and validation steps.
