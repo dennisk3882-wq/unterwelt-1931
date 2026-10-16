@@ -39,3 +39,5 @@ s = once(s, '''            "Szene: $sceneName · Eingabesperre: $sceneGate" +'''
 p.write_text(s, encoding="utf-8")
 
 print("GameDeck v34 faster OCR sampling and freshness telemetry integrated")
+
+# Trigger build after workflow integration for v34.
