@@ -309,13 +309,13 @@ jobs:
           test -s artifacts/GameDeck-S26.apk
           cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v29.apk
           sha256sum artifacts/GameDeck-S26-v29.apk > artifacts/GameDeck-S26-v29.sha256
-          gh release create gamedeck-s26-v29 \\
-            artifacts/GameDeck-S26-v29.apk \\
-            artifacts/GameDeck-S26-v29.sha256 \\
-            --repo "$GITHUB_REPOSITORY" \\
-            --title "GameDeck S26 v29 · Visible AI Test HUD" \\
-            --target "$GITHUB_SHA" \\
-            --prerelease \\
+          gh release create gamedeck-s26-v29 \
+            artifacts/GameDeck-S26-v29.apk \
+            artifacts/GameDeck-S26-v29.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "GameDeck S26 v29 · Visible AI Test HUD" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
             --notes "Live-Overlay während des aktiven KI-Tests: Strategie, Ziel, Aktionszähler, letzte Aktion, Bildreaktion und OCR-Szene. Anzeige wird beim Beenden der Emulation entfernt. Noch kein universell trainiertes Gameplay-Modell; echtes Zielgerät-Testing erforderlich."
 
       - name: Upload APK
