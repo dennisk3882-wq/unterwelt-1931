@@ -107,7 +107,10 @@ jobs:
           python3 gamedeck-s26/patch-v31.py gd
           python3 gamedeck-s26/patch-v32.py gd
           python3 gamedeck-s26/patch-v33.py gd
-          grep -q 'GameDeck v33' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          python3 gamedeck-s26/patch-v34.py gd
+          grep -q 'GameDeck v34' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          grep -q 'capture_interval_ms' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckSceneObserver.kt
+          grep -q 'capture_age_ms' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckSceneObserver.kt
           grep -q 'sceneGate' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'scene_gate' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAiLiveOverlay.kt
           grep -q 'chooseWithEpisodeMemory' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
@@ -379,8 +382,8 @@ jobs:
             --notes "Pro Spiel persistierte Aktionshistorie und begrenzte Anti-Loop-Erholung nach wiederholter fehlender Bildreaktion. Korrigierte virtuelle Eden-Eingaberoute für Player 1 bzw. Handheld-Port. Bildreaktion beweist weder Fortschritt noch Sieg. Kein universeller Game-Solver; Co-op-Coach steuert noch keinen zweiten Spieler."
 
 
-      - name: Publish GameDeck v33 OCR scene-aware AI preview
-        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+      - name: Skip superseded GameDeck v33 preview release
+        if: false
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -398,6 +401,27 @@ jobs:
             --target "$GITHUB_SHA" \
             --prerelease \
             --notes "Stabile lokale OCR-Szenenerkennung pausiert automatische Eingaben bei Laden, Pause, möglichem Abschluss, Game Over und Ladefehlern. Der erkannte Abschluss gilt ausdrücklich nicht als bestätigter Sieg. Nicht universell validiert; manuelle Spieltests erforderlich."
+
+
+      - name: Publish GameDeck v34 faster OCR and scene freshness preview
+        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
+          test -s artifacts/GameDeck-S26.apk
+          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v34.apk
+          sha256sum artifacts/GameDeck-S26-v34.apk > artifacts/GameDeck-S26-v34.sha256
+          gh release create gamedeck-s26-v34 \
+            artifacts/GameDeck-S26-v34.apk \
+            artifacts/GameDeck-S26-v34.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "GameDeck S26 v34 · Faster OCR Scene Feedback" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --notes "Lokale OCR-Szenenproben alle 2,8 Sekunden statt 7,2 Sekunden; Telemetrie zeigt Alter der letzten Aufnahme. Weiterhin experimentell: keine universelle Spiel-Lösung, manuelle Tests erforderlich."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
