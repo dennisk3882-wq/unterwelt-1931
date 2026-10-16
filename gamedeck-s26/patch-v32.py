@@ -55,7 +55,7 @@ s = once(s, '''            if(reacted) {
             rememberEpisodeAction(lastActionKey)
             learn(lastActionKey,reacted)''', "feedback memory")
 
-s = once(s, '''        val choice=decide(frame)''', '''        val baseChoice=decide(frame)
+s = once(s, '''        val choice=decide(frame)''', '''        val baseChoice=decide(frame) ?: return
         val choice=chooseWithEpisodeMemory(baseChoice)''', "memory-guided choice")
 
 s = once(s, '''    private fun issue(choice:Choice) {''', '''    /**
