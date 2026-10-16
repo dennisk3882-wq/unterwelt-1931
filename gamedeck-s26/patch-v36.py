@@ -89,13 +89,15 @@ s = once(s, "},if(choice.button!=0) BUTTON_HOLD_MS else AXIS_HOLD_MS)",
                 else -> AXIS_HOLD_MS
             })''', "genre input duration")
 
-s = once(s, '''        .put("episode_recoveries",episodeRecoveryCount)
-        .put("no_response_streak",consecutiveNoResponse)''',
-'''        .put("episode_recoveries",episodeRecoveryCount)
+telemetry_anchor = '''        .put("episode_recoveries",episodeRecoveryCount)
+        .put("no_response_streak",consecutiveNoResponse)'''
+if telemetry_anchor not in s:
+    raise RuntimeError("Telemetry insertion anchor not found")
+s = s.replace(telemetry_anchor, '''        .put("episode_recoveries",episodeRecoveryCount)
         .put("no_response_streak",consecutiveNoResponse)
         .put("autonomous_session_action_budget",MAX_ACTIONS)
         .put("autonomous_control_loop","observe_gate_plan_issue_release_repeat")
-        .put("objective_progress_verified",false)''', "autonomy telemetry")
+        .put("objective_progress_verified",false)''', 1)
 p.write_text(s, encoding="utf-8")
 
 p = d / "GameDeckAutoTester.kt"
