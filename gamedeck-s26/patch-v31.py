@@ -1,3 +1,4 @@
+# v31 build marker: ensure the workflow uses the v31 integration and release step.
 # GameDeck v31: interactive local co-op objective and tailored coaching hints.
 from pathlib import Path
 import sys
