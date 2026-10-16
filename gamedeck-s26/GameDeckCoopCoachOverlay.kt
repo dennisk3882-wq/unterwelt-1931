@@ -2,6 +2,7 @@
 package org.yuzu.yuzu_emu.gamedeck
 
 import android.app.Activity
+import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -15,6 +16,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.lang.ref.WeakReference
+import java.util.Locale
 
 /**
  * On-device cooperative coach preview. It observes OCR and offers cautious
@@ -28,6 +30,8 @@ object GameDeckCoopCoachOverlay {
     private var card: LinearLayout? = null
     private var chip: TextView? = null
     private var status: TextView? = null
+    private var goalInput: EditText? = null
+    private var savedGoal = ""
     private var minimized = false
     private var attached = false
 
@@ -54,6 +58,8 @@ object GameDeckCoopCoachOverlay {
         activity = WeakReference(screen)
         attached = true
         minimized = false
+        savedGoal = screen.getSharedPreferences("gamedeck_coop_coach", Context.MODE_PRIVATE)
+            .getString("current_goal", "").orEmpty()
         GameDeckSceneObserver.attach(screen)
         handler.post(poll)
     }
@@ -66,6 +72,7 @@ object GameDeckCoopCoachOverlay {
         card = null
         chip = null
         status = null
+        goalInput = null
         activity.clear()
         attached = false
         minimized = false
@@ -109,6 +116,49 @@ object GameDeckCoopCoachOverlay {
         }
         header.addView(hide, LinearLayout.LayoutParams(dp(screen, 38), dp(screen, 32)))
         panel.addView(header)
+
+        val goalLabel = TextView(screen).apply {
+            text = "Dein aktuelles Ziel (bleibt lokal gespeichert)"
+            setTextColor(0xFFCAD7E4.toInt())
+            textSize = 10f
+            setPadding(0, dp(screen, 5), 0, dp(screen, 3))
+        }
+        panel.addView(goalLabel)
+        val inputRow = LinearLayout(screen).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val input = EditText(screen).apply {
+            setSingleLine(true)
+            textSize = 11f
+            hint = "z. B. Boss besiegen / Rätsel lösen"
+            setText(savedGoal)
+            setTextColor(Color.WHITE)
+            setHintTextColor(0xFF9EADBC.toInt())
+            setPadding(dp(screen, 7), dp(screen, 4), dp(screen, 7), dp(screen, 4))
+            background = GradientDrawable().apply {
+                setColor(0xFF303B47.toInt())
+                cornerRadius = dp(screen, 7).toFloat()
+            }
+        }
+        goalInput = input
+        inputRow.addView(input, LinearLayout.LayoutParams(0, dp(screen, 38), 1f))
+        val save = Button(screen).apply {
+            text = "Setzen"
+            textSize = 10f
+            minWidth = dp(screen, 58)
+            minimumWidth = dp(screen, 58)
+            setPadding(dp(screen, 3), 0, dp(screen, 3), 0)
+            setOnClickListener {
+                savedGoal = input.text?.toString()?.trim().orEmpty().take(140)
+                screen.getSharedPreferences("gamedeck_coop_coach", Context.MODE_PRIVATE).edit()
+                    .putString("current_goal", savedGoal).apply()
+                input.setText(savedGoal)
+                update()
+            }
+        }
+        inputRow.addView(save, LinearLayout.LayoutParams(dp(screen, 66), dp(screen, 38)))
+        panel.addView(inputRow)
         val body = TextView(screen).apply {
             setTextColor(Color.WHITE)
             textSize = 11f
@@ -156,6 +206,24 @@ object GameDeckCoopCoachOverlay {
         status = body
     }
 
+    private fun goalHint(goal: String): String {
+        val g = goal.lowercase(Locale.ROOT)
+        return when {
+            g.contains("boss") || g.contains("gegner") || g.contains("endgegner") ->
+                "Boss-Ziel: beobachte erst ein Angriffsmuster, weiche aus und nutze kurze sichere Zeitfenster. Exakte Angriffstiming-Erkennung ist nicht verfügbar."
+            g.contains("rätsel") || g.contains("puzzle") || g.contains("schalter") ->
+                "Rätsel-Ziel: ändere nur ein Element pro Versuch und prüfe danach die sichtbare Reaktion."
+            g.contains("springen") || g.contains("plattform") || g.contains("level") ->
+                "Level-Ziel: prüfe Kanten und Lücken, arbeite Abschnitt für Abschnitt und ändere nicht mehrere Bewegungen gleichzeitig."
+            g.contains("rennen") || g.contains("kart") || g.contains("strecke") ->
+                "Renn-Ziel: priorisiere kontrolliertes Lenken vor maximalem Tempo und prüfe, ob die letzte Eingabe geholfen hat."
+            g.contains("finden") || g.contains("schlüssel") || g.contains("tür") || g.contains("weg") ->
+                "Such-Ziel: prüfe Abzweigungen, interaktive Objekte und Hinweise im Bild. Merke dir bereits untersuchte Wege."
+            g.isNotBlank() -> "Arbeitsziel: $goal. Beschreibe das Hindernis möglichst konkret; teste eine kleine Änderung und prüfe danach die Reaktion."
+            else -> "Trage oben dein aktuelles Ziel ein. Der Coach verbindet es mit erkannten Bildschirmtexten; er versteht noch nicht zuverlässig jedes Spielelement."
+        }
+    }
+
     private fun update() {
         val body = status ?: return
         val snapshot = runCatching { GameDeckSceneObserver.snapshot() }.getOrNull()
@@ -173,7 +241,10 @@ object GameDeckCoopCoachOverlay {
             "UNCLASSIFIED_TEXT" -> "Text erkannt, aber keine sichere Szene. Nutze den Text als Hinweis, nicht als Gewissheit."
             else -> "Noch keine sichere Szene erkannt. Coach beobachtet lokal; beschreibe Ziel oder Hindernis für gezielte Hilfe."
         }
-        body.text = "Szene: $scene  ·  OCR-Proben: $captures\nTipp: $hint" +
+        body.text = "Ziel: " + if (savedGoal.isBlank()) "noch nicht gesetzt" else savedGoal +
+            "\nSzene: $scene · OCR-Proben: $captures\n" +
+            "Zielhinweis: " + goalHint(savedGoal) + "\n" +
+            "Szenenhinweis: $hint" +
             if (excerpt.isNotBlank()) "\nErkannter Text: $excerpt" else ""
     }
 
