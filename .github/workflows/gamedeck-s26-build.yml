@@ -361,8 +361,8 @@ jobs:
             --prerelease \
             --notes "Co-op-Coach mit lokal gespeicherter Zielbeschreibung und vorsichtigen zielbezogenen Hinweisen für Bosskämpfe, Rätsel, Plattformlevel, Rennen und Suche. Die Hinweise kombinieren die Nutzereingabe mit lokaler OCR. Keine Eingaben durch den Coach; noch kein autonomer zweiter Spieler oder universeller Game-Solver."
 
-      - name: Publish GameDeck v32 episode-memory AI preview
-        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+      - name: Skip already-published GameDeck v32 preview release
+        if: false
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
