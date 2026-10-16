@@ -1,3 +1,4 @@
+# v32 episode-memory and anti-loop recovery patch; release workflow skips already-published v31.
 # GameDeck v32: persistent episode memory and bounded anti-loop recovery.
 # This remains feedback from visual change, not proof of task success.
 from pathlib import Path
