@@ -106,7 +106,10 @@ jobs:
           python3 gamedeck-s26/patch-v30.py gd
           python3 gamedeck-s26/patch-v31.py gd
           python3 gamedeck-s26/patch-v32.py gd
-          grep -q 'GameDeck v32' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          python3 gamedeck-s26/patch-v33.py gd
+          grep -q 'GameDeck v33' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          grep -q 'sceneGate' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
+          grep -q 'scene_gate' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAiLiveOverlay.kt
           grep -q 'chooseWithEpisodeMemory' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'episode_recoveries' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'recent_action_memory' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
@@ -374,6 +377,27 @@ jobs:
             --target "$GITHUB_SHA" \
             --prerelease \
             --notes "Pro Spiel persistierte Aktionshistorie und begrenzte Anti-Loop-Erholung nach wiederholter fehlender Bildreaktion. Korrigierte virtuelle Eden-Eingaberoute für Player 1 bzw. Handheld-Port. Bildreaktion beweist weder Fortschritt noch Sieg. Kein universeller Game-Solver; Co-op-Coach steuert noch keinen zweiten Spieler."
+
+
+      - name: Publish GameDeck v33 OCR scene-aware AI preview
+        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
+          test -s artifacts/GameDeck-S26.apk
+          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v33.apk
+          sha256sum artifacts/GameDeck-S26-v33.apk > artifacts/GameDeck-S26-v33.sha256
+          gh release create gamedeck-s26-v33 \
+            artifacts/GameDeck-S26-v33.apk \
+            artifacts/GameDeck-S26-v33.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "GameDeck S26 v33 · OCR Scene-aware Input Gate" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --notes "Stabile lokale OCR-Szenenerkennung pausiert automatische Eingaben bei Laden, Pause, möglichem Abschluss, Game Over und Ladefehlern. Der erkannte Abschluss gilt ausdrücklich nicht als bestätigter Sieg. Nicht universell validiert; manuelle Spieltests erforderlich."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
