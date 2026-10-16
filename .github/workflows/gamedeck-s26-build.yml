@@ -110,7 +110,10 @@ jobs:
           python3 gamedeck-s26/patch-v34.py gd
           python3 gamedeck-s26/patch-v35.py gd
           python3 gamedeck-s26/patch-v36.py gd
-          grep -q 'GameDeck v36' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          python3 gamedeck-s26/patch-v37.py gd
+          grep -q 'GameDeck v37' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          grep -q 'adaptive_policy_used' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
+          grep -q 'adaptiveBestActionScore' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'autonomous_session_action_budget' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q '1200000L' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
           grep -q 'scene_transition_count' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckSceneObserver.kt
@@ -450,8 +453,8 @@ jobs:
             --prerelease \
             --notes "Zeigt stabile Szenenwechsel und Verweildauer zusätzlich zur Aktualität der OCR-Aufnahme. Das liefert Feedback für spätere geschlossene Aktionsschleifen, beweist aber weder Missionsfortschritt noch Sieg. Experimentell; auf Zielgerät testen."
 
-      - name: Publish GameDeck v36 autonomous gameplay preview
-        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+      - name: Skip already-published GameDeck v36 autonomous gameplay preview
+        if: false
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -469,6 +472,26 @@ jobs:
             --target "$GITHUB_SHA" \
             --prerelease \
             --notes "Erweitertes autonomes Eingabe-Beobachtungs-Freigabe-Verfahren bis zu 20 Minuten, längere genrespezifische Aktionsfolgen für Rennspiele und Plattformspiele, erkundende Puzzle-Steuerung und vorhandene OCR-Szenensperren/Anti-Loop-Erholung. Kein universell trainierter Solver; Runde oder Levelabschluss nicht garantiert. Vor Einsatz Spielstände sichern und auf dem Zielgerät validieren."
+
+      - name: Publish GameDeck v37 adaptive action-feedback preview
+        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
+          test -s artifacts/GameDeck-S26.apk
+          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v37.apk
+          sha256sum artifacts/GameDeck-S26-v37.apk > artifacts/GameDeck-S26-v37.sha256
+          gh release create gamedeck-s26-v37 \
+            artifacts/GameDeck-S26-v37.apk \
+            artifacts/GameDeck-S26-v37.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "GameDeck S26 v37 · Adaptive Action Feedback Preview" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --notes "Neu: pro Spiel gespeicherte Bildreaktionen können nach ausreichender Rückmeldung die festen Genre-Aktionsfolgen übersteuern. Bewertet wird nur sichtbare Bildreaktion, nicht Missionsfortschritt oder Sieg. Weiterhin heuristisch, nicht universell; reale Spieltests auf dem Zielgerät erforderlich. Vor Einsatz Spielstände sichern."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
