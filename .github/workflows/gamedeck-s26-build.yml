@@ -110,6 +110,9 @@ jobs:
           grep -q 'chooseWithEpisodeMemory' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'episode_recoveries' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'recent_action_memory' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
+          grep -q 'NativeInput.ConsoleDevice' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
+          grep -q 'OVERLAY_PORT=NativeInput.Player1Device' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
+          ! grep -q 'OVERLAY_PORT=100' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'goalHint(savedGoal)' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
           grep -q 'current_goal' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
@@ -370,7 +373,7 @@ jobs:
             --title "GameDeck S26 v32 · Episode Memory and Anti-loop Recovery" \
             --target "$GITHUB_SHA" \
             --prerelease \
-            --notes "Pro Spiel persistierte Aktionshistorie und begrenzte Anti-Loop-Erholung nach wiederholter fehlender Bildreaktion. Die Reaktion basiert auf visueller Veränderung und beweist weder Fortschritt noch Sieg. Kein universeller Game-Solver; Co-op-Coach steuert keinen zweiten Spieler."
+            --notes "Pro Spiel persistierte Aktionshistorie und begrenzte Anti-Loop-Erholung nach wiederholter fehlender Bildreaktion. Korrigierte virtuelle Eden-Eingaberoute für Player 1 bzw. Handheld-Port. Bildreaktion beweist weder Fortschritt noch Sieg. Kein universeller Game-Solver; Co-op-Coach steuert noch keinen zweiten Spieler."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
