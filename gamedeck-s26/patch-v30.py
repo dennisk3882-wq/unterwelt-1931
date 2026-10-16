@@ -1,4 +1,5 @@
 # GameDeck v30: co-op coach preview and version integration.
+# Build trigger after wiring the v30 workflow release and validation steps.
 from pathlib import Path
 import sys
 
