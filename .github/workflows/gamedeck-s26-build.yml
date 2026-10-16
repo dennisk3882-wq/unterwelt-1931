@@ -104,7 +104,10 @@ jobs:
           python3 gamedeck-s26/patch-v28.py gd
           python3 gamedeck-s26/patch-v29.py gd
           python3 gamedeck-s26/patch-v30.py gd
-          grep -q 'GameDeck v30' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          python3 gamedeck-s26/patch-v31.py gd
+          grep -q 'GameDeck v31' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          grep -q 'goalHint(savedGoal)' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
+          grep -q 'current_goal' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
           grep -q 'GameDeckSceneObserver.captureIfDue' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAiLiveOverlay.kt
@@ -304,8 +307,8 @@ jobs:
             --notes "Lokale OCR von Spielszenen (Startmenü, Game Over, Laden, Fehler, möglicher Levelabschluss) und begrenzte kontextabhängige Controllersteuerung. Maximal 3 Minuten je KI-Einzeltest. Nicht in allen Spielen validiert; kein universelles trainiertes Gameplay-Modell. Vor aktivem Test Spielstände sichern."
 
 
-      - name: Publish GameDeck v30 co-op coach preview
-        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+      - name: Publish GameDeck v30 co-op coach preview (already published)
+        if: false
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -323,6 +326,27 @@ jobs:
             --target "$GITHUB_SHA" \
             --prerelease \
             --notes "Neuer lokaler Co-op-Coach im Emulationsfenster: on-device OCR-Szenenerkennung und vorsichtige situative Hinweise. Der Coach sendet keine Eingaben und behauptet keine Levelabschlüsse. Ein echter zweiter KI-Spieler ist noch nicht enthalten; Zweitcontroller-Routing und spielbezogene Validierung sind weitere Entwicklungsschritte."
+
+
+      - name: Publish GameDeck v31 objective-aware co-op coach preview
+        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
+          test -s artifacts/GameDeck-S26.apk
+          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v31.apk
+          sha256sum artifacts/GameDeck-S26-v31.apk > artifacts/GameDeck-S26-v31.sha256
+          gh release create gamedeck-s26-v31 \
+            artifacts/GameDeck-S26-v31.apk \
+            artifacts/GameDeck-S26-v31.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "GameDeck S26 v31 · Objective-aware Co-op Coach" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --notes "Co-op-Coach mit lokal gespeicherter Zielbeschreibung und vorsichtigen zielbezogenen Hinweisen für Bosskämpfe, Rätsel, Plattformlevel, Rennen und Suche. Die Hinweise kombinieren die Nutzereingabe mit lokaler OCR. Keine Eingaben durch den Coach; noch kein autonomer zweiter Spieler oder universeller Game-Solver."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
