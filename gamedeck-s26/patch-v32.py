@@ -14,6 +14,14 @@ def once(text, old, new, label):
 p = d / "GameDeckAutoPilot.kt"
 s = p.read_text(encoding="utf-8")
 
+s = once(s, '''    private const val OVERLAY_PORT=100''', '''    private const val OVERLAY_PORT=NativeInput.Player1Device''', "valid virtual controller port")
+s = once(s, '''            controlGuid=OVERLAY_GUID
+            controlPort=OVERLAY_PORT
+            controlSource="Registriertes virtuelles Eden-Touch-Overlay, Port 100"''', '''            controlGuid=OVERLAY_GUID
+            controlPort=if(runCatching { NativeInput.isHandheldOnly() }.getOrDefault(false))
+                NativeInput.ConsoleDevice else OVERLAY_PORT
+            controlSource="Eden-Overlay: Handheld/Player-1-Index; tatsächliche Spielreaktion separat prüfen"''', "handheld/player-one routing")
+
 s = once(s, '''    private var lastActionKey=""''', '''    private var lastActionKey=""
     // Per-game episode memory: recent actions and no-response recovery.
     private val recentEpisodeActions=mutableListOf<String>()
