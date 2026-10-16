@@ -335,8 +335,8 @@ jobs:
             --notes "Neuer lokaler Co-op-Coach im Emulationsfenster: on-device OCR-Szenenerkennung und vorsichtige situative Hinweise. Der Coach sendet keine Eingaben und behauptet keine Levelabschlüsse. Ein echter zweiter KI-Spieler ist noch nicht enthalten; Zweitcontroller-Routing und spielbezogene Validierung sind weitere Entwicklungsschritte."
 
 
-      - name: Publish GameDeck v31 objective-aware co-op coach preview
-        if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
+      - name: Publish GameDeck v31 objective-aware co-op coach preview (already published)
+        if: false
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
