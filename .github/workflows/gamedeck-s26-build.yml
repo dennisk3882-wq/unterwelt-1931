@@ -111,7 +111,8 @@ jobs:
           python3 gamedeck-s26/patch-v35.py gd
           python3 gamedeck-s26/patch-v36.py gd
           python3 gamedeck-s26/patch-v37.py gd
-          grep -q 'GameDeck v37' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          python3 gamedeck-s26/patch-v38.py gd
+          grep -q 'GameDeck v38' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
           grep -q 'adaptive_policy_used' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'adaptiveBestActionScore' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'autonomous_session_action_budget' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
@@ -473,7 +474,16 @@ jobs:
             --prerelease \
             --notes "Erweitertes autonomes Eingabe-Beobachtungs-Freigabe-Verfahren bis zu 20 Minuten, längere genrespezifische Aktionsfolgen für Rennspiele und Plattformspiele, erkundende Puzzle-Steuerung und vorhandene OCR-Szenensperren/Anti-Loop-Erholung. Kein universell trainierter Solver; Runde oder Levelabschluss nicht garantiert. Vor Einsatz Spielstände sichern und auf dem Zielgerät validieren."
 
-      - name: Publish GameDeck v37 adaptive action-feedback preview
+      - name: Skip already-published GameDeck v37 preview release
+        if: false
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "v37 is already published; this build publishes v38."
+
+      - name: Publish GameDeck v38 stability and update-check fix
         if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
         shell: bash
         env:
@@ -482,16 +492,16 @@ jobs:
           set -euo pipefail
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
           test -s artifacts/GameDeck-S26.apk
-          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v37.apk
-          sha256sum artifacts/GameDeck-S26-v37.apk > artifacts/GameDeck-S26-v37.sha256
-          gh release create gamedeck-s26-v37 \
-            artifacts/GameDeck-S26-v37.apk \
-            artifacts/GameDeck-S26-v37.sha256 \
+          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v38.apk
+          sha256sum artifacts/GameDeck-S26-v38.apk > artifacts/GameDeck-S26-v38.sha256
+          gh release create gamedeck-s26-v38 \
+            artifacts/GameDeck-S26-v38.apk \
+            artifacts/GameDeck-S26-v38.sha256 \
             --repo "$GITHUB_REPOSITORY" \
-            --title "GameDeck S26 v37 · Adaptive Action Feedback Preview" \
+            --title "GameDeck S26 v38 · Update-check reliability fix" \
             --target "$GITHUB_SHA" \
             --prerelease \
-            --notes "Neu: pro Spiel gespeicherte Bildreaktionen können nach ausreichender Rückmeldung die festen Genre-Aktionsfolgen übersteuern. Bewertet wird nur sichtbare Bildreaktion, nicht Missionsfortschritt oder Sieg. Weiterhin heuristisch, nicht universell; reale Spieltests auf dem Zielgerät erforderlich. Vor Einsatz Spielstände sichern."
+            --notes "Wartungsrelease ohne neue KI-Spielstrategien: korrigiert die Update-Erkennung für veröffentlichte GameDeck-Vorschau-Releases, die als Pre-Release markiert sind. Download und Installation bleiben nutzergesteuert; auf dem Zielgerät zu prüfen."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
