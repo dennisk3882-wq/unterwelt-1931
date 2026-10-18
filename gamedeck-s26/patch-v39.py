@@ -72,14 +72,18 @@ p.write_text(s,encoding="utf-8")
 
 runtime=d/"GameDeckRuntime.kt"
 r=runtime.read_text(encoding="utf-8")
-if 'const val BUILD = "GameDeck v38"' not in r:
-    raise RuntimeError("v39 expected GameDeck v38 runtime baseline")
-runtime.write_text(r.replace('const val BUILD = "GameDeck v38"','const val BUILD = "GameDeck v39"',1),encoding="utf-8")
+if 'const val BUILD = "GameDeck v38"' in r:
+    r=r.replace('const val BUILD = "GameDeck v38"','const val BUILD = "GameDeck v39"',1)
+elif 'const val BUILD = "GameDeck v39"' not in r:
+    raise RuntimeError("v39 expected v38/v39 runtime baseline")
+runtime.write_text(r,encoding="utf-8")
 updater=d/"GameDeckUpdateChecker.kt"
 u=updater.read_text(encoding="utf-8")
-if "private const val LOCAL_VERSION = 38" not in u:
-    raise RuntimeError("v39 expected v38 updater baseline")
-updater.write_text(u.replace("private const val LOCAL_VERSION = 38","private const val LOCAL_VERSION = 39",1),encoding="utf-8")
+if "private const val LOCAL_VERSION = 38" in u:
+    u=u.replace("private const val LOCAL_VERSION = 38","private const val LOCAL_VERSION = 39",1)
+elif "private const val LOCAL_VERSION = 39" not in u:
+    raise RuntimeError("v39 expected v38/v39 updater baseline")
+updater.write_text(u,encoding="utf-8")
 
 # Explicitly remove the live overlays and autonomous controller from Eden's
 # emulation lifecycle. Keep the diagnostic start/FPS tester separate.
