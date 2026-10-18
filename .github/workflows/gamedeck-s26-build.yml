@@ -477,7 +477,7 @@ jobs:
           set -euo pipefail
           echo "v37 is already published; this build publishes v38."
 
-      - name: Publish GameDeck v38 stability and update-check fix
+      - name: Publish GameDeck v39 cleanup release
         if: github.ref == 'refs/heads/gamedeck-s26-v29-build'
         shell: bash
         env:
@@ -486,16 +486,16 @@ jobs:
           set -euo pipefail
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify artifacts/GameDeck-S26.apk
           test -s artifacts/GameDeck-S26.apk
-          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v38.apk
-          sha256sum artifacts/GameDeck-S26-v38.apk > artifacts/GameDeck-S26-v38.sha256
-          gh release create gamedeck-s26-v38 \
-            artifacts/GameDeck-S26-v38.apk \
-            artifacts/GameDeck-S26-v38.sha256 \
+          cp artifacts/GameDeck-S26.apk artifacts/GameDeck-S26-v39.apk
+          sha256sum artifacts/GameDeck-S26-v39.apk > artifacts/GameDeck-S26-v39.sha256
+          gh release create gamedeck-s26-v39 \
+            artifacts/GameDeck-S26-v39.apk \
+            artifacts/GameDeck-S26-v39.sha256 \
             --repo "$GITHUB_REPOSITORY" \
-            --title "GameDeck S26 v38 · Update-check reliability fix" \
+            --title "GameDeck S26 v39 · AI/Co-op cleanup" \
             --target "$GITHUB_SHA" \
             --prerelease \
-            --notes "Wartungsrelease ohne neue KI-Spielstrategien: korrigiert die Update-Erkennung für veröffentlichte GameDeck-Vorschau-Releases, die als Pre-Release markiert sind. Download und Installation bleiben nutzergesteuert; auf dem Zielgerät zu prüfen."
+            --notes "Entfernt sichtbare autonome Spiel-/Koop-Einstiege und trennt deren Live-Overlays vom Emulations-Lifecycle. Updater-Version angehoben; v38-Prerelease-Erkennung bleibt erhalten. Ordner-Deduplizierung und Zielgeräteprüfung sind separat zu validieren."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
