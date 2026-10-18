@@ -112,7 +112,9 @@ jobs:
           python3 gamedeck-s26/patch-v36.py gd
           python3 gamedeck-s26/patch-v37.py gd
           python3 gamedeck-s26/patch-v38.py gd
-          grep -q 'GameDeck v38' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          python3 gamedeck-s26/patch-v39.py gd
+          grep -q 'GameDeck v39' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckRuntime.kt
+          ! grep -Eqi 'KI aktiv spielen lassen|Autonomes Spielen|Koop-Coach|Koop-Modus|Co-op-Coach' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           grep -q 'adaptive_policy_used' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'adaptiveBestActionScore' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'autonomous_session_action_budget' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
@@ -130,10 +132,6 @@ jobs:
           grep -q 'NativeInput.ConsoleDevice' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'OVERLAY_PORT=NativeInput.Player1Device' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           ! grep -q 'OVERLAY_PORT=100' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
-          grep -q 'goalHint(savedGoal)' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
-          grep -q 'current_goal' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
-          test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
-          grep -q 'GameDeckSceneObserver.captureIfDue' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckCoopCoachOverlay.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAiLiveOverlay.kt
           grep -q 'live_step_count' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'GameDeckSceneObserver' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckVisualProbe.kt
@@ -146,7 +144,6 @@ jobs:
           grep -q 'GameDeckProfileEngine.apply(activity,game,mode).getOrThrow()' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
           grep -q 'GameDeckAutoPilot.configure' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
           test -s gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckHardwareAudit.kt
-          grep -q 'KI aktiv spielen lassen' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckActivity.kt
           grep -q 'NativeInput.onGamePadButtonEvent' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoPilot.kt
           grep -q 'recoverInterruptedRun' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckAutoTester.kt
           grep -q 'visual_classification' gd/overlay/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckSmartAnalyzer.kt
@@ -218,10 +215,6 @@ jobs:
           grep -q 'GameDeckAutoTester.onNativeStarted(this)' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
           grep -q 'GameDeckAutoTester.onNativeStarted' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
           grep -q 'GameDeckAutoTester.onNativeStopped' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
-          grep -q 'GameDeckAiLiveOverlay.attach(this)' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
-          grep -q 'GameDeckAiLiveOverlay.detach()' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
-          grep -q 'GameDeckCoopCoachOverlay.attach(this)' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
-          grep -q 'GameDeckCoopCoachOverlay.detach()' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
           grep -q 'de.gamedeck.s26' eden/src/android/app/build.gradle.kts
           grep -q 'GameDeckActivity' eden/src/android/app/src/main/AndroidManifest.xml
           test -s eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/gamedeck/GameDeckTvPresentation.kt
