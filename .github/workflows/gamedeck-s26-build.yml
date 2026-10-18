@@ -211,6 +211,7 @@ jobs:
           python3 gamedeck-s26/patch-v28-eden.py eden
           python3 gamedeck-s26/patch-v29-eden.py eden
           python3 gamedeck-s26/patch-v30-eden.py eden
+          python3 gamedeck-s26/patch-v39.py gd
           grep -q 'com.google.mlkit:text-recognition' eden/src/android/app/build.gradle.kts
           grep -q 'GameDeckAutoTester.onNativeStarted(this)' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
           grep -q 'GameDeckAutoTester.onNativeStarted' eden/src/android/app/src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt
