@@ -95,3 +95,5 @@ if eden.exists():
     eden.write_text(e,encoding="utf-8")
 
 print("GameDeck v39: removed visible autonomous-play/coop entry points and detached their overlays; v38 updater behavior retained.")
+
+# v39 workflow also reruns this idempotently after Eden integration to detach overlays.
