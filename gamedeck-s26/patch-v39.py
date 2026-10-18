@@ -97,3 +97,4 @@ if eden.exists():
 print("GameDeck v39: removed visible autonomous-play/coop entry points and detached their overlays; v38 updater behavior retained.")
 
 # v39 workflow also reruns this idempotently after Eden integration to detach overlays.
+# Release workflow correction: publish the v39 APK under a fresh v39 release tag.
